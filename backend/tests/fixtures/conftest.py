@@ -44,26 +44,33 @@ def sample_ifc_bytes() -> bytes:
     )
 
     site = ifcopenshell.api.run("root.create_entity", model, ifc_class="IfcSite", name="TestSite")
-    ifcopenshell.api.run("aggregate.assign_object", model, relating_object=project, product=site)
+    ifcopenshell.api.run(
+        "aggregate.assign_object", model, relating_object=project, products=[site],
+    )
 
     building = ifcopenshell.api.run(
         "root.create_entity", model, ifc_class="IfcBuilding", name="TestBldg",
     )
-    ifcopenshell.api.run("aggregate.assign_object", model, relating_object=site, product=building)
+    ifcopenshell.api.run(
+        "aggregate.assign_object", model, relating_object=site, products=[building],
+    )
 
     # Un étage
     storey = ifcopenshell.api.run(
         "root.create_entity", model, ifc_class="IfcBuildingStorey", name="RDC",
     )
-    ifcopenshell.api.run("aggregate.assign_object", model, relating_object=building, product=storey)
+    ifcopenshell.api.run(
+        "aggregate.assign_object", model, relating_object=building, products=[storey],
+    )
 
     # 3 espaces de 100 m² chacun, H=3m, V=300 m³
     for idx in range(1, 4):
         space = ifcopenshell.api.run(
             "root.create_entity", model, ifc_class="IfcSpace", name=f"Space_{idx}",
         )
-        ifcopenshell.api.run("spatial.assign_container", model,
-                             relating_structure=storey, product=space)
+        ifcopenshell.api.run(
+            "aggregate.assign_object", model, relating_object=storey, products=[space],
+        )
         pset = ifcopenshell.api.run(
             "pset.add_pset", model, product=space, name="Qto_SpaceBaseQuantities",
         )
@@ -83,7 +90,7 @@ def sample_ifc_bytes() -> bytes:
             "root.create_entity", model, ifc_class="IfcWall", name=name,
         )
         ifcopenshell.api.run("spatial.assign_container", model,
-                             relating_structure=storey, product=wall)
+                             relating_structure=storey, products=[wall])
         pset = ifcopenshell.api.run("pset.add_pset", model,
                                     product=wall, name="Pset_WallCommon")
         ifcopenshell.api.run("pset.edit_pset", model, pset=pset, properties={
@@ -106,7 +113,7 @@ def sample_ifc_bytes() -> bytes:
             "root.create_entity", model, ifc_class=ifc_class, name=roof_name,
         )
         ifcopenshell.api.run("spatial.assign_container", model,
-                             relating_structure=storey, product=elem)
+                             relating_structure=storey, products=[elem])
         pset = ifcopenshell.api.run("pset.add_pset", model, product=elem, name=pset_name)
         ifcopenshell.api.run("pset.edit_pset", model, pset=pset, properties={
             "IsExternal": True,
@@ -124,7 +131,7 @@ def sample_ifc_bytes() -> bytes:
         "root.create_entity", model, ifc_class="IfcWindow", name="FenetreSud",
     )
     ifcopenshell.api.run("spatial.assign_container", model,
-                         relating_structure=storey, product=window)
+                         relating_structure=storey, products=[window])
     pset_w = ifcopenshell.api.run("pset.add_pset", model,
                                   product=window, name="Pset_WindowCommon")
     ifcopenshell.api.run("pset.edit_pset", model, pset=pset_w, properties={

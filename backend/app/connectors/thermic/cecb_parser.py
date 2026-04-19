@@ -214,7 +214,7 @@ class CecbParser(ThermicConnector):
             return None
         lower = raw.lower()
         if "habit" in lower or "logement" in lower:
-            return "logement_collectif" if "collectif" in lower or "multi" in lower \
+            return "logement_collectif" if "collectif" in lower or "collective" in lower or "multi" in lower \
                 else "logement_individuel"
         if "admin" in lower or "bureau" in lower or "office" in lower:
             return "administration"

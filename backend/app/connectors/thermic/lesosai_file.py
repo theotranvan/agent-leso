@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -37,8 +38,8 @@ from app.connectors.thermic.gbxml_generator import GbxmlGenerator
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_INPUT_DIR: Final = "/tmp/lesosai/in"
-DEFAULT_OUTPUT_DIR: Final = "/tmp/lesosai/out"
+DEFAULT_INPUT_DIR: Final = str(Path(tempfile.gettempdir()) / "lesosai" / "in")
+DEFAULT_OUTPUT_DIR: Final = str(Path(tempfile.gettempdir()) / "lesosai" / "out")
 DEFAULT_POLL_SECONDS: Final = 10
 DEFAULT_TIMEOUT_SECONDS: Final = 1800
 RESULT_EXTENSIONS: Final = (".xml", ".cecb")

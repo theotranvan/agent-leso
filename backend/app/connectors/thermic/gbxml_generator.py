@@ -298,6 +298,11 @@ class GbxmlGenerator(ThermicConnector):
             for key, val in pset_data.items():
                 if isinstance(val, (int, float)):
                     qto[key] = float(val)
+                elif isinstance(val, str):
+                    try:
+                        qto[key] = float(val.replace(",", "."))
+                    except ValueError:
+                        continue
         return qto
 
     @staticmethod

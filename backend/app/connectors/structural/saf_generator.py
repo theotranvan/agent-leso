@@ -21,6 +21,7 @@ Limitations V3 :
 from __future__ import annotations
 
 import logging
+import tempfile
 import time
 from dataclasses import dataclass, field
 from io import BytesIO
@@ -173,7 +174,8 @@ class SafGenerator(StructuralConnector):
             raise ConnectorError("Aucun élément structurel trouvé")
 
         xlsx_bytes = self._build_saf_xlsx(model, inputs)
-        tmp_path = Path(f"/tmp/saf_{int(time.time())}.xlsx")
+        tmp_dir = Path(tempfile.gettempdir())
+        tmp_path = tmp_dir / f"saf_{int(time.time())}.xlsx"
         tmp_path.write_bytes(xlsx_bytes)
 
         elapsed = time.monotonic() - start

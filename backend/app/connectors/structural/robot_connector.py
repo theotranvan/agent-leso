@@ -39,6 +39,7 @@ import csv
 import io
 import logging
 import os
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -62,8 +63,8 @@ from app.connectors.structural.saf_generator import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ROBOT_INPUT: Final = "/tmp/robot/in"
-DEFAULT_ROBOT_OUTPUT: Final = "/tmp/robot/out"
+DEFAULT_ROBOT_INPUT: Final = str(Path(tempfile.gettempdir()) / "robot" / "in")
+DEFAULT_ROBOT_OUTPUT: Final = str(Path(tempfile.gettempdir()) / "robot" / "out")
 DEFAULT_ROBOT_POLL: Final = 10
 DEFAULT_ROBOT_TIMEOUT: Final = 1800
 

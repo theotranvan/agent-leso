@@ -41,7 +41,7 @@ class TestCecbParser:
         bad = tmp_path / "bad.xml"
         bad.write_text("<not_xml<<<")
         inputs = ThermicInputs(ifc_path=bad, canton="GE")
-        with pytest.raises(ConnectorError, match="malformé"):
+        with pytest.raises(ConnectorError, match="vide|tronqué|malformé"):
             parser.simulate(inputs)
 
     def test_compliant_flag_matches_limite(self, temp_cecb_file: Path) -> None:

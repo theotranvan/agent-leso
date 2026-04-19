@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -32,8 +33,8 @@ from app.connectors.structural.saf_generator import SafGenerator
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCIA_INPUT: Final = "/tmp/scia/in"
-DEFAULT_SCIA_OUTPUT: Final = "/tmp/scia/out"
+DEFAULT_SCIA_INPUT: Final = str(Path(tempfile.gettempdir()) / "scia" / "in")
+DEFAULT_SCIA_OUTPUT: Final = str(Path(tempfile.gettempdir()) / "scia" / "out")
 DEFAULT_SCIA_POLL: Final = 10
 DEFAULT_SCIA_TIMEOUT: Final = 1800
 
