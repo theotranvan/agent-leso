@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+bandit-report.json
+
+# Environnement
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.local.example
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Build
+dist/
+build/
+*.log
+
+# Déploiement
+.vercel
+.render/
+
+# Secrets
+*.pem
+*.key
+
+# Uploads temporaires
+uploads/
+tmp/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/

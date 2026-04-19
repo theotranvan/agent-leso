@@ -1,0 +1,52 @@
+# Core
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+gunicorn==23.0.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-multipart==0.0.19
+python-jose[cryptography]==3.3.0
+
+# Database
+supabase==2.10.0
+asyncpg==0.30.0
+pgvector==0.3.6
+
+# LLM / AI
+anthropic==0.40.0
+openai==1.57.4
+tiktoken==0.8.0
+
+# Document processing
+PyMuPDF==1.25.1
+pdfplumber==0.11.4
+python-docx==1.1.2
+ifcopenshell==0.8.1
+pytesseract==0.3.13
+Pillow==11.0.0
+
+# Generation
+weasyprint==63.1
+openpyxl==3.1.5
+Jinja2==3.1.4
+
+# Email / Billing
+resend==2.5.1
+stripe==11.4.1
+
+# Async / HTTP
+arq==0.26.3
+redis==5.2.1
+httpx==0.28.1
+
+# Security
+slowapi==0.1.9
+cryptography==44.0.0
+
+# Monitoring
+sentry-sdk[fastapi]==2.19.2
+
+# Utils
+python-dotenv==1.0.1
+tenacity==9.0.0
+pytz==2024.2

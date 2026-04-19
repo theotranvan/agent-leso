@@ -1,0 +1,134 @@
+"""Orchestrateur : exécute une tâche en dispatchant vers le bon module."""
+import logging
+from datetime import datetime
+from typing import Any
+
+from app.database import get_supabase_admin
+
+logger = logging.getLogger(__name__)
+
+
+async def execute_task(task_id: str) -> dict[str, Any]:
+    """Point d'entrée unique pour exécuter une tâche.
+
+    - Lit la tâche depuis la DB
+    - Route vers le module approprié
+    - Met à jour le statut, le résultat, les coûts
+    - Envoie l'email si demandé
+    - Gère les erreurs et les retries
+    """
+    admin = get_supabase_admin()
+
+    task_result = admin.table("tasks").select("*").eq("id", task_id).maybe_single().execute()
+    if not task_result.data:
+        logger.error(f"Tâche {task_id} introuvable")
+        return {"status": "failed", "error": "Tâche introuvable"}
+
+    task = task_result.data
+
+    # Passe en running
+    admin.table("tasks").update({
+        "status": "running",
+        "attempts": task.get("attempts", 0) + 1,
+    }).eq("id", task_id).execute()
+
+    task_type = task["task_type"]
+
+    try:
+        # Dispatch vers le module
+        from app.agent.modules import cctp, chiffrage, coordination, doe, note_calcul, rapport
+
+        if task_type == "redaction_cctp":
+            result = await cctp.execute(task)
+        elif task_type in ("note_calcul_structure", "verification_eurocode",
+                           "calcul_thermique_re2020", "calcul_acoustique"):
+            result = await note_calcul.execute(task)
+        elif task_type in ("chiffrage_dpgf", "chiffrage_dqe"):
+            result = await chiffrage.execute(task)
+        elif task_type == "coordination_inter_lots":
+            result = await coordination.execute(task)
+        elif task_type in ("compte_rendu_reunion", "memoire_technique", "resume_document"):
+            result = await rapport.execute(task)
+        elif task_type == "doe_compilation":
+            result = await doe.execute(task)
+        elif task_type in ("veille_reglementaire", "alerte_norme"):
+            from app.agent.modules import rapport as _rapport
+            result = await _rapport.execute_generic(task)
+        elif task_type == "extraction_metadata":
+            from app.agent.modules import rapport as _rapport
+            result = await _rapport.execute_generic(task)
+        else:
+            raise ValueError(f"Type de tâche non supporté: {task_type}")
+
+        # Marque completed
+        admin.table("tasks").update({
+            "status": "completed",
+            "completed_at": datetime.utcnow().isoformat(),
+            "result_url": result.get("result_url"),
+            "result_preview": result.get("preview"),
+            "model_used": result.get("model"),
+            "tokens_used": result.get("tokens_used", 0),
+            "cost_euros": result.get("cost_eur", 0),
+        }).eq("id", task_id).execute()
+
+        # Incrémente compteur tâches de l'organisation
+        org = admin.table("organizations").select("tasks_used_this_month").eq("id", task["organization_id"]).maybe_single().execute()
+        if org.data:
+            admin.table("organizations").update({
+                "tasks_used_this_month": (org.data.get("tasks_used_this_month") or 0) + 1,
+            }).eq("id", task["organization_id"]).execute()
+
+        # Audit log
+        admin.table("audit_logs").insert({
+            "organization_id": task["organization_id"],
+            "user_id": task.get("user_id"),
+            "action": "task_completed",
+            "resource_type": "task",
+            "resource_id": task_id,
+            "metadata": {"task_type": task_type, "model": result.get("model"), "cost_eur": result.get("cost_eur")},
+        }).execute()
+
+        # Envoi email si demandé
+        input_params = task.get("input_params") or {}
+        if input_params.get("send_email") and input_params.get("recipient_emails") and result.get("email_bytes"):
+            from app.services.email_service import send_task_completed_email
+            project_name = input_params.get("project_name", "")
+            if not project_name and task.get("project_id"):
+                proj = admin.table("projects").select("name").eq("id", task["project_id"]).maybe_single().execute()
+                if proj.data:
+                    project_name = proj.data["name"]
+
+            send_task_completed_email(
+                to=input_params["recipient_emails"],
+                task_type=task_type,
+                project_name=project_name,
+                attachment_bytes=result.get("email_bytes"),
+                attachment_filename=result.get("email_filename"),
+                preview_text=result.get("preview", "")[:500],
+            )
+
+        return {"status": "completed", **result}
+
+    except Exception as e:
+        logger.exception(f"Erreur exécution tâche {task_id}: {e}")
+        admin.table("tasks").update({
+            "status": "failed",
+            "error_message": str(e)[:1000],
+            "completed_at": datetime.utcnow().isoformat(),
+        }).eq("id", task_id).execute()
+
+        # Alerte admin si 3 échecs
+        attempts = task.get("attempts", 0) + 1
+        if attempts >= 3:
+            try:
+                from app.config import settings
+                from app.services.email_service import send_alert_email
+                send_alert_email(
+                    to=[settings.ADMIN_EMAIL],
+                    subject=f"Tâche {task_id} en échec définitif",
+                    body_html=f"<p>Task <strong>{task_type}</strong> a échoué {attempts} fois.</p><p>Erreur : {e}</p>",
+                )
+            except Exception:
+                pass
+
+        return {"status": "failed", "error": str(e)}
