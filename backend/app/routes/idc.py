@@ -261,3 +261,199 @@ async def list_declarations(
         q = q.eq("year", year)
     r = q.order("year", desc=True).execute()
     return {"declarations": r.data or []}
+
+
+# ============================================================
+# V3 — Endpoints directs sur les connecteurs IDC
+# ============================================================
+
+@router.post("/v3/extract-facture")
+async def v3_extract_facture(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    pdf: UploadFile = File(...),
+    vector: str = Form("mazout"),
+):
+    """V3 : extrait valeur + unité + période depuis une facture PDF.
+
+    Stratégie à 3 niveaux : PyMuPDF → Tesseract OCR → Claude Haiku Vision.
+    """
+    from app.connectors.idc.facture_extractor import FactureExtractor
+
+    pdf_bytes = await pdf.read()
+    if not pdf_bytes:
+        raise HTTPException(400, "PDF vide")
+
+    extractor = FactureExtractor(enable_claude_fallback=True)
+    try:
+        result = extractor.extract(pdf_bytes, vector=vector)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    audit_log(user, "v3_idc_extract_facture", {
+        "vector": vector,
+        "confidence": result.confidence,
+        "method": result.extraction_method,
+    })
+    return result.to_dict()
+
+
+@router.post("/v3/compute")
+async def v3_compute_idc(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """V3 : calcule l'IDC annuel depuis une liste de consommations.
+
+    Body attendu :
+      {
+        "sre_m2": 1250.0,
+        "vector": "mazout",
+        "affectation": "logement_collectif",
+        "year": 2024,
+        "dju_year": 3100.0,  (optionnel)
+        "consumptions": [
+          {"value": 5250, "unit": "litre", "period_start": "2024-01-01", "period_end": "2024-04-30"}
+        ]
+      }
+    """
+    from datetime import date
+    from app.connectors.idc import IDCCalculator, IDCComputationInput
+    from app.connectors.idc.idc_calculator import IDCConsumption
+
+    try:
+        sre = float(body["sre_m2"])
+        vector = str(body["vector"])
+        affectation = str(body.get("affectation", "logement_collectif"))
+        year = int(body.get("year", date.today().year))
+        dju_year = body.get("dju_year")
+        consumptions_raw = body.get("consumptions") or []
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(400, f"Body invalide : {e}")
+
+    if not consumptions_raw:
+        raise HTTPException(400, "Au moins une consommation requise")
+
+    consumptions = []
+    for c in consumptions_raw:
+        try:
+            ps = c.get("period_start")
+            pe = c.get("period_end")
+            consumptions.append(IDCConsumption(
+                raw_value=float(c["value"]),
+                raw_unit=str(c.get("unit", "kwh")),
+                period_start=date.fromisoformat(ps) if isinstance(ps, str) else None,
+                period_end=date.fromisoformat(pe) if isinstance(pe, str) else None,
+                source_document_id=c.get("source_doc_id"),
+            ))
+        except (KeyError, TypeError, ValueError) as e:
+            raise HTTPException(400, f"Consommation invalide : {e}")
+
+    calc = IDCCalculator()
+    try:
+        result = calc.compute(IDCComputationInput(
+            sre_m2=sre, vector=vector, affectation=affectation,
+            consumptions=consumptions, year=year,
+            dju_year_measured=float(dju_year) if dju_year else None,
+        ))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    audit_log(user, "v3_idc_compute", {
+        "vector": vector, "year": year,
+        "idc_normalized_kwh_m2_an": result.idc_normalized_kwh_m2_an,
+        "classification": result.classification.status.value,
+    })
+
+    return {
+        "idc_raw_kwh_m2_an": result.idc_raw_kwh_m2_an,
+        "idc_normalized_kwh_m2_an": result.idc_normalized_kwh_m2_an,
+        "idc_normalized_mj_m2_an": result.idc_normalized_mj_m2_an,
+        "total_energy_kwh": result.total_energy_kwh,
+        "climate_correction_factor": result.climate_correction_factor,
+        "sre_m2": result.sre_m2,
+        "year": result.year,
+        "classification": {
+            "status": result.classification.status.value,
+            "label": result.classification.label,
+            "action_required": result.classification.action_required,
+            "color": result.classification.color,
+        },
+        "warnings": result.warnings,
+        "details": result.details,
+    }
+
+
+@router.post("/v3/ocen-form")
+async def v3_generate_ocen_form(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """V3 : génère un PDF préparatoire de déclaration OCEN."""
+    from fastapi.responses import Response
+    from datetime import date
+    from app.connectors.idc import IDCCalculator, IDCComputationInput
+    from app.connectors.idc.idc_calculator import IDCConsumption
+    from app.connectors.idc.ocen_form_generator import OCENFormGenerator, OCENFormInput
+
+    # Calcul IDC
+    try:
+        calc_in = body.get("calculation") or {}
+        sre = float(calc_in["sre_m2"])
+        vector = str(calc_in["vector"])
+        year = int(calc_in.get("year", date.today().year))
+        consumptions = [
+            IDCConsumption(
+                raw_value=float(c["value"]),
+                raw_unit=str(c.get("unit", "kwh")),
+                period_start=date.fromisoformat(c["period_start"]) if c.get("period_start") else None,
+                period_end=date.fromisoformat(c["period_end"]) if c.get("period_end") else None,
+            )
+            for c in (calc_in.get("consumptions") or [])
+        ]
+        if not consumptions:
+            raise HTTPException(400, "Consommations requises")
+
+        idc_result = calc.compute(IDCComputationInput(
+            sre_m2=sre, vector=vector,
+            affectation=calc_in.get("affectation", "logement_collectif"),
+            consumptions=consumptions, year=year,
+            dju_year_measured=float(calc_in["dju_year"]) if calc_in.get("dju_year") else None,
+        )) if False else IDCCalculator().compute(IDCComputationInput(
+            sre_m2=sre, vector=vector,
+            affectation=calc_in.get("affectation", "logement_collectif"),
+            consumptions=consumptions, year=year,
+            dju_year_measured=float(calc_in["dju_year"]) if calc_in.get("dju_year") else None,
+        ))
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, f"Données calcul invalides : {e}")
+
+    bldg = body.get("building") or {}
+    form_input = OCENFormInput(
+        egid=bldg.get("egid"),
+        address=str(bldg.get("address", "")),
+        postal_code=bldg.get("postal_code"),
+        city=str(bldg.get("city", "Genève")),
+        sre_m2=sre,
+        heating_vector=vector,
+        building_year=bldg.get("building_year"),
+        nb_logements=bldg.get("nb_logements"),
+        regie_name=bldg.get("regie_name"),
+        regie_email=bldg.get("regie_email"),
+        regie_phone=bldg.get("regie_phone"),
+        declarant_name=bldg.get("declarant_name"),
+    )
+
+    gen = OCENFormGenerator()
+    try:
+        pdf_bytes = gen.generate(form_input, idc_result)
+    except RuntimeError as e:
+        raise HTTPException(500, f"Génération PDF échouée : {e}")
+
+    audit_log(user, "v3_ocen_form_generate", {"size_bytes": len(pdf_bytes)})
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="OCEN_IDC_{year}_{bldg.get("egid") or "building"}.pdf"',
+        },
+    )

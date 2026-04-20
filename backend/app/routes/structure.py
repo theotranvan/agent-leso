@@ -227,3 +227,89 @@ async def import_saf_results(
         "double_check": result["double_check"],
         "preview": result["note_md"][:500],
     }
+
+
+# ============================================================
+# V3 — Endpoints directs sur les connecteurs structure
+# ============================================================
+
+@router.post("/v3/saf")
+async def v3_generate_saf(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """V3 : génère un fichier SAF xlsx depuis un modèle JSON.
+
+    Body : {nodes:[...], members:[...], supports:[...], project_info:{...}}
+    Retourne le xlsx directement.
+    """
+    from fastapi.responses import Response
+    from app.connectors.structural import StructuralInputs
+    from app.connectors.structural.saf_generator import SafGenerator
+
+    info = body.get("project_info") or {}
+    inputs = StructuralInputs(
+        ifc_path=None,
+        model_data={
+            "nodes": body.get("nodes", []),
+            "members": body.get("members", []),
+            "supports": body.get("supports", []),
+            "loads": body.get("loads", []),
+        },
+        referentiel=info.get("referentiel", "sia"),
+        exposure_class=info.get("exposure_class", "XC2"),
+        consequence_class=info.get("consequence_class", "CC2"),
+        seismic_zone=info.get("seismic_zone", "Z1b"),
+    )
+    try:
+        xlsx_bytes = SafGenerator().generate_saf_bytes(inputs)
+    except Exception as e:
+        raise HTTPException(400, f"Génération SAF échouée : {e}")
+
+    audit_log(user, "v3_structural_saf_generate", {"size_bytes": len(xlsx_bytes)})
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="model.xlsx"'},
+    )
+
+
+@router.post("/v3/double-check")
+async def v3_double_check(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    saf_xlsx: UploadFile = File(...),
+    model_json: str = Form("{}"),
+):
+    """V3 : parse un SAF enrichi + exécute le double-check analytique M=qL²/8.
+
+    Retourne la liste des anomalies détectées (INFO/WARNING/ANOMALY).
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+    from app.connectors.structural.results_parser import SafResultsParser
+
+    try:
+        model_data = json.loads(model_json)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "model_json invalide")
+
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        tmp.write(await saf_xlsx.read())
+        tmp_path = Path(tmp.name)
+
+    try:
+        parser = SafResultsParser()
+        result = parser.parse_and_check(
+            saf_input=tmp_path, saf_output=tmp_path,
+            model_data=model_data,
+        )
+        audit_log(user, "v3_structural_double_check", {
+            "compliant": result.compliant,
+            "nb_anomalies": len(result.anomalies),
+        })
+        return result.to_dict()
+    except Exception as e:
+        raise HTTPException(400, f"Double-check échoué : {e}")
+    finally:
+        tmp_path.unlink(missing_ok=True)

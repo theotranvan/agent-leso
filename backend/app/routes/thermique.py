@@ -317,3 +317,100 @@ Produire le justificatif complet en markdown avec toutes les sections habituelle
         "results": parsed,
         "preview": md[:500],
     }
+
+
+# ============================================================
+# V3 — Endpoints directs sur les connecteurs (pas de DB, pas d'orchestration)
+# ============================================================
+
+@router.post("/v3/simulate")
+async def v3_simulate(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    ifc_file: UploadFile = File(...),
+    canton: str = Form("GE"),
+    affectation: str = Form("logement_collectif"),
+    operation_type: str = Form("neuf"),
+    standard: str = Form("sia_380_1"),
+    heating_vector: str = Form("gaz"),
+    connector: str = Form("gbxml"),
+):
+    """V3 : simulation thermique directe via un connector spécifique.
+
+    Connectors disponibles : gbxml, stub, lesosai_file.
+    Retourne un SimulationResult détaillé (kWh/m²·an, classe CECB, compliance SIA).
+    """
+    import tempfile
+    from pathlib import Path
+
+    from app.connectors.thermic import ThermicInputs
+    from app.connectors.thermic.gbxml_generator import GbxmlGenerator
+    from app.connectors.thermic.lesosai_file import LesosaiFileConnector
+    from app.connectors.thermic.stub import StubThermicConnector
+
+    connectors_map = {
+        "gbxml": GbxmlGenerator,
+        "stub": StubThermicConnector,
+        "lesosai_file": LesosaiFileConnector,
+    }
+    if connector not in connectors_map:
+        raise HTTPException(400, f"Connector inconnu. Disponibles : {list(connectors_map.keys())}")
+
+    # Écriture temporaire de l'IFC
+    suffix = Path(ifc_file.filename or "upload.ifc").suffix or ".ifc"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        contents = await ifc_file.read()
+        tmp.write(contents)
+        tmp_path = Path(tmp.name)
+
+    try:
+        inputs = ThermicInputs(
+            ifc_path=tmp_path,
+            canton=canton,
+            affectation=affectation,
+            operation_type=operation_type,
+            standard=standard,
+            heating_vector=heating_vector,
+        )
+        conn_instance = connectors_map[connector]()
+        result = conn_instance.simulate(inputs)
+        audit_log(user, "v3_thermic_simulate", {
+            "connector": connector, "canton": canton, "affectation": affectation,
+            "qh_kwh_m2_an": result.qh_kwh_m2_an,
+        })
+        return result.to_dict()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+@router.post("/v3/gbxml")
+async def v3_generate_gbxml(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    ifc_file: UploadFile = File(...),
+    canton: str = Form("GE"),
+    affectation: str = Form("logement_collectif"),
+):
+    """V3 : génère uniquement le gbXML v0.37 (pour import Lesosai ou outil tiers)."""
+    import tempfile
+    from pathlib import Path
+    from fastapi.responses import Response
+    from app.connectors.thermic import ThermicInputs
+    from app.connectors.thermic.gbxml_generator import GbxmlGenerator
+
+    with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:
+        tmp.write(await ifc_file.read())
+        tmp_path = Path(tmp.name)
+
+    try:
+        gen = GbxmlGenerator()
+        xml_bytes = gen.generate_gbxml_bytes(ThermicInputs(
+            ifc_path=tmp_path, canton=canton, affectation=affectation,
+        ))
+        audit_log(user, "v3_gbxml_generate", {"size": len(xml_bytes)})
+        return Response(
+            content=xml_bytes,
+            media_type="application/xml",
+            headers={"Content-Disposition": f'attachment; filename="{ifc_file.filename or "model"}.gbxml"'},
+        )
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
