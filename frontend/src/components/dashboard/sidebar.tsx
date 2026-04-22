@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, FolderKanban, ListChecks, CreditCard, Settings, LogOut, Sparkles,
-  Flame, Building, Layers, Building2, Bell, BookOpen, Shield,
+  Flame, Building, Layers, Building2, Bell, BookOpen, Shield, ShieldCheck,
+  FileCheck2, MessageSquareWarning, Ruler, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button';
 const navGeneral = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projets', icon: FolderKanban },
+  { href: '/compliance', label: 'Conformité', icon: ShieldCheck },
   { href: '/tasks/new', label: 'Nouvelle tâche', icon: Sparkles },
 ];
 
@@ -22,6 +24,13 @@ const navCH = [
   { href: '/idc', label: 'IDC Genève', icon: Building2 },
   { href: '/aeai', label: 'AEAI (incendie)', icon: Shield },
   { href: '/veille', label: 'Veille CH', icon: Bell },
+];
+
+const navV4 = [
+  { href: '/dossier-enquete', label: 'Dossier enquête', icon: FileCheck2 },
+  { href: '/observations', label: 'Observations', icon: MessageSquareWarning },
+  { href: '/metres', label: 'Métrés IFC', icon: Ruler },
+  { href: '/simulation-rapide', label: 'Simulation rapide', icon: Zap },
 ];
 
 const navAccount = [
@@ -54,6 +63,10 @@ export function Sidebar() {
           Suisse romande
         </p>
         <NavSection items={navCH} pathname={pathname} />
+        <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Livrables avancés
+        </p>
+        <NavSection items={navV4} pathname={pathname} />
         <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Compte
         </p>

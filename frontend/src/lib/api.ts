@@ -10,6 +10,15 @@ async function authHeaders(): Promise<HeadersInit> {
   return { Authorization: `Bearer ${token}` };
 }
 
+// Pour multipart/form-data : NE PAS mettre Content-Type (le browser le génère avec boundary)
+async function authHeadersNoContent(): Promise<HeadersInit> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Non authentifié');
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -186,6 +195,26 @@ export const api = {
   dashboardAlerts: async () => {
     const res = await fetch(`${API_URL}/api/dashboard/alerts`, { headers: await authHeaders() });
     return handle<{ alerts: any[] }>(res);
+  },
+
+  // Namespace dashboard unifié
+  dashboard: {
+    overview: async () => {
+      const res = await fetch(`${API_URL}/api/dashboard/overview`, { headers: await authHeaders() });
+      return handle<any>(res);
+    },
+    consumption: async (days = 30) => {
+      const res = await fetch(`${API_URL}/api/dashboard/consumption?days=${days}`, { headers: await authHeaders() });
+      return handle<{ daily: any[]; by_model: any[] }>(res);
+    },
+    alerts: async () => {
+      const res = await fetch(`${API_URL}/api/dashboard/alerts`, { headers: await authHeaders() });
+      return handle<{ alerts: any[] }>(res);
+    },
+    compliance: async () => {
+      const res = await fetch(`${API_URL}/api/dashboard/compliance`, { headers: await authHeaders() });
+      return handle<{ projects: any[] }>(res);
+    },
   },
 
   // ===================== V2 SWISS-FIRST =====================
@@ -423,6 +452,179 @@ export const api = {
     get: async (id: string) => {
       const res = await fetch(`${API_URL}/api/norms/${id}`, { headers: await authHeaders() });
       return handle<any>(res);
+    },
+  },
+
+  // V3 — Connecteurs directs (pas de DB, réponse immédiate)
+  v3: {
+    // Thermique
+    simulate: async (formData: FormData) => {
+      const res = await fetch(`${API_URL}/api/thermique/v3/simulate`, {
+        method: 'POST',
+        headers: await authHeadersNoContent(),
+        body: formData,
+      });
+      return handle<any>(res);
+    },
+    gbxml: async (formData: FormData): Promise<Blob> => {
+      const res = await fetch(`${API_URL}/api/thermique/v3/gbxml`, {
+        method: 'POST',
+        headers: await authHeadersNoContent(),
+        body: formData,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.blob();
+    },
+
+    // IDC
+    extractFacture: async (formData: FormData) => {
+      const res = await fetch(`${API_URL}/api/idc/v3/extract-facture`, {
+        method: 'POST',
+        headers: await authHeadersNoContent(),
+        body: formData,
+      });
+      return handle<{
+        value: number | null;
+        unit: string | null;
+        period_start: string | null;
+        period_end: string | null;
+        confidence: number;
+        extraction_method: string;
+        warnings: string[];
+      }>(res);
+    },
+    computeIDC: async (body: {
+      sre_m2: number;
+      vector: string;
+      affectation?: string;
+      year?: number;
+      dju_year?: number;
+      consumptions: Array<{ value: number; unit: string; period_start?: string; period_end?: string }>;
+    }) => {
+      const res = await fetch(`${API_URL}/api/idc/v3/compute`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return handle<any>(res);
+    },
+    ocenForm: async (body: { calculation: any; building: any }): Promise<Blob> => {
+      const res = await fetch(`${API_URL}/api/idc/v3/ocen-form`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.blob();
+    },
+
+    // Structure
+    generateSAF: async (body: { nodes: any[]; members: any[]; supports?: any[]; loads?: any[]; project_info?: any }): Promise<Blob> => {
+      const res = await fetch(`${API_URL}/api/structure/v3/saf`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.blob();
+    },
+    doubleCheck: async (formData: FormData) => {
+      const res = await fetch(`${API_URL}/api/structure/v3/double-check`, {
+        method: 'POST',
+        headers: await authHeadersNoContent(),
+        body: formData,
+      });
+      return handle<any>(res);
+    },
+  },
+
+  // =======================
+  // V4 — Agents haute valeur ajoutée
+  // =======================
+  v4: {
+    dossierEnquete: {
+      create: async (body: any) => {
+        const res = await fetch(`${API_URL}/api/v4/dossier-enquete`, {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return handle<any>(res);
+      },
+      list: async (project_id?: string) => {
+        const url = new URL(`${API_URL}/api/v4/dossier-enquete`);
+        if (project_id) url.searchParams.set('project_id', project_id);
+        const res = await fetch(url, { headers: await authHeaders() });
+        return handle<{ dossiers: any[] }>(res);
+      },
+      get: async (id: string) => {
+        const res = await fetch(`${API_URL}/api/v4/dossier-enquete/${id}`, {
+          headers: await authHeaders(),
+        });
+        return handle<any>(res);
+      },
+    },
+    observations: {
+      create: async (body: any) => {
+        const res = await fetch(`${API_URL}/api/v4/observations`, {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return handle<any>(res);
+      },
+      upload: async (formData: FormData) => {
+        const res = await fetch(`${API_URL}/api/v4/observations/upload`, {
+          method: 'POST',
+          headers: await authHeadersNoContent(),
+          body: formData,
+        });
+        return handle<any>(res);
+      },
+      list: async (project_id?: string) => {
+        const url = new URL(`${API_URL}/api/v4/observations`);
+        if (project_id) url.searchParams.set('project_id', project_id);
+        const res = await fetch(url, { headers: await authHeaders() });
+        return handle<{ observations: any[] }>(res);
+      },
+    },
+    simulationRapide: {
+      create: async (body: any) => {
+        const res = await fetch(`${API_URL}/api/v4/simulation-rapide`, {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return handle<any>(res);
+      },
+      list: async (project_id?: string) => {
+        const url = new URL(`${API_URL}/api/v4/simulation-rapide`);
+        if (project_id) url.searchParams.set('project_id', project_id);
+        const res = await fetch(url, { headers: await authHeaders() });
+        return handle<{ simulations: any[] }>(res);
+      },
+    },
+    metres: {
+      extract: async (formData: FormData) => {
+        const res = await fetch(`${API_URL}/api/v4/metres/extract`, {
+          method: 'POST',
+          headers: await authHeadersNoContent(),
+          body: formData,
+        });
+        return handle<any>(res);
+      },
+      list: async (project_id?: string) => {
+        const url = new URL(`${API_URL}/api/v4/metres`);
+        if (project_id) url.searchParams.set('project_id', project_id);
+        const res = await fetch(url, { headers: await authHeaders() });
+        return handle<{ metres: any[] }>(res);
+      },
+    },
+    dashboard: async () => {
+      const res = await fetch(`${API_URL}/api/v4/compliance-dashboard`, {
+        headers: await authHeaders(),
+      });
+      return handle<{ projects: any[] }>(res);
     },
   },
 };
