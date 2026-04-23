@@ -120,3 +120,23 @@ async def run_veille_romande() -> dict:
         "summary_md": parsed.get("summary_md", ""),
         "items_analyzed": len(all_items),
     }
+
+
+async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
+    """Wrapper orchestrateur pour veille_romande."""
+    from typing import Any
+
+    pipeline = await run_veille_romande()
+
+    return {
+        "result_url": None,
+        "preview": (
+            f"Veille romande — {pipeline.get('new_alerts', 0)} alertes, "
+            f"{pipeline.get('critical', 0)} critiques, "
+            f"{pipeline.get('items_analyzed', 0)} items analysés"
+        ),
+        "model": None,
+        "tokens_used": 0,
+        "cost_eur": 0,
+        "veille_result": pipeline,
+    }

@@ -34,10 +34,33 @@ async def execute_task(task_id: str) -> dict[str, Any]:
 
     task_type = task["task_type"]
 
+    # ==================== Ingestion documents (V4+) ====================
+    # Enrichit automatiquement les input_params avec les documents du projet
+    try:
+        from app.agent.ingestion import ingest_for_task
+        ingestion = await ingest_for_task(
+            task_type=task_type,
+            organization_id=task["organization_id"],
+            project_id=task.get("project_id"),
+            input_params=task.get("input_params") or {},
+        )
+        enriched_params = ingestion.merge_into(task.get("input_params") or {})
+        task["input_params"] = enriched_params
+
+        if ingestion.documents_attached:
+            logger.info(
+                "Ingestion task=%s : %d docs attachés, %d warnings",
+                task_id, len(ingestion.documents_attached), len(ingestion.warnings),
+            )
+    except Exception as exc:
+        logger.warning("Ingestion échec pour task %s : %s", task_id, exc)
+        # Non-bloquant : continue avec input_params original
+
     try:
         # Dispatch vers le module
         from app.agent.modules import cctp, chiffrage, coordination, doe, note_calcul, rapport
 
+        # ==================== Dispatch V1 (France) ====================
         if task_type == "redaction_cctp":
             result = await cctp.execute(task)
         elif task_type in ("note_calcul_structure", "verification_eurocode",
@@ -52,11 +75,56 @@ async def execute_task(task_id: str) -> dict[str, Any]:
         elif task_type == "doe_compilation":
             result = await doe.execute(task)
         elif task_type in ("veille_reglementaire", "alerte_norme"):
-            from app.agent.modules import rapport as _rapport
-            result = await _rapport.execute_generic(task)
+            result = await rapport.execute_generic(task)
         elif task_type == "extraction_metadata":
-            from app.agent.modules import rapport as _rapport
-            result = await _rapport.execute_generic(task)
+            result = await rapport.execute_generic(task)
+
+        # ==================== Dispatch V2+V3 (Suisse romande) ====================
+        elif task_type in ("justificatif_sia_380_1", "calcul_cecb"):
+            from app.agent.swiss import thermique_agent
+            result = await thermique_agent.execute(task)
+        elif task_type == "note_calcul_sia_260_267":
+            from app.agent.swiss import structure_agent
+            result = await structure_agent.execute(task)
+        elif task_type == "descriptif_can_sia_451":
+            # CAN/SIA 451 = descriptif suisse — on réutilise le module cctp avec prompt CH
+            result = await cctp.execute(task)
+        elif task_type in ("controle_reglementaire_geneve",
+                           "controle_reglementaire_vaud",
+                           "controle_reglementaire_canton"):
+            from app.agent.swiss import geneva_agent
+            result = await geneva_agent.execute(task)
+        elif task_type in ("prebim_generation", "prebim_extraction"):
+            from app.agent.swiss import prebim_agent
+            result = await prebim_agent.execute(task)
+        elif task_type == "idc_geneve_rapport":
+            from app.agent.swiss import idc_agent
+            result = await idc_agent.execute(task)
+        elif task_type == "idc_extraction_facture":
+            from app.agent.swiss import idc_agent
+            result = await idc_agent.execute_extraction(task)
+        elif task_type == "aeai_rapport":
+            from app.agent.swiss import aeai_agent
+            result = await aeai_agent.execute(task)
+        elif task_type == "aeai_checklist_generation":
+            from app.agent.swiss import aeai_agent
+            result = await aeai_agent.execute_checklist(task)
+        elif task_type == "veille_romande":
+            from app.agent.swiss import veille_agent
+            result = await veille_agent.execute(task)
+        elif task_type == "dossier_mise_enquete":
+            from app.agent.swiss import dossier_enquete_agent
+            result = await dossier_enquete_agent.execute(task)
+        elif task_type == "reponse_observations_autorite":
+            from app.agent.swiss import observations_agent
+            result = await observations_agent.execute(task)
+        elif task_type == "simulation_energetique_rapide":
+            from app.agent.swiss import simulation_rapide_agent
+            result = await simulation_rapide_agent.execute(task)
+        elif task_type == "metres_automatiques_ifc":
+            from app.agent.swiss import metres_agent
+            result = await metres_agent.execute(task)
+
         else:
             raise ValueError(f"Type de tâche non supporté: {task_type}")
 

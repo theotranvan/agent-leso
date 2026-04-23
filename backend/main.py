@@ -14,7 +14,7 @@ from app.config import settings
 from app.middleware import SecurityHeadersMiddleware, limiter
 from app.routes import (
     aeai, auth, bim as bim_routes, billing, dashboard, documents,
-    idc, norms, projects, structure, tasks, thermique, veille,
+    idc, norms, projects, structure, tasks, thermique, v4_agents, veille,
 )
 
 logging.basicConfig(
@@ -124,6 +124,8 @@ app.include_router(idc.router, prefix=API_PREFIX)
 app.include_router(aeai.router, prefix=API_PREFIX)
 app.include_router(veille.router, prefix=API_PREFIX)
 app.include_router(norms.router, prefix=API_PREFIX)
+# V4 - nouveaux agents haute valeur
+app.include_router(v4_agents.router, prefix=f"{API_PREFIX}/v4")
 
 
 if __name__ == "__main__":

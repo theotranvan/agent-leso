@@ -71,3 +71,52 @@ Transformer cette checklist en RAPPORT PROFESSIONNEL en markdown :
             "cost_eur": llm_result["cost_eur"],
         },
     }
+
+
+async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
+    """Wrapper orchestrateur pour controle_reglementaire_geneve / vaud / canton."""
+    from datetime import datetime
+    from typing import Any
+    from app.database import get_storage, get_supabase_admin
+
+    params = task.get("input_params") or {}
+    org_id = task["organization_id"]
+    project_id = task.get("project_id")
+
+    project_data = params.get("project_data") or {}
+    if not project_data:
+        raise ValueError("project_data manquant (canton, affectation, sre_m2...)")
+
+    project_name = params.get("project_name", "")
+    author = params.get("author", "")
+
+    pipeline = await run_geneva_control(project_data, project_name, author)
+
+    pdf_bytes = pipeline["pdf_bytes"]
+    canton = project_data.get("canton", "CH")
+    storage = get_storage()
+    filename = f"controle_{canton}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    path = f"{org_id}/controle/{task['id']}/{filename}"
+    storage.upload(path, pdf_bytes, content_type="application/pdf")
+    signed_url = storage.get_signed_url(path, expires_in=604800)
+
+    admin = get_supabase_admin()
+    admin.table("documents").insert({
+        "organization_id": org_id,
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": "pdf",
+        "storage_path": path,
+        "processed": True,
+    }).execute()
+
+    llm = pipeline.get("llm") or {}
+    return {
+        "result_url": signed_url,
+        "preview": pipeline["report_md"][:500],
+        "model": llm.get("model"),
+        "tokens_used": llm.get("tokens", 0),
+        "cost_eur": llm.get("cost_eur", 0),
+        "email_bytes": pdf_bytes,
+        "email_filename": filename,
+    }

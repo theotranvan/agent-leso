@@ -69,7 +69,7 @@ class ThermalModelInput(BaseModel):
 
 class ThermalRunRequest(BaseModel):
     model_id: str
-    engine: Literal["lesosai_stub", "lesosai_file"] = "lesosai_file"
+    engine: Literal["lesosai_stub", "lesosai_file", "gbxml", "stub"] = "lesosai_stub"
     generate_justificatif: bool = True
     author_name: Optional[str] = None
 

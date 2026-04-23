@@ -37,12 +37,11 @@ async def run_thermal_pipeline(
     prepared = await engine.prepare_model(thermal_model)
     warnings = prepared.get("warnings", [])
 
-    # Calcul si stub (sync), sinon pas de résultat dispo immédiatement
+    # Calcul si synchrone (stub ou gbxml), sinon résultat = None jusqu'à import Lesosai
     results = None
-    if engine_name == "lesosai_stub":
-        from app.services.thermique.lesosai_stub import LesosaiStubEngine
-        stub: LesosaiStubEngine = engine  # type: ignore
-        r = await stub.compute(thermal_model)
+    if engine_name in ("lesosai_stub", "stub", "gbxml"):
+        # Le registry V3 adapte les connecteurs → compute() est toujours disponible
+        r = await engine.compute(thermal_model)
         results = r.to_dict()
 
     # Génération justificatif via LLM
@@ -128,4 +127,66 @@ Rédiger le justificatif complet en markdown."""
             "tokens": llm_result["tokens_used"],
             "cost_eur": llm_result["cost_eur"],
         },
+    }
+
+
+async def execute(task: dict[str, Any]) -> dict[str, Any]:
+    """Wrapper orchestrateur : exécute un pipeline thermique depuis une tâche DB.
+
+    Input params attendus :
+      - thermal_model: dict du modèle (canton, affectation, zones, walls, openings, systems)
+      - engine_name: 'lesosai_stub' (défaut) | 'lesosai_file' | 'gbxml'
+      - project_name, project_address, author (optionnels)
+    """
+    from app.database import get_storage, get_supabase_admin
+
+    params = task.get("input_params") or {}
+    org_id = task["organization_id"]
+    project_id = task.get("project_id")
+
+    thermal_model = params.get("thermal_model") or {}
+    if not thermal_model:
+        raise ValueError("thermal_model manquant dans input_params")
+
+    engine_name = params.get("engine_name", "lesosai_stub")
+    project_name = params.get("project_name", "")
+    project_address = params.get("project_address", "")
+    author = params.get("author", "")
+
+    pipeline_result = await run_thermal_pipeline(
+        thermal_model=thermal_model,
+        engine_name=engine_name,
+        project_name=project_name,
+        project_address=project_address,
+        author=author,
+    )
+
+    pdf_bytes = pipeline_result["pdf_bytes"]
+    storage = get_storage()
+    filename = f"justificatif_SIA_380_1_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    path = f"{org_id}/thermique/{task['id']}/{filename}"
+    storage.upload(path, pdf_bytes, content_type="application/pdf")
+    signed_url = storage.get_signed_url(path, expires_in=604800)
+
+    admin = get_supabase_admin()
+    admin.table("documents").insert({
+        "organization_id": org_id,
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": "pdf",
+        "storage_path": path,
+        "processed": True,
+    }).execute()
+
+    llm_info = pipeline_result.get("llm") or {}
+    md_preview = pipeline_result["justificatif_md"][:500]
+
+    return {
+        "result_url": signed_url,
+        "preview": md_preview + ("..." if len(pipeline_result["justificatif_md"]) > 500 else ""),
+        "model": llm_info.get("model"),
+        "tokens_used": llm_info.get("tokens", 0),
+        "cost_eur": llm_info.get("cost_eur", 0),
+        "email_bytes": pdf_bytes,
+        "email_filename": filename,
     }

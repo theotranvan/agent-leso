@@ -1,470 +1,714 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import {
+  ArrowLeft, ArrowRight, Loader2, FileText, Flame, Building, Building2, Shield, Bell,
+  Layers, FileCheck2, MessageSquareWarning, Ruler, Zap, Users, Calculator, BookOpen,
+  PenTool, ScrollText,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TASK_TYPE_LABELS } from '@/lib/utils';
+import { Banner } from '@/components/ui/banner';
+import { Dropzone } from '@/components/ui/dropzone';
+import { CANTONS_ROMANDS, AFFECTATIONS_SIA } from '@/lib/ch';
+import { useActiveProject } from '@/lib/active-project';
 
-const TASK_CATEGORIES = [
+type TaskCategory = {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  color: string;
+  fields: string[];  // champs du form à afficher
+  days_saved?: string;
+};
+
+const TASK_CATEGORIES: TaskCategory[] = [
+  // Livrables haute valeur
   {
-    group: 'Documents techniques',
-    tasks: ['redaction_cctp', 'memoire_technique', 'doe_compilation'],
+    id: 'dossier_mise_enquete',
+    title: 'Dossier mise en enquête',
+    description: 'Mémoire justificatif APA/APC avec tableau SIA 416 et checklist des pièces à fournir',
+    icon: FileCheck2, color: 'bg-purple-50 text-purple-700',
+    days_saved: '5-10 j économisés',
+    fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'specificities', 'author'],
   },
   {
-    group: 'Notes de calcul',
-    tasks: ['note_calcul_structure', 'verification_eurocode', 'calcul_thermique_re2020', 'calcul_acoustique'],
+    id: 'metres_automatiques_ifc',
+    title: 'Métrés automatiques IFC',
+    description: 'Extrait SRE, volumes et quantités par CFC depuis un IFC. Produit un DPGF pré-rempli.',
+    icon: Ruler, color: 'bg-amber-50 text-amber-700',
+    days_saved: '1-2 j économisés',
+    fields: ['project_name', 'ifc_upload', 'author'],
   },
   {
-    group: 'Chiffrage',
-    tasks: ['chiffrage_dpgf', 'chiffrage_dqe'],
+    id: 'reponse_observations_autorite',
+    title: 'Réponse aux observations',
+    description: 'Lettre argumentée point par point depuis un courrier DALE, DGT ou CAMAC',
+    icon: MessageSquareWarning, color: 'bg-red-50 text-red-700',
+    days_saved: '1-3 j économisés',
+    fields: ['project_name', 'canton', 'autorite_pdf_upload', 'author'],
   },
   {
-    group: 'BIM / Coordination',
-    tasks: ['coordination_inter_lots', 'analyse_ifc'],
+    id: 'simulation_energetique_rapide',
+    title: 'Simulation énergétique rapide',
+    description: 'Estime Qh en 30 s depuis un programme — avant-projet ou concours, sans IFC',
+    icon: Zap, color: 'bg-orange-50 text-orange-700',
+    fields: ['project_name', 'canton', 'affectation', 'sre_m2', 'standard', 'heating_vector', 'facteur_forme'],
+  },
+  // Livrables courants
+  {
+    id: 'redaction_cctp',
+    title: 'CCTP',
+    description: 'Descriptif des prestations par lot — rédigé selon SIA 451',
+    icon: ScrollText, color: 'bg-blue-50 text-blue-700',
+    fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'contraintes'],
   },
   {
-    group: 'Réunions & synthèses',
-    tasks: ['compte_rendu_reunion', 'resume_document'],
+    id: 'chiffrage_dpgf',
+    title: 'DPGF / Chiffrage',
+    description: 'Devis quantitatif structuré par lot à partir du programme',
+    icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
+    fields: ['project_name', 'lot', 'surface', 'notes'],
+  },
+  {
+    id: 'justificatif_sia_380_1',
+    title: 'Justificatif SIA 380/1',
+    description: 'Thermique — requiert un modèle ou un IFC (redirige vers le module)',
+    icon: Flame, color: 'bg-orange-50 text-orange-700',
+    fields: ['redirect_thermique'],
+  },
+  {
+    id: 'note_calcul_sia_260_267',
+    title: 'Note structure SIA 260-267',
+    description: 'SAF pour Scia/RFEM puis note de calcul (redirige vers le module)',
+    icon: Building, color: 'bg-slate-50 text-slate-700',
+    fields: ['redirect_structure'],
+  },
+  {
+    id: 'idc_geneve_rapport',
+    title: 'IDC Genève',
+    description: 'Extraction factures, calcul, formulaire OCEN (redirige vers le module)',
+    icon: Building2, color: 'bg-emerald-50 text-emerald-700',
+    fields: ['redirect_idc'],
+  },
+  {
+    id: 'aeai_checklist_generation',
+    title: 'Checklist AEAI',
+    description: 'Checklist incendie pour une typologie donnée',
+    icon: Shield, color: 'bg-amber-50 text-amber-700',
+    fields: ['project_name', 'building_type', 'height_m', 'nb_occupants_max', 'special_context'],
+  },
+  {
+    id: 'controle_reglementaire_geneve',
+    title: 'Contrôle réglementaire',
+    description: 'Rapport pré-dépôt : zone, énergie, LDTR, AEAI, stationnement',
+    icon: FileText, color: 'bg-blue-50 text-blue-700',
+    fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'nb_logements'],
+  },
+  {
+    id: 'compte_rendu_reunion',
+    title: 'Compte-rendu de réunion',
+    description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
+    icon: Users, color: 'bg-slate-50 text-slate-700',
+    fields: ['project_name', 'meeting_title', 'participants', 'notes'],
   },
 ];
 
+const MODULE_REDIRECTS: Record<string, string> = {
+  redirect_thermique: '/thermique',
+  redirect_structure: '/structure',
+  redirect_idc: '/idc',
+};
+
 export default function NewTaskPage() {
+  return (
+    <Suspense fallback={<div className="text-muted-foreground">Chargement…</div>}>
+      <NewTaskInner />
+    </Suspense>
+  );
+}
+
+function NewTaskInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const prefillProject = searchParams.get('project_id');
+  const { activeProject } = useActiveProject();
 
+  const preselectedType = searchParams.get('type');
+  const preselectedProject = searchParams.get('project_id');
+
+  const [selected, setSelected] = useState<TaskCategory | null>(
+    preselectedType ? TASK_CATEGORIES.find((c) => c.id === preselectedType) || null : null
+  );
+  const [projectId, setProjectId] = useState<string>(preselectedProject || activeProject?.id || '');
   const [projects, setProjects] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [taskType, setTaskType] = useState('redaction_cctp');
-  const [projectId, setProjectId] = useState<string>(prefillProject || '');
-  const [sendEmail, setSendEmail] = useState(true);
-  const [recipientEmails, setRecipientEmails] = useState('');
-  const [params, setParams] = useState<Record<string, any>>({});
+  const [form, setForm] = useState<any>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
 
   useEffect(() => {
-    api.listProjects().then((d) => setProjects(d.projects));
+    api.projects.list().then((r: any) => setProjects(r.projects || [])).catch(() => {});
   }, []);
 
+  // Sync avec projet actif
   useEffect(() => {
-    if (projectId) {
-      api.listProjectDocuments(projectId).then((d) => setDocuments(d.documents));
-    } else {
-      setDocuments([]);
+    if (!projectId && activeProject?.id) setProjectId(activeProject.id);
+  }, [activeProject, projectId]);
+
+  // Redirect si l'utilisateur choisit un module
+  useEffect(() => {
+    if (!selected) return;
+    const redirect = selected.fields.find((f) => f.startsWith('redirect_'));
+    if (redirect && MODULE_REDIRECTS[redirect]) {
+      router.push(MODULE_REDIRECTS[redirect]);
     }
-  }, [projectId]);
+  }, [selected, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!selected) return;
     setSubmitting(true);
-    try {
-      const emails = recipientEmails
-        .split(',')
-        .map((e) => e.trim())
-        .filter(Boolean);
+    setError(null);
 
-      const task = await api.createTask({
-        task_type: taskType,
-        project_id: projectId || null,
-        input_params: params,
-        send_email: sendEmail,
-        recipient_emails: emails,
-      });
-      router.push(`/tasks/${task.id}`);
+    try {
+      const payload = buildTaskPayload(selected.id, form, projectId, uploadedDocId);
+      await api.createTask(payload);
+      router.push(projectId ? `/projects/${projectId}` : '/dashboard');
     } catch (e: any) {
-      setError(e.message);
+      setError(e?.message || 'Erreur lors de la création de la tâche');
+    } finally {
       setSubmitting(false);
     }
   };
 
+  const handleFileUpload = async (files: File[]) => {
+    setUploading(true);
+    try {
+      const f = files[0];
+      const r = await api.uploadDocument(f, projectId || undefined);
+      setUploadedDocId(r.id || r.document_id);
+      setUploadedFileName(f.name);
+    } catch (e: any) {
+      setError(e?.message || 'Upload échoué');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Étape 1 : sélection du type
+  if (!selected) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <ArrowLeft className="h-3.5 w-3.5" /> Tableau de bord
+          </Link>
+          <h1 className="text-2xl font-semibold mt-3">Nouvelle tâche</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choisis le type de livrable à produire.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {TASK_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelected(c)}
+              className="group relative p-4 rounded-lg border bg-card text-left hover:border-muted-foreground/40 hover:shadow-sm transition-all focus-ring"
+            >
+              <div className={`inline-flex w-10 h-10 rounded-md ${c.color} items-center justify-center mb-3`}>
+                <c.icon className="h-5 w-5" strokeWidth={1.8} />
+              </div>
+              <h3 className="font-medium text-sm mb-1.5">{c.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                {c.description}
+              </p>
+              <div className="flex items-center justify-between">
+                {c.days_saved ? (
+                  <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    {c.days_saved}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Si redirect module, on affiche rien le temps du redirect
+  if (selected.fields.some((f) => f.startsWith('redirect_'))) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Redirection vers le module…
+      </div>
+    );
+  }
+
+  // Étape 2 : formulaire
   return (
-    <div className="space-y-6 max-w-3xl">
-      <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Retour
-      </Link>
+    <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Nouvelle tâche</h1>
-        <p className="text-sm text-muted-foreground mt-1">Lancez un traitement automatisé par l'agent IA</p>
+        <button
+          onClick={() => setSelected(null)}
+          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Changer de type
+        </button>
+        <div className="flex items-start gap-3 mt-3">
+          <div className={`inline-flex w-10 h-10 rounded-md ${selected.color} items-center justify-center shrink-0`}>
+            <selected.icon className="h-5 w-5" strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold">{selected.title}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{selected.description}</p>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Type de tâche</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={taskType} onValueChange={setTaskType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TASK_CATEGORIES.map((cat) => (
-                  <div key={cat.group}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{cat.group}</div>
-                    {cat.tasks.map((t) => (
-                      <SelectItem key={t} value={t}>{TASK_TYPE_LABELS[t]}</SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+      {error && <Banner variant="error">{error}</Banner>}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Contexte projet</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Projet (optionnel)</Label>
-              <Select value={projectId || 'none'} onValueChange={(v) => setProjectId(v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un projet" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Aucun</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Projet lié - toujours visible */}
+        <div>
+          <Label>Projet lié (optionnel)</Label>
+          <Select value={projectId} onValueChange={setProjectId}>
+            <SelectTrigger><SelectValue placeholder="Aucun projet" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Aucun</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Paramètres</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <TaskParamsForm
-              taskType={taskType}
-              params={params}
-              setParams={setParams}
-              documents={documents}
-            />
-          </CardContent>
-        </Card>
+        {/* Champs adaptatifs */}
+        <AdaptiveFields
+          fields={selected.fields}
+          form={form}
+          setForm={setForm}
+          onFileUpload={handleFileUpload}
+          uploadedFileName={uploadedFileName}
+          uploading={uploading}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Livraison</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={sendEmail}
-                onChange={(e) => setSendEmail(e.target.checked)}
-                className="h-4 w-4"
-              />
-              Envoyer le résultat par email
-            </label>
-            {sendEmail && (
-              <div className="space-y-2">
-                <Label>Destinataires (séparés par des virgules)</Label>
-                <Input
-                  type="text"
-                  placeholder="contact@client.com, ingenieur@bet.fr"
-                  value={recipientEmails}
-                  onChange={(e) => setRecipientEmails(e.target.value)}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {error && <div className="text-sm text-destructive">{error}</div>}
-
-        <div className="flex gap-2">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Envoi...' : 'Lancer la tâche'}
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="submit" disabled={submitting} className="gap-2">
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {submitting ? 'En cours de génération…' : 'Lancer la tâche'}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <button
+            type="button"
+            onClick={() => setSelected(null)}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
             Annuler
-          </Button>
+          </button>
         </div>
       </form>
     </div>
   );
 }
 
-// Formulaire paramètres dynamique selon task_type
-function TaskParamsForm({
-  taskType, params, setParams, documents,
+function AdaptiveFields({
+  fields, form, setForm, onFileUpload, uploadedFileName, uploading,
 }: {
-  taskType: string;
-  params: Record<string, any>;
-  setParams: (p: Record<string, any>) => void;
-  documents: any[];
+  fields: string[]; form: any; setForm: (f: any) => void;
+  onFileUpload: (files: File[]) => Promise<void>;
+  uploadedFileName: string; uploading: boolean;
 }) {
-  const update = (key: string, value: any) => setParams({ ...params, [key]: value });
-
-  if (taskType === 'redaction_cctp') {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label>Lot *</Label>
-          <Select value={params.lot || ''} onValueChange={(v) => update('lot', v)}>
-            <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="electricite">Électricité</SelectItem>
-              <SelectItem value="cvc">CVC</SelectItem>
-              <SelectItem value="structure">Structure</SelectItem>
-              <SelectItem value="facade">Façade</SelectItem>
-              <SelectItem value="plomberie">Plomberie</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Type d'ouvrage</Label>
-          <Input placeholder="Logement collectif, ERP R+6..." value={params.type_ouvrage || ''} onChange={(e) => update('type_ouvrage', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Niveau de prestation</Label>
-          <Select value={params.niveau_prestation || 'standard'} onValueChange={(v) => update('niveau_prestation', v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="standard">Standard</SelectItem>
-              <SelectItem value="haut_de_gamme">Haut de gamme</SelectItem>
-              <SelectItem value="thqe">Très haute qualité environnementale</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Surface (m²)</Label>
-          <Input type="number" value={params.surface || ''} onChange={(e) => update('surface', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Contraintes particulières</Label>
-          <Textarea rows={4} placeholder="Zone sismique, accessibilité PMR, budget contraint..." value={params.contraintes || ''} onChange={(e) => update('contraintes', e.target.value)} />
-        </div>
-      </>
-    );
-  }
-
-  if (taskType.startsWith('note_calcul') || taskType === 'verification_eurocode' || taskType.startsWith('calcul_')) {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label>Éléments à calculer / vérifier</Label>
-          <Textarea rows={3} value={params.elements || ''} onChange={(e) => update('elements', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Hypothèses</Label>
-          <Textarea rows={4} placeholder="Charges permanentes, charges d'exploitation, classes de matériaux..." value={params.hypotheses || ''} onChange={(e) => update('hypotheses', e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Localisation</Label>
-            <Input placeholder="France / Suisse" value={params.localisation || 'France'} onChange={(e) => update('localisation', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Zone climatique</Label>
-            <Input placeholder="H1a, H2b, H3..." value={params.zone_climatique || ''} onChange={(e) => update('zone_climatique', e.target.value)} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Document IFC (optionnel)</Label>
-          <Select value={params.ifc_document_id || 'none'} onValueChange={(v) => update('ifc_document_id', v === 'none' ? undefined : v)}>
-            <SelectTrigger><SelectValue placeholder="Aucun fichier IFC" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Aucun</SelectItem>
-              {documents.filter((d) => d.file_type === 'ifc').map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </>
-    );
-  }
-
-  if (taskType === 'chiffrage_dpgf') {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label>Lot *</Label>
-          <Input value={params.lot || ''} onChange={(e) => update('lot', e.target.value)} required />
-        </div>
-        <div className="space-y-2">
-          <Label>Métré source (PDF uploadé)</Label>
-          <Select value={params.metre_document_id || 'none'} onValueChange={(v) => update('metre_document_id', v === 'none' ? undefined : v)}>
-            <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Aucun (métré textuel)</SelectItem>
-              {documents.filter((d) => d.file_type === 'pdf').map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Métré textuel (si pas de PDF)</Label>
-          <Textarea rows={6} value={params.metre_text || ''} onChange={(e) => update('metre_text', e.target.value)} />
-        </div>
-      </>
-    );
-  }
-
-  if (taskType === 'chiffrage_dqe') {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label>Lots à chiffrer (séparés par des virgules)</Label>
-          <Input placeholder="gros_oeuvre, cvc, electricite, plomberie"
-            value={(params.lots || []).join(', ')}
-            onChange={(e) => update('lots', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Métré source</Label>
-          <Select value={params.metre_document_id || 'none'} onValueChange={(v) => update('metre_document_id', v === 'none' ? undefined : v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Aucun</SelectItem>
-              {documents.filter((d) => d.file_type === 'pdf').map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </>
-    );
-  }
-
-  if (taskType === 'coordination_inter_lots') {
-    return (
-      <>
-        <Label>Fichiers IFC à coordonner (minimum 2)</Label>
-        <p className="text-xs text-muted-foreground">Associez chaque fichier IFC à son lot</p>
-        <CoordinationInputs params={params} setParams={setParams} documents={documents.filter((d) => d.file_type === 'ifc')} />
-      </>
-    );
-  }
-
-  if (taskType === 'compte_rendu_reunion') {
-    return (
-      <>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Objet</Label>
-            <Input value={params.objet || ''} onChange={(e) => update('objet', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Date</Label>
-            <Input type="date" value={params.date || ''} onChange={(e) => update('date', e.target.value)} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Lieu</Label>
-          <Input value={params.lieu || ''} onChange={(e) => update('lieu', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Participants (un par ligne)</Label>
-          <Textarea rows={4} value={(params.participants || []).join('\n')} onChange={(e) => update('participants', e.target.value.split('\n').filter(Boolean))} />
-        </div>
-        <div className="space-y-2">
-          <Label>Notes ou transcription *</Label>
-          <Textarea rows={10} value={params.notes || ''} onChange={(e) => update('notes', e.target.value)} required />
-        </div>
-      </>
-    );
-  }
-
-  if (taskType === 'memoire_technique') {
-    return (
-      <div className="space-y-2">
-        <Label>Brief / CCTP client *</Label>
-        <Textarea rows={10} value={params.brief || ''} onChange={(e) => update('brief', e.target.value)} required />
-      </div>
-    );
-  }
-
-  if (taskType === 'resume_document') {
-    return (
-      <div className="space-y-2">
-        <Label>Document à résumer</Label>
-        <Select value={params.document_id || 'none'} onValueChange={(v) => update('document_id', v === 'none' ? undefined : v)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sélectionner</SelectItem>
-            {documents.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
-
-  if (taskType === 'doe_compilation') {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label>Date de réception</Label>
-          <Input type="date" value={params.date_reception || ''} onChange={(e) => update('date_reception', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Intervenants (un par ligne)</Label>
-          <Textarea rows={4} placeholder="Maître d'ouvrage : ...&#10;Architecte : ..." value={(params.intervenants || []).join('\n')} onChange={(e) => update('intervenants', e.target.value.split('\n').filter(Boolean))} />
-        </div>
-      </>
-    );
-  }
+  const setField = (k: string, v: any) => setForm({ ...form, [k]: v });
 
   return (
-    <div className="space-y-2">
-      <Label>Contenu / instructions</Label>
-      <Textarea rows={6} value={params.content || ''} onChange={(e) => update('content', e.target.value)} />
-    </div>
+    <>
+      {fields.includes('project_name') && (
+        <div>
+          <Label>Nom du projet *</Label>
+          <Input required value={form.project_name || ''}
+            onChange={(e) => setField('project_name', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('canton') && (
+        <div>
+          <Label>Canton *</Label>
+          <Select value={form.canton || 'GE'} onValueChange={(v) => setField('canton', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CANTONS_ROMANDS.map((c) => (
+                <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('address') && (
+        <div>
+          <Label>Adresse</Label>
+          <Input value={form.address || ''} onChange={(e) => setField('address', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('affectation') && (
+        <div>
+          <Label>Affectation *</Label>
+          <Select value={form.affectation || 'logement_collectif'}
+            onValueChange={(v) => setField('affectation', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {AFFECTATIONS_SIA.map((a) => (
+                <SelectItem key={a.code} value={a.code}>{a.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('operation_type') && (
+        <div>
+          <Label>Type d'opération *</Label>
+          <Select value={form.operation_type || 'neuf'}
+            onValueChange={(v) => setField('operation_type', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="neuf">Construction neuve</SelectItem>
+              <SelectItem value="renovation">Rénovation</SelectItem>
+              <SelectItem value="transformation">Transformation</SelectItem>
+              <SelectItem value="surelevation">Surélévation</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('sre_m2') && (
+        <div>
+          <Label>SRE (m²) *</Label>
+          <Input required type="number" step="1" value={form.sre_m2 || ''}
+            onChange={(e) => setField('sre_m2', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('nb_logements') && (
+        <div>
+          <Label>Nombre de logements</Label>
+          <Input type="number" value={form.nb_logements || ''}
+            onChange={(e) => setField('nb_logements', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('lot') && (
+        <div>
+          <Label>Lot *</Label>
+          <Select value={form.lot || 'cvs'} onValueChange={(v) => setField('lot', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cvs">CVS / Chauffage</SelectItem>
+              <SelectItem value="electricite">Électricité</SelectItem>
+              <SelectItem value="sanitaire">Sanitaire</SelectItem>
+              <SelectItem value="mcr">MCR</SelectItem>
+              <SelectItem value="structure">Structure</SelectItem>
+              <SelectItem value="enveloppe">Enveloppe</SelectItem>
+              <SelectItem value="second_oeuvre">Second œuvre</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('type_ouvrage') && (
+        <div>
+          <Label>Type d'ouvrage</Label>
+          <Input value={form.type_ouvrage || ''}
+            placeholder="Ex: logement collectif neuf R+4"
+            onChange={(e) => setField('type_ouvrage', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('niveau_prestation') && (
+        <div>
+          <Label>Niveau de prestation</Label>
+          <Select value={form.niveau_prestation || 'standard'}
+            onValueChange={(v) => setField('niveau_prestation', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="economique">Économique</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('surface') && (
+        <div>
+          <Label>Surface concernée (m²)</Label>
+          <Input type="number" value={form.surface || ''}
+            onChange={(e) => setField('surface', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('standard') && (
+        <div>
+          <Label>Standard énergétique</Label>
+          <Select value={form.standard || 'sia_380_1_neuf'}
+            onValueChange={(v) => setField('standard', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sia_380_1_neuf">SIA 380/1 neuf</SelectItem>
+              <SelectItem value="renovation_qualifiee">Rénovation qualifiée</SelectItem>
+              <SelectItem value="minergie">MINERGIE</SelectItem>
+              <SelectItem value="minergie_p">MINERGIE-P</SelectItem>
+              <SelectItem value="existant_1980">Existant (avant 1980)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('heating_vector') && (
+        <div>
+          <Label>Vecteur chauffage</Label>
+          <Select value={form.heating_vector || 'chauffage_distance'}
+            onValueChange={(v) => setField('heating_vector', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gaz">Gaz</SelectItem>
+              <SelectItem value="mazout">Mazout</SelectItem>
+              <SelectItem value="pellet">Pellets</SelectItem>
+              <SelectItem value="chauffage_distance">CAD (réseau)</SelectItem>
+              <SelectItem value="pac_air_eau">PAC air/eau</SelectItem>
+              <SelectItem value="pac_sonde">PAC sonde géothermique</SelectItem>
+              <SelectItem value="electrique">Électrique direct</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('facteur_forme') && (
+        <div>
+          <Label>Facteur de forme</Label>
+          <Select value={form.facteur_forme || 'standard'}
+            onValueChange={(v) => setField('facteur_forme', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="compact">Compact (A/V faible)</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="etale">Étalé</SelectItem>
+              <SelectItem value="tres_etale">Très étalé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('building_type') && (
+        <div>
+          <Label>Typologie du bâtiment</Label>
+          <Select value={form.building_type || 'habitation_faible'}
+            onValueChange={(v) => setField('building_type', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="habitation_faible">Habitation - hauteur faible</SelectItem>
+              <SelectItem value="habitation_moyenne">Habitation - hauteur moyenne</SelectItem>
+              <SelectItem value="habitation_elevee">Habitation - hauteur élevée</SelectItem>
+              <SelectItem value="administration">Administration</SelectItem>
+              <SelectItem value="erp_petit">ERP petit</SelectItem>
+              <SelectItem value="erp_moyen">ERP moyen</SelectItem>
+              <SelectItem value="erp_grand">ERP grand</SelectItem>
+              <SelectItem value="parking">Parking</SelectItem>
+              <SelectItem value="industriel">Industriel</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {fields.includes('height_m') && (
+        <div>
+          <Label>Hauteur (m)</Label>
+          <Input type="number" step="0.1" value={form.height_m || ''}
+            onChange={(e) => setField('height_m', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('nb_occupants_max') && (
+        <div>
+          <Label>Occupants max</Label>
+          <Input type="number" value={form.nb_occupants_max || ''}
+            onChange={(e) => setField('nb_occupants_max', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('special_context') && (
+        <div>
+          <Label>Contexte particulier (optionnel)</Label>
+          <Textarea rows={2} value={form.special_context || ''}
+            placeholder="Ex: parking souterrain sur 2 niveaux avec accès véhicules"
+            onChange={(e) => setField('special_context', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('specificities') && (
+        <div>
+          <Label>Spécificités du projet</Label>
+          <Textarea rows={3} value={form.specificities || ''}
+            placeholder="Contraintes particulières, éléments à mettre en avant, dérogations envisagées…"
+            onChange={(e) => setField('specificities', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('contraintes') && (
+        <div>
+          <Label>Contraintes</Label>
+          <Textarea rows={2} value={form.contraintes || ''}
+            onChange={(e) => setField('contraintes', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('notes') && (
+        <div>
+          <Label>Notes</Label>
+          <Textarea rows={3} value={form.notes || ''}
+            onChange={(e) => setField('notes', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('meeting_title') && (
+        <div>
+          <Label>Intitulé de la réunion</Label>
+          <Input value={form.meeting_title || ''}
+            onChange={(e) => setField('meeting_title', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('participants') && (
+        <div>
+          <Label>Participants</Label>
+          <Input value={form.participants || ''}
+            placeholder="Noms séparés par des virgules"
+            onChange={(e) => setField('participants', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('author') && (
+        <div>
+          <Label>Ingénieur signataire</Label>
+          <Input value={form.author || ''} placeholder="Nom prénom"
+            onChange={(e) => setField('author', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('ifc_upload') && (
+        <div>
+          <Label>Fichier IFC *</Label>
+          <Dropzone
+            accept=".ifc,.ifczip"
+            hint="Glisse ton IFC (max 50 Mo)"
+            maxSizeMB={50}
+            uploading={uploading}
+            currentFileName={uploadedFileName}
+            onFilesSelected={onFileUpload}
+          />
+        </div>
+      )}
+
+      {fields.includes('autorite_pdf_upload') && (
+        <div>
+          <Label>Courrier de l'autorité (PDF) *</Label>
+          <Dropzone
+            accept=".pdf"
+            hint="DALE, DGT, CAMAC ou autre"
+            uploading={uploading}
+            currentFileName={uploadedFileName}
+            onFilesSelected={onFileUpload}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
-function CoordinationInputs({ params, setParams, documents }: any) {
-  const entries = params.ifc_documents || [];
-
-  const add = () => {
-    setParams({ ...params, ifc_documents: [...entries, { lot: '', document_id: '' }] });
-  };
-  const update = (idx: number, key: string, value: string) => {
-    const next = [...entries];
-    next[idx] = { ...next[idx], [key]: value };
-    setParams({ ...params, ifc_documents: next });
-  };
-  const remove = (idx: number) => {
-    setParams({ ...params, ifc_documents: entries.filter((_: any, i: number) => i !== idx) });
+function buildTaskPayload(
+  taskType: string,
+  form: any,
+  projectId: string,
+  uploadedDocId: string | null,
+): any {
+  const base: any = {
+    task_type: taskType,
+    project_id: projectId || null,
+    input_params: {},
   };
 
-  return (
-    <div className="space-y-3">
-      {entries.map((entry: any, idx: number) => (
-        <div key={idx} className="flex gap-2 items-end">
-          <div className="flex-1 space-y-2">
-            <Label className="text-xs">Lot</Label>
-            <Input placeholder="cvc, structure..." value={entry.lot} onChange={(e) => update(idx, 'lot', e.target.value)} />
-          </div>
-          <div className="flex-[2] space-y-2">
-            <Label className="text-xs">Fichier IFC</Label>
-            <Select value={entry.document_id || ''} onValueChange={(v) => update(idx, 'document_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-              <SelectContent>
-                {documents.map((d: any) => (
-                  <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => remove(idx)}>Supprimer</Button>
-        </div>
-      ))}
-      <Button type="button" variant="outline" size="sm" onClick={add}>+ Ajouter un lot</Button>
-    </div>
-  );
+  const p = base.input_params;
+
+  // Champs universels
+  if (form.project_name) p.project_name = form.project_name;
+  if (form.author) p.author = form.author;
+
+  // Par type
+  if (taskType === 'dossier_mise_enquete') {
+    p.project_data = {
+      canton: form.canton || 'GE',
+      address: form.address || '',
+      affectation: form.affectation,
+      operation_type: form.operation_type,
+      sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
+    };
+    p.specificities = form.specificities || '';
+  } else if (taskType === 'metres_automatiques_ifc') {
+    p.ifc_document_id = uploadedDocId;
+  } else if (taskType === 'reponse_observations_autorite') {
+    p.autorite_pdf_document_id = uploadedDocId;
+    p.project_data = { canton: form.canton, address: form.address };
+  } else if (taskType === 'simulation_energetique_rapide') {
+    p.programme = {
+      canton: form.canton || 'GE',
+      affectation: form.affectation,
+      sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
+      standard: form.standard || 'sia_380_1_neuf',
+      heating_vector: form.heating_vector || 'chauffage_distance',
+      facteur_forme: form.facteur_forme || 'standard',
+    };
+  } else if (taskType === 'redaction_cctp') {
+    Object.assign(p, {
+      lot: form.lot, type_ouvrage: form.type_ouvrage,
+      niveau_prestation: form.niveau_prestation, surface: form.surface,
+      contraintes: form.contraintes,
+    });
+  } else if (taskType === 'chiffrage_dpgf') {
+    Object.assign(p, { lot: form.lot, surface: form.surface, notes: form.notes });
+  } else if (taskType === 'controle_reglementaire_geneve') {
+    p.project_data = {
+      canton: form.canton, address: form.address,
+      affectation: form.affectation, operation_type: form.operation_type,
+      sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
+      nb_logements: form.nb_logements ? Number(form.nb_logements) : undefined,
+    };
+  } else if (taskType === 'aeai_checklist_generation') {
+    Object.assign(p, {
+      building_type: form.building_type,
+      height_m: form.height_m ? Number(form.height_m) : undefined,
+      nb_occupants_max: form.nb_occupants_max ? Number(form.nb_occupants_max) : undefined,
+      special_context: form.special_context || '',
+    });
+  } else if (taskType === 'compte_rendu_reunion') {
+    Object.assign(p, {
+      meeting_title: form.meeting_title,
+      participants: form.participants,
+      notes: form.notes,
+    });
+  }
+
+  return base;
 }

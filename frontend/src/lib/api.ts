@@ -84,6 +84,27 @@ export const api = {
     const res = await fetch(`${API_URL}/api/projects/${id}`, { method: 'DELETE', headers: await authHeaders() });
     return handle<void>(res);
   },
+
+  // Namespace projects (alias moderne)
+  projects: {
+    list: async (archived = false) => {
+      const res = await fetch(`${API_URL}/api/projects?archived=${archived}`, { headers: await authHeaders() });
+      return handle<{ projects: any[] }>(res);
+    },
+    get: async (id: string) => {
+      const res = await fetch(`${API_URL}/api/projects/${id}`, { headers: await authHeaders() });
+      return handle<any>(res);
+    },
+    create: async (data: any) => {
+      const res = await fetch(`${API_URL}/api/projects`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handle<any>(res);
+    },
+  },
+
   listProjectDocuments: async (id: string) => {
     const res = await fetch(`${API_URL}/api/projects/${id}/documents`, { headers: await authHeaders() });
     return handle<{ documents: any[] }>(res);

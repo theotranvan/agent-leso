@@ -87,39 +87,181 @@ async def search_recent_fedlex(keywords: list[str], days_back: int = 7) -> list[
     return results[:30]
 
 
-async def sparql_query(query: str) -> dict[str, Any]:
+async def sparql_query(query: str, timeout: float = 30.0) -> dict[str, Any]:
     """Exécute une requête SPARQL sur l'endpoint Fedlex.
 
-    Utile pour des recherches structurées précises (en V3).
+    Endpoint officiel : https://fedlex.data.admin.ch/sparqlendpoint
+    Format : application/sparql-results+json
     """
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             response = await client.post(
                 FEDLEX_SPARQL,
-                data={"query": query, "format": "application/sparql-results+json"},
-                headers={"Accept": "application/sparql-results+json"},
+                data={"query": query},
+                headers={
+                    "Accept": "application/sparql-results+json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "BET-Agent/3.0 (contact: team@bet-agent.ch)",
+                },
             )
             response.raise_for_status()
             return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"SPARQL HTTP error {e.response.status_code}: {e.response.text[:500]}")
+            return {}
         except Exception as e:
             logger.error(f"SPARQL query error: {e}")
             return {}
 
 
+async def sparql_recent_acts(days_back: int = 7, limit: int = 50) -> list[dict]:
+    """Recherche des actes législatifs fédéraux récents via SPARQL.
+
+    Retourne les actes (loi, ordonnance) publiés dans les N derniers jours.
+    Schéma Fedlex : utilise `jolux:dateApplicability` pour l'entrée en vigueur.
+    """
+    from_date = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    query = f"""
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+SELECT DISTINCT ?uri ?title ?date ?type WHERE {{
+  ?uri a jolux:ConsolidationAbstract .
+  ?uri jolux:dateApplicability ?date .
+  ?uri jolux:title ?title .
+  OPTIONAL {{ ?uri jolux:typeDocument ?type . }}
+  FILTER (?date >= "{from_date}"^^<http://www.w3.org/2001/XMLSchema#date>)
+  FILTER (LANG(?title) = "fr")
+}}
+ORDER BY DESC(?date)
+LIMIT {limit}
+"""
+
+    data = await sparql_query(query)
+    if not data:
+        return []
+
+    bindings = data.get("results", {}).get("bindings", []) or []
+    results: list[dict] = []
+    for b in bindings:
+        try:
+            uri = b.get("uri", {}).get("value")
+            title = b.get("title", {}).get("value", "").strip()
+            date = b.get("date", {}).get("value", "")
+            doc_type = b.get("type", {}).get("value", "") if "type" in b else ""
+            if uri and title:
+                results.append({
+                    "source_url": uri,
+                    "title": title,
+                    "detected_at": datetime.utcnow().isoformat(),
+                    "publication_date": date,
+                    "document_type": doc_type.split("/")[-1] if doc_type else "acte",
+                    "method": "sparql",
+                })
+        except Exception as e:
+            logger.debug(f"Parse binding Fedlex échec : {e}")
+
+    return results
+
+
+async def sparql_search_keyword(keyword: str, days_back: int = 30, limit: int = 20) -> list[dict]:
+    """Recherche par mot-clé dans les actes Fedlex récents."""
+    from_date = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    keyword_safe = keyword.replace('"', '').replace('\\', '')
+
+    query = f"""
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+
+SELECT DISTINCT ?uri ?title ?date WHERE {{
+  ?uri jolux:title ?title .
+  ?uri jolux:dateApplicability ?date .
+  FILTER (CONTAINS(LCASE(?title), LCASE("{keyword_safe}")))
+  FILTER (?date >= "{from_date}"^^<http://www.w3.org/2001/XMLSchema#date>)
+  FILTER (LANG(?title) = "fr")
+}}
+ORDER BY DESC(?date)
+LIMIT {limit}
+"""
+
+    data = await sparql_query(query)
+    if not data:
+        return []
+
+    bindings = data.get("results", {}).get("bindings", []) or []
+    results: list[dict] = []
+    for b in bindings:
+        try:
+            results.append({
+                "source_url": b["uri"]["value"],
+                "title": b["title"]["value"].strip(),
+                "publication_date": b["date"]["value"],
+                "keyword_matched": keyword,
+                "detected_at": datetime.utcnow().isoformat(),
+                "method": "sparql",
+            })
+        except (KeyError, TypeError):
+            continue
+
+    return results
+
+
 async def daily_fedlex_veille() -> list[dict]:
-    """Run quotidien de veille Fedlex sur tous les domaines BET."""
+    """Run quotidien de veille Fedlex sur tous les domaines BET.
+
+    Stratégie à 2 niveaux :
+      1. SPARQL officiel (prioritaire) : requête par mot-clé sur actes récents
+      2. Fallback scraping HTML si SPARQL échoue (réseau/endpoint down)
+    """
     all_results: list[dict] = []
+
+    # Niveau 1 : SPARQL officiel
+    sparql_ok = False
     for domain, keywords in FEDLEX_KEYWORDS.items():
-        domain_results = await search_recent_fedlex(keywords, days_back=2)
-        for r in domain_results:
-            r["domain"] = domain
-        all_results.extend(domain_results)
+        for keyword in keywords[:3]:  # top 3 keywords par domaine
+            try:
+                items = await sparql_search_keyword(keyword, days_back=2, limit=10)
+                for r in items:
+                    r["domain"] = domain
+                all_results.extend(items)
+                if items:
+                    sparql_ok = True
+            except Exception as e:
+                logger.debug(f"SPARQL keyword '{keyword}' échec : {e}")
+
+    # Complément : actes très récents (sans filtre mot-clé)
+    if sparql_ok:
+        try:
+            recent = await sparql_recent_acts(days_back=2, limit=20)
+            for r in recent:
+                r["domain"] = "general"
+            all_results.extend(recent)
+        except Exception as e:
+            logger.warning(f"SPARQL recent_acts échec : {e}")
+
+    # Niveau 2 : fallback HTML scraping si SPARQL a tout raté
+    if not sparql_ok:
+        logger.warning("SPARQL Fedlex indisponible, fallback HTML scraping")
+        for domain, keywords in FEDLEX_KEYWORDS.items():
+            try:
+                domain_results = await search_recent_fedlex(keywords, days_back=2)
+                for r in domain_results:
+                    r["domain"] = domain
+                    r.setdefault("method", "html_scraping")
+                all_results.extend(domain_results)
+            except Exception as e:
+                logger.error(f"HTML fallback domain '{domain}' échec : {e}")
 
     # Déduplication par URL
-    seen = set()
-    unique = []
+    seen: set[str] = set()
+    unique: list[dict] = []
     for r in all_results:
-        if r["source_url"] not in seen:
-            seen.add(r["source_url"])
+        url = r.get("source_url")
+        if url and url not in seen:
+            seen.add(url)
             unique.append(r)
+
+    logger.info(f"Veille Fedlex : {len(unique)} actes uniques ({'SPARQL' if sparql_ok else 'HTML'})")
     return unique

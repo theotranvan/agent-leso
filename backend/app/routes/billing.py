@@ -101,7 +101,14 @@ async def stripe_webhook(
     request: Request,
     stripe_signature: Annotated[str, Header(alias="Stripe-Signature")],
 ):
-    """Webhook Stripe - signature vérifiée, puis dispatch événement."""
+    """Webhook Stripe - signature vérifiée, dispatch événement, onboarding auto.
+
+    Sur checkout.session.completed, on déclenche :
+      - Activation du plan sur l'organisation
+      - Création d'un projet démo
+      - Génération du 1er justificatif stub (pour que l'utilisateur voie la valeur dès J0)
+      - Email de bienvenue
+    """
     payload = await request.body()
     try:
         event = stripe_service.verify_webhook_signature(payload, stripe_signature)
@@ -113,7 +120,19 @@ async def stripe_webhook(
         stripe_service.handle_webhook_event(event)
     except Exception as e:
         logger.exception(f"Erreur handler webhook: {e}")
-        # On ne lève pas d'erreur pour que Stripe ne re-retry pas indéfiniment sur une erreur applicative
         return {"received": True, "error": str(e)}
+
+    # Onboarding post-paiement sur checkout.session.completed
+    event_type = event.get("type", "")
+    if event_type == "checkout.session.completed":
+        try:
+            from app.services.onboarding import run_first_payment_onboarding
+            session = event.get("data", {}).get("object", {})
+            customer_id = session.get("customer")
+            if customer_id:
+                await run_first_payment_onboarding(customer_id)
+        except Exception as e:
+            logger.exception(f"Onboarding post-paiement échec : {e}")
+            # Non-bloquant : le paiement est déjà validé
 
     return {"received": True}

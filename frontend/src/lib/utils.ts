@@ -62,3 +62,15 @@ export const LOT_LABELS: Record<string, string> = {
   acoustique: 'Acoustique',
   thermique: 'Thermique',
 };
+
+export function formatBytes(bytes: number): string {
+  if (!bytes) return '0 o';
+  const units = ['o', 'Ko', 'Mo', 'Go'];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit++;
+  }
+  return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}

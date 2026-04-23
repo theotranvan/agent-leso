@@ -63,6 +63,14 @@ ROUTING_TABLE: dict[str, str] = {
     "idc_extraction_facture": MODEL_HAIKU,
     "veille_romande": MODEL_HAIKU,
     "aeai_checklist_generation": MODEL_HAIKU,
+
+    # ==== V3 Agents haute valeur ajoutée ====
+    # Sonnet - livrables complexes
+    "dossier_mise_enquete": MODEL_SONNET,
+    "reponse_observations_autorite": MODEL_SONNET,
+    # Haiku - déterministe (pas d'appel LLM mais taggage pour trace)
+    "simulation_energetique_rapide": MODEL_HAIKU,
+    "metres_automatiques_ifc": MODEL_HAIKU,
 }
 
 # Tarifs API Anthropic (USD / million de tokens) - pour estimation de coût
