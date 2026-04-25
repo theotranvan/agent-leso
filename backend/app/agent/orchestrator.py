@@ -34,6 +34,36 @@ async def execute_task(task_id: str) -> dict[str, Any]:
 
     task_type = task["task_type"]
 
+    # ==================== QUOTA CHECK (V5) ====================
+    # Vérifie que l'organisation a encore des tokens avant tout dispatch.
+    # Si dépassé → passe la tâche en 'failed' avec un message utilisateur clair.
+    try:
+        from app.services.token_quota import TokenQuotaExceeded, check_quota_available
+        await check_quota_available(
+            organization_id=task["organization_id"],
+            estimated_tokens=0,
+        )
+    except TokenQuotaExceeded as quota_err:
+        logger.warning(
+            "Task %s bloquée : quota dépassé pour org=%s",
+            task_id, task["organization_id"],
+        )
+        admin.table("tasks").update({
+            "status": "failed",
+            "error_message": quota_err.user_message,
+            "completed_at": datetime.utcnow().isoformat(),
+        }).eq("id", task_id).execute()
+        return {
+            "status": "failed",
+            "error": "quota_exceeded",
+            "user_message": quota_err.user_message,
+            "tokens_used": quota_err.tokens_used,
+            "tokens_limit": quota_err.tokens_limit,
+        }
+    except Exception as exc:
+        # Autre erreur de check : on log mais on n'empêche pas la tâche
+        logger.warning("Check quota échec (non-bloquant) : %s", exc)
+
     # ==================== Ingestion documents (V4+) ====================
     # Enrichit automatiquement les input_params avec les documents du projet
     try:
@@ -55,6 +85,22 @@ async def execute_task(task_id: str) -> dict[str, Any]:
     except Exception as exc:
         logger.warning("Ingestion échec pour task %s : %s", task_id, exc)
         # Non-bloquant : continue avec input_params original
+
+    # ==================== TaskContext (V5) ====================
+    # Propage org_id / task_id / régénération à call_llm via ContextVar.
+    # Les agents n'ont plus besoin de passer ces arguments explicitement.
+    from app.agent.router import TaskContext, set_task_context
+    regen_ctx = (task.get("input_params") or {}).get("regeneration_context") or {}
+    task_context = TaskContext(
+        organization_id=task["organization_id"],
+        task_id=task_id,
+        task_type=task_type,
+        is_regeneration=bool(regen_ctx),
+        regeneration_attempt=int(regen_ctx.get("attempt") or 0),
+        regeneration_reasons=regen_ctx.get("reasons") or None,
+        regeneration_sections=regen_ctx.get("target_sections") or None,
+    )
+    set_task_context(task_context)
 
     try:
         # Dispatch vers le module
@@ -200,3 +246,9 @@ async def execute_task(task_id: str) -> dict[str, Any]:
                 pass
 
         return {"status": "failed", "error": str(e)}
+    finally:
+        # V5 : reset TaskContext pour ne pas fuiter entre tâches
+        try:
+            set_task_context(None)
+        except Exception:
+            pass

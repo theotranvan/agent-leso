@@ -91,25 +91,61 @@ def handle_webhook_event(event: stripe.Event) -> None:
 
 def _handle_checkout_completed(session: dict) -> None:
     organization_id = session.get("metadata", {}).get("organization_id")
-    plan = session.get("metadata", {}).get("plan", "starter")
-    subscription_id = session.get("subscription")
+    session_type = session.get("metadata", {}).get("type", "subscription")
     customer_id = session.get("customer")
 
     if not organization_id:
         logger.error("Webhook checkout sans organization_id")
         return
 
+    # V5 : traitement des credit packs (one-shot payment, pas subscription)
+    if session_type == "credit_pack":
+        try:
+            import asyncio
+            from app.services.token_quota import CREDIT_PACK_PRICE_CHF, CREDIT_PACK_TOKENS, add_credit_pack
+
+            quantity = int(session.get("metadata", {}).get("quantity", 1) or 1)
+            tokens = int(session.get("metadata", {}).get("tokens_per_pack", CREDIT_PACK_TOKENS) or CREDIT_PACK_TOKENS)
+
+            coro = add_credit_pack(
+                organization_id=organization_id,
+                stripe_session_id=session["id"],
+                stripe_payment_intent_id=session.get("payment_intent"),
+                tokens=tokens * quantity,
+                price_chf=CREDIT_PACK_PRICE_CHF * quantity,
+            )
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(coro)
+                else:
+                    loop.run_until_complete(coro)
+            except RuntimeError:
+                asyncio.run(coro)
+
+            logger.info("Credit pack enregistré : org=%s x%d", organization_id, quantity)
+        except Exception as e:
+            logger.exception("Enregistrement credit pack échoué : %s", e)
+        return
+
+    # Subscription classique
+    plan = session.get("metadata", {}).get("plan", "pilot")
+    subscription_id = session.get("subscription")
+
     admin = get_supabase_admin()
-    limits = settings.PLAN_LIMITS.get(plan, {"tasks": 500})
+    # V5 : on utilise les quotas tokens au lieu des tasks_limit
+    from app.services.token_quota import QUOTA_PLANS
+    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS["pilot"])
+
     admin.table("organizations").update({
         "plan": plan,
-        "tasks_limit": limits["tasks"],
+        "tokens_limit_monthly": tokens_limit,
         "stripe_customer_id": customer_id,
         "stripe_subscription_id": subscription_id,
         "active": True,
     }).eq("id", organization_id).execute()
 
-    logger.info(f"Organisation {organization_id} activée sur plan {plan}")
+    logger.info(f"Organisation {organization_id} activée sur plan {plan} ({tokens_limit:,} tokens/mois)")
 
 
 def _handle_subscription_updated(subscription: dict) -> None:
@@ -165,3 +201,41 @@ def _handle_payment_failed(invoice: dict) -> None:
             subject="Paiement échoué — action requise",
             body_html=f"<p>Le paiement de votre abonnement BET Agent a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
         )
+
+
+def create_credit_pack_session(
+    customer_id: str,
+    organization_id: str,
+    quantity: int = 1,
+) -> str:
+    """Crée une session Stripe one-shot pour l'achat d'un/plusieurs credit packs.
+
+    Chaque pack = 5M tokens = 200 CHF. Mode 'payment' (pas d'abonnement).
+    """
+    from app.services.token_quota import CREDIT_PACK_PRICE_CHF, CREDIT_PACK_TOKENS
+
+    session = stripe.checkout.Session.create(
+        customer=customer_id,
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "chf",
+                "product_data": {
+                    "name": f"Pack de {CREDIT_PACK_TOKENS:,} tokens BET Agent",
+                    "description": "Tokens additionnels consommés après le quota mensuel",
+                },
+                "unit_amount": CREDIT_PACK_PRICE_CHF * 100,  # en centimes CHF
+            },
+            "quantity": quantity,
+        }],
+        metadata={
+            "type": "credit_pack",
+            "organization_id": organization_id,
+            "tokens_per_pack": CREDIT_PACK_TOKENS,
+            "quantity": quantity,
+        },
+        success_url=f"{settings.FRONTEND_URL}/settings/billing?pack_purchased=1",
+        cancel_url=f"{settings.FRONTEND_URL}/settings/billing?cancelled=1",
+    )
+    return session.url

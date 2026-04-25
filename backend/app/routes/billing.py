@@ -136,3 +136,74 @@ async def stripe_webhook(
             # Non-bloquant : le paiement est déjà validé
 
     return {"received": True}
+
+
+# ============================================================
+# V5 — Quotas tokens & credit packs
+# ============================================================
+
+@router.get("/usage")
+async def get_usage(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+):
+    """Consommation tokens du mois courant + quotas + packs + coût CHF."""
+    from app.services.token_quota import get_monthly_usage
+    try:
+        return await get_monthly_usage(user.organization_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        logger.exception("get_usage échec")
+        raise HTTPException(500, f"Erreur : {e}")
+
+
+class CreditPackCheckoutRequest(BaseModel):
+    quantity: int = 1  # nb de packs (chaque pack = 5M tokens / 200 CHF)
+
+
+@router.post("/credit-pack/checkout")
+async def checkout_credit_pack(
+    body: CreditPackCheckoutRequest,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+):
+    """Crée une session Stripe Checkout pour acheter des credit packs.
+
+    Chaque pack = 5 000 000 tokens = 200 CHF.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Droits admin requis")
+
+    qty = max(1, min(body.quantity, 20))  # garde-fou : 1 à 20 packs
+
+    admin = get_supabase_admin()
+    org = admin.table("organizations").select("*").eq(
+        "id", user.organization_id,
+    ).maybe_single().execute()
+    if not org.data:
+        raise HTTPException(404, "Organisation introuvable")
+
+    # Création customer Stripe si besoin
+    customer_id = org.data.get("stripe_customer_id")
+    if not customer_id:
+        customer_id = stripe_service.create_customer(
+            email=org.data["email"],
+            organization_name=org.data["name"],
+            organization_id=user.organization_id,
+        )
+        admin.table("organizations").update({
+            "stripe_customer_id": customer_id,
+        }).eq("id", user.organization_id).execute()
+
+    # Session one-shot
+    try:
+        session_url = stripe_service.create_credit_pack_session(
+            customer_id=customer_id,
+            organization_id=user.organization_id,
+            quantity=qty,
+        )
+    except Exception as e:
+        logger.exception("Création session Stripe pack échouée")
+        raise HTTPException(500, f"Stripe : {e}")
+
+    audit_log(user, "credit_pack_checkout_created", {"quantity": qty})
+    return {"checkout_url": session_url, "quantity": qty}

@@ -186,7 +186,48 @@ export const api = {
     return handle<any>(res);
   },
 
-  // Billing
+  // V5 — Régénération intelligente
+  regenerateTask: async (id: string, body: {
+    reasons: string[];
+    custom_feedback?: string;
+    target_sections?: string[];
+    upgrade_model?: boolean;
+  }) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/regenerate`, {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return handle<{
+      status: string; task_id: string;
+      attempt: number; remaining_regenerations: number;
+    }>(res);
+  },
+  getRegenerations: async (id: string) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/regenerations`, { headers: await authHeaders() });
+    return handle<{
+      count: number; max_per_task: number; last_at?: string;
+      history: any[]; remaining: number;
+    }>(res);
+  },
+
+  // Billing (V5) — usage + credit packs
+  billing: {
+    getUsage: async () => {
+      const res = await fetch(`${API_URL}/api/billing/usage`, { headers: await authHeaders() });
+      return handle<any>(res);
+    },
+    purchaseCreditPack: async (quantity = 1) => {
+      const res = await fetch(`${API_URL}/api/billing/credit-pack/checkout`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity }),
+      });
+      return handle<{ checkout_url: string; quantity: number }>(res);
+    },
+  },
+
+  // Billing (legacy V1)
   getBillingStatus: async () => {
     const res = await fetch(`${API_URL}/api/billing/status`, { headers: await authHeaders() });
     return handle<any>(res);

@@ -54,7 +54,19 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 
 Produire le CCTP complet en markdown, structuré, prescriptif. Minimum 1500 mots. Inclure toutes les sections habituelles d'un CCTP professionnel."""
 
+    # V5 : injection du feedback de régénération si applicable
+    from app.agent.prompts import build_regeneration_instructions, get_model_override_for_regeneration
+    regen_context = params.get("regeneration_context")
+    regen_block = build_regeneration_instructions(regen_context)
+    if regen_block:
+        user_content = user_content + regen_block
+
     system_prompt = get_system_prompt("redaction_cctp")
+
+    # Upgrade modèle optionnel sur régénération
+    from app.agent.router import get_model_for_task
+    base_model = get_model_for_task("redaction_cctp")
+    model_override = get_model_override_for_regeneration(regen_context, base_model)
 
     llm_result = await call_llm(
         task_type="redaction_cctp",
@@ -62,6 +74,9 @@ Produire le CCTP complet en markdown, structuré, prescriptif. Minimum 1500 mots
         user_content=user_content,
         max_tokens=8000,
         temperature=0.2,
+        model_override=model_override,
+        organization_id=org_id,
+        task_id=task.get("id"),
     )
 
     cctp_markdown = llm_result["text"]
