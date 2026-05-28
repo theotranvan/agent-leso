@@ -174,6 +174,37 @@ async def execute_task(task_id: str) -> dict[str, Any]:
         else:
             raise ValueError(f"Type de tâche non supporté: {task_type}")
 
+        # ==================== Score de confiance (Levier 1) ====================
+        # L'agent s'auto-évalue sur des critères déterministes pour aider
+        # l'ingénieur à prioriser sa relecture. N'engage pas la responsabilité.
+        confidence_dict: dict[str, Any] = {}
+        try:
+            from app.agent.confidence import compute_confidence
+            score = compute_confidence(
+                task_type=task_type,
+                document_html=result.get("document_html") or result.get("preview") or "",
+                connector_warnings=result.get("connector_warnings"),
+                ingestion_warnings=(ingestion.warnings if "ingestion" in dir() else None),
+                expected_sections=result.get("expected_sections"),
+                numeric_checks=result.get("numeric_checks"),
+            )
+            confidence_dict = score.to_dict()
+            logger.info(
+                "Confiance task=%s : %d%% (%s) — %d alertes",
+                task_id, score.score, score.level.value, len(score.alerts),
+            )
+        except Exception as exc:
+            logger.warning("Calcul confiance échoué (non-bloquant) task=%s : %s", task_id, exc)
+
+        # Détermine le statut de validation selon le niveau de confiance
+        # (utilisé par le Levier 3 approbation et le Levier 4 délégation)
+        review_status = "pending_review"  # défaut
+        if confidence_dict:
+            if confidence_dict.get("level") == "high":
+                review_status = "ready_to_approve"
+            elif confidence_dict.get("level") == "low":
+                review_status = "needs_revision"
+
         # Marque completed
         admin.table("tasks").update({
             "status": "completed",
@@ -183,7 +214,60 @@ async def execute_task(task_id: str) -> dict[str, Any]:
             "model_used": result.get("model"),
             "tokens_used": result.get("tokens_used", 0),
             "cost_euros": result.get("cost_eur", 0),
+            "confidence_score": confidence_dict.get("score"),
+            "confidence_level": confidence_dict.get("level"),
+            "confidence_alerts": confidence_dict.get("alerts"),
+            "confidence_detail": confidence_dict,
+            "review_status": review_status,
         }).eq("id", task_id).execute()
+
+        # ==================== Auto-délégation (Levier 4) ====================
+        # Si l'organisation l'autorise et que la tâche est éligible (non réservée,
+        # confiance haute), elle passe directement en 'approved'.
+        try:
+            from app.services.validation_service import apply_auto_delegation
+            auto = apply_auto_delegation(task_id)
+            if auto.get("auto_approved"):
+                review_status = "approved"
+                logger.info("Task %s auto-approuvée via délégation", task_id)
+        except Exception as exc:
+            logger.warning("Auto-délégation échec (non-bloquant) task=%s : %s", task_id, exc)
+
+        # ==================== Email d'approbation 1-clic (Levier 3) ====================
+        # Si la tâche n'est pas auto-approuvée et qu'un destinataire validateur
+        # est défini, on envoie l'email avec boutons Approuver/Renvoyer.
+        try:
+            ip = task.get("input_params") or {}
+            approver_emails = ip.get("approver_emails") or ip.get("recipient_emails")
+            if review_status != "approved" and approver_emails and confidence_dict:
+                from app.services.validation_service import generate_approval_token
+                from app.services.email_service import send_approval_request_email
+                approve_tok = generate_approval_token(
+                    task_id=task_id, organization_id=task["organization_id"],
+                    user_id=task.get("user_id"), action="approve",
+                )
+                reject_tok = generate_approval_token(
+                    task_id=task_id, organization_id=task["organization_id"],
+                    user_id=task.get("user_id"), action="reject",
+                )
+                proj_name = ip.get("project_name", "")
+                if not proj_name and task.get("project_id"):
+                    pr = admin.table("projects").select("name").eq("id", task["project_id"]).maybe_single().execute()
+                    if pr.data:
+                        proj_name = pr.data["name"]
+                send_approval_request_email(
+                    to=approver_emails if isinstance(approver_emails, list) else [approver_emails],
+                    task_type=task_type,
+                    project_name=proj_name,
+                    confidence_score=confidence_dict.get("score", 0),
+                    confidence_level=confidence_dict.get("level", "medium"),
+                    alerts=confidence_dict.get("alerts", []),
+                    approve_token=approve_tok,
+                    reject_token=reject_tok,
+                )
+                logger.info("Email d'approbation envoyé pour task=%s", task_id)
+        except Exception as exc:
+            logger.warning("Email approbation échec (non-bloquant) task=%s : %s", task_id, exc)
 
         # Incrémente compteur tâches de l'organisation
         org = admin.table("organizations").select("tasks_used_this_month").eq("id", task["organization_id"]).maybe_single().execute()
@@ -221,7 +305,7 @@ async def execute_task(task_id: str) -> dict[str, Any]:
                 preview_text=result.get("preview", "")[:500],
             )
 
-        return {"status": "completed", **result}
+        return {"status": "completed", "confidence": confidence_dict, "review_status": review_status, **result}
 
     except Exception as e:
         logger.exception(f"Erreur exécution tâche {task_id}: {e}")

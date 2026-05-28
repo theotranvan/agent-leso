@@ -92,6 +92,83 @@ def send_task_completed_email(
     return send_email(to, f"[BET Agent] {label} - {project_name}", html, attachments=attachments)
 
 
+def send_approval_request_email(
+    to: list[str],
+    task_type: str,
+    project_name: str,
+    confidence_score: int,
+    confidence_level: str,
+    alerts: list[str],
+    approve_token: str,
+    reject_token: str,
+    backend_url: str = "",
+) -> Optional[str]:
+    """Levier 3 — Email d'approbation 1-clic.
+
+    L'ingénieur reçoit un résumé court (score + points à vérifier) et deux
+    boutons qui approuvent/rejettent sans qu'il ait à se connecter.
+    """
+    from app.config import settings as _settings
+    base = backend_url or _settings.BACKEND_URL
+
+    task_labels = {
+        "redaction_cctp": "CCTP",
+        "justificatif_sia_380_1": "Justificatif thermique SIA 380/1",
+        "note_calcul_sia_260_267": "Note de calcul structure",
+        "chiffrage_dpgf": "DPGF",
+        "aeai_rapport": "Rapport AEAI",
+        "idc_geneve_rapport": "Rapport IDC",
+    }
+    label = task_labels.get(task_type, task_type.replace("_", " ").title())
+
+    # Couleur selon le niveau de confiance
+    color = {"high": "#16a34a", "medium": "#d97706", "low": "#dc2626"}.get(confidence_level, "#525252")
+    level_fr = {"high": "élevée", "medium": "moyenne", "low": "faible"}.get(confidence_level, confidence_level)
+
+    approve_url = f"{base}/api/tasks/approve-via-token?token={approve_token}"
+    reject_url = f"{base}/api/tasks/approve-via-token?token={reject_token}"
+
+    alerts_html = ""
+    if alerts:
+        items = "".join(f"<li style='margin:4px 0;color:#525252;'>{a}</li>" for a in alerts[:6])
+        alerts_html = f"""
+        <div style="margin:16px 0;padding:12px 16px;background:#fef3c7;border-radius:8px;">
+          <p style="margin:0 0 8px;font-weight:600;font-size:14px;color:#92400e;">Points à vérifier ({len(alerts)})</p>
+          <ul style="margin:0;padding-left:18px;font-size:13px;">{items}</ul>
+        </div>
+        """
+    else:
+        alerts_html = """
+        <div style="margin:16px 0;padding:12px 16px;background:#dcfce7;border-radius:8px;">
+          <p style="margin:0;font-size:14px;color:#166534;">Aucun point bloquant signalé par l'agent.</p>
+        </div>
+        """
+
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color:#0a0a0a;">
+      <h2 style="margin:0 0 4px;font-size:20px;font-weight:600;">Document à valider : {label}</h2>
+      <p style="margin:0 0 16px;color:#525252;font-size:14px;">Projet : <strong>{project_name}</strong></p>
+
+      <div style="display:inline-block;padding:6px 14px;border-radius:99px;background:{color}1a;margin-bottom:8px;">
+        <span style="color:{color};font-weight:600;font-size:14px;">Confiance {level_fr} — {confidence_score}%</span>
+      </div>
+
+      {alerts_html}
+
+      <div style="margin:24px 0;">
+        <a href="{approve_url}" style="display:inline-block;padding:12px 28px;background:#16a34a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;margin-right:12px;">✓ Approuver</a>
+        <a href="{reject_url}" style="display:inline-block;padding:12px 28px;background:#fff;color:#dc2626;text-decoration:none;border:1px solid #dc2626;border-radius:8px;font-weight:600;font-size:15px;">Renvoyer</a>
+      </div>
+
+      <p style="margin:16px 0 0;color:#a3a3a3;font-size:12px;">
+        En approuvant, vous engagez votre validation professionnelle sur ce document.
+        Lien valable 72h. Vous pouvez aussi ouvrir le document complet dans votre espace BET Agent.
+      </p>
+    </div>
+    """
+    return send_email(to, f"[À valider] {label} — {project_name}", html)
+
+
 def send_alert_email(to: list[str], subject: str, body_html: str) -> Optional[str]:
     """Email d'alerte (réglementaire, incident)."""
     html = f"""

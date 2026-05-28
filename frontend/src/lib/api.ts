@@ -211,6 +211,40 @@ export const api = {
     }>(res);
   },
 
+  // Validation assistée (Leviers 1-4)
+  getTaskReview: async (id: string) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/review`, { headers: await authHeaders() });
+    return handle<{
+      task_id: string; confidence_score: number; confidence_level: string;
+      ready_to_approve: boolean; alerts: string[]; failed_checks: any[];
+      summary: string; nb_points_to_verify: number;
+      can_approve: boolean; approval_reason: string; review_status: string;
+    }>(res);
+  },
+  approveTask: async (id: string, note?: string) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/approve`, {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: note || '', channel: 'web' }),
+    });
+    return handle<{ task_id: string; review_status: string; reason: string }>(res);
+  },
+  rejectTask: async (id: string, note?: string) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/reject`, {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: note || '', channel: 'web' }),
+    });
+    return handle<{ task_id: string; review_status: string; reason: string }>(res);
+  },
+  getReviewQueue: async () => {
+    const res = await fetch(`${API_URL}/api/tasks/review/queue`, { headers: await authHeaders() });
+    return handle<{
+      queue: any[];
+      counts: { ready_to_approve: number; pending_review: number; needs_revision: number };
+    }>(res);
+  },
+
   // Settings — charte client (branding)
   settings: {
     getBranding: async () => {

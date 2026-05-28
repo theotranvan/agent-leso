@@ -94,6 +94,146 @@ async def get_task(task_id: str, user: Annotated[AuthUser, Depends(get_current_u
     return task.data
 
 
+@router.get("/approve-via-token")
+async def approve_via_token_route(token: str):
+    """Levier 3 — Approbation via lien email, sans authentification.
+
+    Le token à usage unique encode l'action (approve/reject) et la tâche.
+    Retourne une page HTML simple de confirmation.
+    """
+    from fastapi.responses import HTMLResponse
+    from app.services.validation_service import approve_via_token
+
+    try:
+        result = approve_via_token(token)
+        status = result["review_status"]
+        msg = "Document approuvé" if status == "approved" else "Document renvoyé pour révision"
+        color = "#16a34a" if status == "approved" else "#d97706"
+        html = f"""
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{msg}</title></head>
+        <body style="font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f7f6f2;">
+        <div style="text-align:center;padding:40px;background:#fff;border-radius:16px;box-shadow:0 2px 20px rgba(0,0,0,0.06);">
+        <div style="font-size:48px;color:{color};">✓</div>
+        <h1 style="font-size:22px;color:#0a0a0a;margin:16px 0 8px;">{msg}</h1>
+        <p style="color:#525252;font-size:14px;">Votre validation a bien été enregistrée.</p>
+        </div></body></html>
+        """
+        return HTMLResponse(content=html)
+    except ValueError as e:
+        html = f"""
+        <html><head><meta charset="utf-8"><title>Lien invalide</title></head>
+        <body style="font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f7f6f2;">
+        <div style="text-align:center;padding:40px;background:#fff;border-radius:16px;">
+        <div style="font-size:48px;color:#dc2626;">✗</div>
+        <h1 style="font-size:20px;color:#0a0a0a;margin:16px 0 8px;">{e}</h1>
+        </div></body></html>
+        """
+        return HTMLResponse(content=html, status_code=400)
+
+
+@router.get("/{task_id}/review")
+async def get_task_review(task_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Levier 2 — Alertes ciblées : retourne le score + uniquement les points à vérifier.
+
+    Au lieu de relire tout le document, l'ingénieur voit le score de confiance
+    et seulement les alertes signalées par l'agent.
+    """
+    from app.services.validation_service import get_review_alerts, can_user_validate
+
+    admin = get_supabase_admin()
+    task = (
+        admin.table("tasks").select("*")
+        .eq("id", task_id).eq("organization_id", user.organization_id)
+        .maybe_single().execute()
+    )
+    if not task.data:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
+
+    review = get_review_alerts(task.data)
+    allowed, reason = can_user_validate(
+        user_id=user.id, organization_id=user.organization_id,
+        role=user.role, task=task.data,
+    )
+    review["can_approve"] = allowed
+    review["approval_reason"] = reason
+    review["review_status"] = task.data.get("review_status")
+    return review
+
+
+@router.post("/{task_id}/approve")
+async def approve_task_route(
+    task_id: str,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: Optional[dict] = None,
+):
+    """Levier 3 — Approbation 1-clic."""
+    from app.services.validation_service import approve_task
+
+    note = (body or {}).get("note", "")
+    channel = (body or {}).get("channel", "web")
+    try:
+        result = approve_task(
+            task_id=task_id, user_id=user.id,
+            organization_id=user.organization_id, role=user.role,
+            note=note, channel=channel,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return result
+
+
+@router.post("/{task_id}/reject")
+async def reject_task_route(
+    task_id: str,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: Optional[dict] = None,
+):
+    """Levier 3 — Rejet 1-clic (renvoie en régénération)."""
+    from app.services.validation_service import reject_task
+
+    note = (body or {}).get("note", "")
+    try:
+        result = reject_task(
+            task_id=task_id, user_id=user.id,
+            organization_id=user.organization_id, role=user.role,
+            note=note, channel=(body or {}).get("channel", "web"),
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return result
+
+
+@router.get("/review/queue")
+async def review_queue(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """File de validation triée par priorité (confiance haute en premier)."""
+    admin = get_supabase_admin()
+    result = (
+        admin.table("tasks")
+        .select("id, task_type, review_status, confidence_score, confidence_level, "
+                "confidence_alerts, result_preview, project_id, completed_at")
+        .eq("organization_id", user.organization_id)
+        .eq("status", "completed")
+        .in_("review_status", ["pending_review", "ready_to_approve", "needs_revision"])
+        .order("confidence_score", desc=True)
+        .limit(100)
+        .execute()
+    )
+    tasks = result.data or []
+    return {
+        "queue": tasks,
+        "counts": {
+            "ready_to_approve": sum(1 for t in tasks if t.get("review_status") == "ready_to_approve"),
+            "pending_review": sum(1 for t in tasks if t.get("review_status") == "pending_review"),
+            "needs_revision": sum(1 for t in tasks if t.get("review_status") == "needs_revision"),
+        },
+    }
+
+
 @router.get("/{task_id}/status", response_model=TaskStatusResponse)
 async def get_task_status(task_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
     """Endpoint léger de polling pour le frontend (toutes les 3s)."""
