@@ -182,6 +182,17 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
         for l in lines[:80] if not l.get("is_section")
     )
 
+    # Charte client pour le PDF
+    from app.knowledge_base.templates.charter import get_org_branding
+    branding = await get_org_branding(org_id)
+    branding_dict = {
+        "primary_color": branding.primary_color,
+        "accent_color": branding.accent_color,
+        "logo_url": branding.logo_url,
+        "footer_text": branding.footer_text or branding.organization_name,
+        "full_name": branding.organization_full_name,
+    }
+
     pdf_bytes = render_pdf_from_html(
         body_html=markdown_to_html(recap_md),
         title=f"DPGF — Lot {lot}",
@@ -189,6 +200,7 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
         project_name=project_name,
         lot=lot,
         reference=f"DPGF-{datetime.now().strftime('%Y%m%d-%H%M')}",
+        branding=branding_dict,
     )
 
     storage = get_storage()

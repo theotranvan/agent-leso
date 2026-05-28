@@ -117,6 +117,26 @@ PRIX_VENTILATION = {
         },
         "notes": "Coefficient de complexité +20% pour gaines rectangulaires.",
     },
+    "244.120": {  # VMC simple flux hygro
+        "designation": "VMC simple flux hygroréglable (caisson + bouches + réseau)",
+        "unite": "logement équivalent",
+        "prix": {
+            "economique": {"min": 1400, "median": 1750, "max": 2100},
+            "standard": {"min": 1900, "median": 2400, "max": 2900},
+            "premium": {"min": 2700, "median": 3400, "max": 4200},
+        },
+        "notes": "Par logement type 3.5 pièces. Hors gaines verticales collectives.",
+    },
+    "244.410": {  # Rafraîchissement
+        "designation": "Rafraîchissement de confort (batterie froide ou plafond rafraîchissant)",
+        "unite": "m² rafraîchi",
+        "prix": {
+            "economique": {"min": 25, "median": 35, "max": 50},
+            "standard": {"min": 60, "median": 85, "max": 120},
+            "premium": {"min": 130, "median": 180, "max": 250},
+        },
+        "notes": "Free-cooling seul = économique. Plafonds rafraîchissants = premium.",
+    },
     "244.310": {  # Bouches/diffuseurs
         "designation": "Bouche ou diffuseur, fourniture et pose",
         "unite": "pièce",

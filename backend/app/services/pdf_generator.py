@@ -98,7 +98,8 @@ tr:nth-child(even) td { background: #fafafa; }
 
 COVER_TEMPLATE = """
 <div class="cover">
-    <div style="font-size: 10pt; color: #737373; margin-bottom: 2cm;">BET Agent — Bureau d'Études Techniques</div>
+    {% if logo_html %}{{ logo_html|safe }}{% endif %}
+    <div style="font-size: 10pt; color: #737373; margin-bottom: 2cm;">{{ footer_org|default("BET Agent — Bureau d'Études Techniques") }}</div>
     <h1>{{ title }}</h1>
     <div class="subtitle">{{ subtitle }}</div>
     <div class="meta">
@@ -124,9 +125,31 @@ def render_pdf_from_html(
     reference: str = "",
     extra_css: str = "",
     include_cover: bool = True,
+    branding: dict | None = None,
 ) -> bytes:
-    """Rend un PDF à partir d'un corps HTML + métadonnées."""
+    """Rend un PDF à partir d'un corps HTML + métadonnées.
+
+    Si `branding` est fourni (dict de la charte client), applique les couleurs
+    primaire/accent, le logo et le pied de page personnalisés.
+    """
     date = datetime.now().strftime("%d/%m/%Y")
+
+    # Charte client : surcharge CSS des couleurs + logo
+    branding_css = ""
+    logo_html = ""
+    footer_org = "BET Agent — Bureau d'Études Techniques"
+    if branding:
+        primary = branding.get("primary_color", "#0a0a0a")
+        accent = branding.get("accent_color", "#171717")
+        branding_css = f"""
+        .cover h1 {{ color: {primary} !important; }}
+        h1 {{ color: {primary} !important; border-bottom-color: {accent} !important; }}
+        h2 {{ color: {primary} !important; }}
+        h3 {{ color: {accent} !important; }}
+        """
+        if branding.get("logo_url"):
+            logo_html = f'<img src="{branding["logo_url"]}" style="max-height:60px;margin-bottom:1cm;" alt="logo"/>'
+        footer_org = branding.get("footer_text") or branding.get("full_name") or footer_org
 
     cover_html = ""
     if include_cover:
@@ -140,6 +163,8 @@ def render_pdf_from_html(
             author=author,
             date=date,
             reference=reference or f"BET-{datetime.now().strftime('%Y%m%d-%H%M')}",
+            logo_html=logo_html,
+            footer_org=footer_org,
         )
 
     full_html = f"""<!DOCTYPE html>
@@ -147,7 +172,7 @@ def render_pdf_from_html(
 <head>
 <meta charset="UTF-8">
 <title>{title}</title>
-<style>{BASE_CSS}{extra_css}</style>
+<style>{BASE_CSS}{extra_css}{branding_css}</style>
 <style>
   body {{ string-set: project-name "{project_name}"; }}
 </style>

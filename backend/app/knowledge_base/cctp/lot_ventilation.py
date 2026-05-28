@@ -75,6 +75,73 @@ CFC_244_VENTILATION = {
             "normes_referencees": ["EN 10346", "EN 12237", "DIN 4140", "SIA 382/1"],
         },
         {
+            "numero": "244.120",
+            "titre": "Ventilation mécanique contrôlée simple flux hygroréglable",
+            "prescriptions": {
+                "economique": {
+                    "principe": "Extraction hygroréglable type B, entrées d'air autoréglables en façade",
+                    "debit_dimensionnement": "Selon SIA 382/1, débits modulés par taux d'humidité",
+                    "ventilateurs": "Caisson d'extraction basse consommation, SFP ≤ 0.4 kW/(m³/s)",
+                    "regulation": "Bouches hygroréglables sans énergie",
+                    "acoustique": "Pièges à son sur réseau collectif, ≤ 30 dB(A) en logement",
+                },
+                "standard": {
+                    "principe": "VMC hygro B avec détection présence dans sanitaires",
+                    "debit_dimensionnement": "SIA 382/1 avec calcul par typologie de logement",
+                    "ventilateurs": "Caisson EC à débit constant régulé, SFP ≤ 0.35 kW/(m³/s)",
+                    "regulation": "Bouches hygroréglables + temporisation cuisine/SDB",
+                    "acoustique": "≤ 28 dB(A) en pièces de vie",
+                    "extras": "Caisson en toiture avec rejet maîtrisé, trappe de visite",
+                },
+                "premium": {
+                    "principe": "VMC hygro B haut de gamme ou bascule double flux selon saison",
+                    "debit_dimensionnement": "Calcul individualisé, étanchéité réseau classe C",
+                    "ventilateurs": "Caisson EC ultra-silencieux, SFP ≤ 0.25 kW/(m³/s)",
+                    "regulation": "Sondes humidité + CO2 dans pièces principales",
+                    "acoustique": "≤ 25 dB(A), mesure NR en réception",
+                    "extras": "Monitoring débits et alarme encrassement filtre",
+                },
+            },
+            "essais_reception": [
+                "Mesure des débits extraits par bouche selon SICC 2024-1",
+                "Mesure acoustique en logement type",
+                "Vérification du fonctionnement hygroréglable",
+            ],
+            "normes_referencees": ["SIA 382/1", "SIA 2024", "SICC 2024-1", "SIA 181"],
+        },
+        {
+            "numero": "244.410",
+            "titre": "Rafraîchissement / climatisation de confort",
+            "prescriptions": {
+                "economique": {
+                    "principe": "Free-cooling nocturne par sur-ventilation, pas de groupe froid",
+                    "dimensionnement": "Selon SIA 382/1 charges thermiques d'été, limitation surchauffe SIA 180",
+                    "regulation": "Pilotage horaire bypass récupérateur",
+                    "objectif_confort": "T° intérieure ≤ 26.5°C (catégorie III SIA 180)",
+                },
+                "standard": {
+                    "principe": "Rafraîchissement adiabatique ou batterie froide sur CTA",
+                    "dimensionnement": "Calcul charges + simulation thermique dynamique simplifiée",
+                    "regulation": "Régulation T° de soufflage + sondes ambiance",
+                    "objectif_confort": "T° ≤ 26°C (catégorie II SIA 180), free-cooling prioritaire",
+                    "extras": "Récupération sur PAC réversible si présente",
+                },
+                "premium": {
+                    "principe": "Plafonds rafraîchissants ou poutres climatiques + free-cooling géothermique",
+                    "dimensionnement": "Simulation thermique dynamique complète (IDA-ICE ou équivalent)",
+                    "regulation": "GTC avec optimisation prédictive et anti-condensation",
+                    "objectif_confort": "T° ≤ 25.5°C (catégorie I SIA 180), confort élevé",
+                    "extras": "Géocooling sur sondes géothermiques, COP froid > 15",
+                },
+            },
+            "essais_reception": [
+                "Mesure du confort thermique d'été selon SIA 180 (PMV/PPD)",
+                "Vérification absence de condensation sur émetteurs froids",
+                "Mesure puissance frigorifique et COP",
+            ],
+            "normes_referencees": ["SIA 382/1", "SIA 180", "SIA 382/2"],
+        },
+        {
             "numero": "244.310",
             "titre": "Bouches et diffuseurs",
             "prescriptions": {

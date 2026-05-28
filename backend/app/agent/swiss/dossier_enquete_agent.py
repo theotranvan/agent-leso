@@ -97,19 +97,36 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     # V6 : contrôle urbanistique automatique via knowledge_base
     urba_check = None
     zone_key = project_data.get("zone")
+    commune = project_data.get("commune")
     if zone_key and project_data.get("terrain_m2"):
         try:
-            from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
-            urba_check = check_conformite_urbanistique(
-                canton=canton,
-                zone_key=zone_key,
-                surface_terrain_m2=float(project_data.get("terrain_m2", 0)),
-                sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
-                emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
-                hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
-                hauteur_faitage_m=float(project_data.get("hauteur_faitage_m", 0)),
-                nb_niveaux=int(project_data.get("nb_niveaux", 0)),
-            )
+            # Priorité : check communal VD précis si commune connue
+            if canton == "VD" and commune:
+                from app.knowledge_base.urbanisme.communes_vd import check_conformite_commune, get_commune_zone
+                if get_commune_zone(commune, zone_key):
+                    urba_check = check_conformite_commune(
+                        commune=commune,
+                        zone_key=zone_key,
+                        surface_terrain_m2=float(project_data.get("terrain_m2", 0)),
+                        sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
+                        emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
+                        hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
+                        hauteur_faitage_m=float(project_data.get("hauteur_faitage_m", 0)),
+                        nb_niveaux=int(project_data.get("nb_niveaux", 0)),
+                    )
+            # Fallback : zone cantonale générique
+            if urba_check is None:
+                from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
+                urba_check = check_conformite_urbanistique(
+                    canton=canton,
+                    zone_key=zone_key,
+                    surface_terrain_m2=float(project_data.get("terrain_m2", 0)),
+                    sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
+                    emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
+                    hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
+                    hauteur_faitage_m=float(project_data.get("hauteur_faitage_m", 0)),
+                    nb_niveaux=int(project_data.get("nb_niveaux", 0)),
+                )
         except Exception as e:
             logger.warning("Check urbanistique dossier échoué : %s", e)
 

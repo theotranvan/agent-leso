@@ -95,6 +95,41 @@ CFC_250_SANITAIRE = {
             },
             "normes_referencees": ["SIA 190", "SIA 181", "VSA", "norme cantonale"],
         },
+        {
+            "numero": "254.110",
+            "titre": "Appareils sanitaires",
+            "prescriptions": {
+                "economique": {
+                    "wc": "WC suspendu avec réservoir encastré, double touche 3/6 L",
+                    "lavabo": "Lavabo céramique avec mitigeur monocommande classe débit Z",
+                    "douche": "Receveur acrylique + paroi + mitigeur thermostatique",
+                    "robinetterie": "Mitigeurs économes classe A (≤ 6 L/min lavabo)",
+                    "accessibilite": "1 sanitaire adapté PMR par niveau public (SIA 500)",
+                },
+                "standard": {
+                    "wc": "WC suspendu sans bride, réservoir encastré Geberit/Laufen, plaque inox",
+                    "lavabo": "Lavabo céramique qualité + mitigeur à limiteur de débit et température",
+                    "douche": "Receveur extra-plat + paroi verre sécurit + barre thermostatique",
+                    "robinetterie": "Robinetterie classe A, mousseurs économes",
+                    "accessibilite": "Sanitaires PMR conformes SIA 500 avec barres d'appui",
+                    "extras": "WC lavant en option, sèche-mains air pulsé dans ERP",
+                },
+                "premium": {
+                    "wc": "WC lavant suspendu, réservoir silencieux, plaque design",
+                    "lavabo": "Plan vasque sur mesure, mitigeur design certifié",
+                    "douche": "Douche à l'italienne, receveur carrelé, robinetterie encastrée",
+                    "robinetterie": "Robinetterie haut de gamme, finitions au choix architecte",
+                    "accessibilite": "Sanitaires PMR design intégré SIA 500 + Pro Infirmis",
+                    "extras": "Système de réutilisation eaux grises, détection de fuite",
+                },
+            },
+            "essais_reception": [
+                "Vérification de l'accessibilité PMR selon SIA 500",
+                "Test d'étanchéité des appareils et raccordements",
+                "Mesure des débits de robinetterie",
+            ],
+            "normes_referencees": ["SIA 385/1", "SIA 500", "SVGW W3"],
+        },
     ],
 }
 
