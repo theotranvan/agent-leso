@@ -20,7 +20,40 @@ async def run_geneva_control(project_data: dict, project_name: str = "", author:
     canton = project_data.get("canton", "GE")
     checklist = checklist_for_canton(canton, project_data)
 
+    # V6 : contrôle urbanistique réel via knowledge_base si données dispo
+    urba_check = None
+    zone_key = project_data.get("zone")
+    if zone_key and project_data.get("surface_terrain_m2"):
+        try:
+            from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
+            urba_check = check_conformite_urbanistique(
+                canton=canton,
+                zone_key=zone_key,
+                surface_terrain_m2=float(project_data.get("surface_terrain_m2", 0)),
+                sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
+                emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
+                hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
+                hauteur_faitage_m=float(project_data.get("hauteur_faitage_m", 0)),
+                nb_niveaux=int(project_data.get("nb_niveaux", 0)),
+            )
+        except Exception as e:
+            logger.warning("Check urbanistique échoué : %s", e)
+
     system = get_prompt_ch("controle_geneve")
+
+    urba_block = ""
+    if urba_check and "error" not in urba_check:
+        urba_block = f"""
+
+CONTRÔLE URBANISTIQUE AUTOMATIQUE (calculé par le moteur, à intégrer au rapport) :
+- Zone : {urba_check['zone_label']}
+- IUS projeté : {urba_check['ius_projete']} (max autorisé : {urba_check['ius_max']})
+- COS projeté : {urba_check['cos_projete']} (max autorisé : {urba_check['cos_max']})
+- Conforme : {'OUI' if urba_check['conforme'] else 'NON'}
+- Dépassements détectés : {json.dumps(urba_check['depassements'], ensure_ascii=False) if urba_check['depassements'] else 'aucun'}
+- Règles de la zone : {json.dumps(urba_check['regles_zone'], ensure_ascii=False)}
+
+IMPORTANT : Si des dépassements sont détectés, signale-les comme points BLOQUANTS dans le rapport."""
 
     user_content = f"""Produire un rapport de contrôle réglementaire pré-dépôt pour Genève.
 
@@ -35,11 +68,13 @@ PROJET :
 
 CHECKLIST GÉNÉRÉE PAR LE MOTEUR INTERNE (base déterministe) :
 {json.dumps(checklist, ensure_ascii=False, indent=2)}
+{urba_block}
 
 Transformer cette checklist en RAPPORT PROFESSIONNEL en markdown :
 - Page de garde textuelle
 - Synthèse (nombre de points BLOQUANT, IMPORTANT, etc.)
 - Tableau par thème
+- Section dédiée au contrôle urbanistique (indices IUS/COS) si fourni
 - Pour chaque point : référence, statut, commentaire contextuel
 - Conclusion avec actions à mener avant dépôt
 - Note sur la responsabilité ingénieur/architecte"""

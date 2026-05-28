@@ -94,9 +94,40 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     # 2. Checklist réglementaire cantonale
     checklist = checklist_for_canton(canton, project_data)
 
+    # V6 : contrôle urbanistique automatique via knowledge_base
+    urba_check = None
+    zone_key = project_data.get("zone")
+    if zone_key and project_data.get("terrain_m2"):
+        try:
+            from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
+            urba_check = check_conformite_urbanistique(
+                canton=canton,
+                zone_key=zone_key,
+                surface_terrain_m2=float(project_data.get("terrain_m2", 0)),
+                sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
+                emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
+                hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
+                hauteur_faitage_m=float(project_data.get("hauteur_faitage_m", 0)),
+                nb_niveaux=int(project_data.get("nb_niveaux", 0)),
+            )
+        except Exception as e:
+            logger.warning("Check urbanistique dossier échoué : %s", e)
+
     # 3. Analyse des documents existants (matching avec les pièces attendues)
     existing_docs = params.get("existing_documents") or []
     doc_coverage = _match_docs_to_pieces(existing_docs, pieces_attendues)
+
+    urba_block = ""
+    if urba_check and "error" not in urba_check:
+        statut_urba = "CONFORME" if urba_check["conforme"] else "NON CONFORME — DÉPASSEMENTS DÉTECTÉS"
+        urba_block = f"""
+
+CONTRÔLE URBANISTIQUE AUTOMATIQUE (calculé par le moteur) — {statut_urba}
+- Zone : {urba_check['zone_label']}
+- IUS projeté : {urba_check['ius_projete']} / max {urba_check['ius_max']}
+- COS projeté : {urba_check['cos_projete']} / max {urba_check['cos_max']}
+- Dépassements : {json.dumps(urba_check['depassements'], ensure_ascii=False) if urba_check['depassements'] else 'aucun'}
+Intègre ces valeurs calculées dans le chapitre indices et le tableau SIA 416 du mémoire."""
 
     # 4. Génération du mémoire justificatif via LLM Sonnet
     system = get_prompt_ch("dossier_enquete")
@@ -116,6 +147,7 @@ PROJET
 - Zone affectation : {project_data.get('zone', '?')}
 - Nombre de logements : {project_data.get('nb_logements', 'n/a')}
 - Indices projet : IUS={project_data.get('indices', {}).get('ius', 'n/a')}, IBUS={project_data.get('indices', {}).get('ibus', 'n/a')}
+{urba_block}
 
 SPÉCIFICITÉS DU PROJET
 {params.get('specificities', 'Aucune spécificité signalée.')}

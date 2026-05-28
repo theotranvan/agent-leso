@@ -35,9 +35,31 @@ async def execute_checklist(task: dict[str, Any]) -> dict[str, Any]:
     height_m = params.get("height_m")
     nb_occupants = params.get("nb_occupants_max")
     special_context = params.get("special_context", "")
+    org_id = task["organization_id"]
+    canton = params.get("canton", "VD")
 
-    # Base déterministe
-    template = get_template_for_building(building_type, height_m=height_m, nb_occupants=nb_occupants)
+    # Base déterministe — priorité à la knowledge_base calibrée ECA-VD / OCAS-GE
+    from app.knowledge_base.aeai.checklists_calibrees import get_checklist_aeai
+    kb_checklist = get_checklist_aeai(building_type, canton)
+
+    if kb_checklist:
+        # Aplatit la checklist calibrée en items
+        base_items = []
+        for cat_key, cat in kb_checklist["categories"].items():
+            for item in cat["items"]:
+                base_items.append({
+                    "code": item["id"].upper(),
+                    "category": cat["label"],
+                    "question": item["critere"],
+                    "reference_aeai": item["reference_aeai"],
+                    "documents": item.get("documents", []),
+                    "particularites_canton": item.get(f"particularites_{canton}", ""),
+                    "status": "a_verifier",
+                })
+        template = {"building_type": building_type, "items": base_items, "source": "knowledge_base_calibree"}
+    else:
+        # Fallback ancien template
+        template = get_template_for_building(building_type, height_m=height_m, nb_occupants=nb_occupants)
 
     base_items = template["items"]
 

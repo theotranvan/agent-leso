@@ -211,6 +211,22 @@ export const api = {
     }>(res);
   },
 
+  // Settings — charte client (branding)
+  settings: {
+    getBranding: async () => {
+      const res = await fetch(`${API_URL}/api/settings/branding`, { headers: await authHeaders() });
+      return handle<{ organization_name: string; branding_config: any }>(res);
+    },
+    updateBranding: async (config: any) => {
+      const res = await fetch(`${API_URL}/api/settings/branding`, {
+        method: 'PUT',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      return handle<any>(res);
+    },
+  },
+
   // Billing (V5) — usage + credit packs
   billing: {
     getUsage: async () => {

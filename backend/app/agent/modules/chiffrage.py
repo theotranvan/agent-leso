@@ -45,32 +45,106 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         return await _generate_dqe(task, params, project_name, org_name, metre_text, rag_context)
 
 
+DPGF_SYSTEM_PROMPT = """Tu es un métreur-chiffreur d'un BET de Suisse romande. On te fournit une \
+BASE DE PRIX UNITAIRES RÉELS (CHF, indice 2025, ajustés au canton) pour les articles du lot.
+
+Ton travail :
+1. Identifier les articles pertinents pour ce projet parmi ceux fournis.
+2. Estimer les QUANTITÉS de chaque article à partir du métré / programme / surface fournis.
+3. NE PAS inventer de prix : utilise les prix médians fournis. Si tu dois estimer une quantité \
+   sans donnée précise, indique-le dans une note et reste conservateur.
+
+Retourne UNIQUEMENT un JSON strict (pas de markdown) :
+{
+  "lines": [
+    {"is_section": true, "designation": "CFC 231 — Production de chaleur"},
+    {"article": "231.110", "designation": "PAC air-eau ...", "unite": "kW", "quantite": 50,
+     "prix_unitaire": 1700, "hypothese": "Puissance estimée selon SRE et standard"},
+    ...
+  ],
+  "hypotheses_globales": ["..."],
+  "taux_incertitude_pct": 15
+}
+
+Le champ prix_unitaire DOIT correspondre au prix médian fourni pour l'article (ne l'invente pas)."""
+
 async def _generate_dpgf(task, params, project_name, org_name, metre_text, rag_context) -> dict[str, Any]:
     lot = params.get("lot", "")
-    system_prompt = get_system_prompt("chiffrage_dpgf")
+    niveau = params.get("niveau_prestation", "standard")
+    org_id = task["organization_id"]
 
-    user_content = f"""Générer le DPGF pour ce projet.
+    # Charge le canton du projet
+    project_id = task.get("project_id")
+    canton = params.get("canton", "VD")
+    if project_id:
+        proj = get_supabase_admin().table("projects").select("canton").eq("id", project_id).maybe_single().execute()
+        if proj.data and proj.data.get("canton"):
+            canton = proj.data["canton"]
+
+    # Injecte la base de prix réelle pour le lot
+    from app.knowledge_base.dpgf import list_prix_for_lot
+    prix_catalogue = list_prix_for_lot(lot, niveau, canton)
+
+    if prix_catalogue:
+        prix_block = f"BASE DE PRIX RÉELLE — Lot {lot}, niveau {niveau}, canton {canton} (CHF HT) :\n"
+        for p in prix_catalogue:
+            prix_block += (
+                f"- [{p['code']}] {p['designation']} | unité: {p['unite']} | "
+                f"prix médian: {p['prix_median']} CHF (fourchette {p['prix_min']}-{p['prix_max']})"
+            )
+            if p.get("notes"):
+                prix_block += f" | note: {p['notes']}"
+            prix_block += "\n"
+    else:
+        prix_block = (
+            f"Aucune base de prix disponible pour le lot '{lot}'. "
+            f"Indique clairement que les prix doivent être complétés manuellement."
+        )
+
+    user_content = f"""Générer le DPGF chiffré pour ce projet.
 
 **Projet :** {project_name}
 **Lot :** {lot}
+**Niveau de prestation :** {niveau}
+**Canton :** {canton}
 
 **Métré / descriptif fourni :**
-{metre_text[:15000] if metre_text else "Aucun métré fourni — poser les hypothèses nécessaires."}
+{metre_text[:12000] if metre_text else "Aucun métré fourni — estime les quantités depuis le programme et la surface, et liste tes hypothèses."}
+
+**{prix_block}**
 
 {rag_context}
 
-Retourner uniquement le JSON strict demandé par les instructions système."""
+Retourne le JSON strict avec les quantités estimées et les prix médians fournis."""
+
+    # Régénération
+    from app.agent.prompts import build_regeneration_instructions
+    regen_block = build_regeneration_instructions(params.get("regeneration_context"))
+    if regen_block:
+        user_content += regen_block
 
     llm_result = await call_llm(
         task_type="chiffrage_dpgf",
-        system_prompt=system_prompt,
+        system_prompt=DPGF_SYSTEM_PROMPT,
         user_content=user_content,
         max_tokens=8000,
         temperature=0.1,
+        organization_id=org_id,
+        task_id=task.get("id"),
     )
 
     data = _parse_json_lenient(llm_result["text"])
     lines = data.get("lines", [])
+
+    # Validation : on force les prix unitaires à correspondre à la base réelle
+    prix_lookup = {p["code"]: p for p in prix_catalogue}
+    for line in lines:
+        code = line.get("article")
+        if code and code in prix_lookup:
+            # On écrase le prix LLM par le prix réel de la base (sécurité)
+            line["prix_unitaire"] = prix_lookup[code]["prix_median"]
+            line["prix_min"] = prix_lookup[code]["prix_min"]
+            line["prix_max"] = prix_lookup[code]["prix_max"]
 
     excel_bytes = generate_dpgf_excel(
         project_name=project_name,
@@ -81,25 +155,37 @@ Retourner uniquement le JSON strict demandé par les instructions système."""
 
     # PDF récapitulatif
     total_ht = sum((l.get("quantite") or 0) * (l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
+    total_min = sum((l.get("quantite") or 0) * (l.get("prix_min") or l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
+    total_max = sum((l.get("quantite") or 0) * (l.get("prix_max") or l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
+    incertitude = data.get("taux_incertitude_pct", 15)
+    hypotheses = data.get("hypotheses_globales", [])
+
     recap_md = f"""# Récapitulatif DPGF — Lot {lot}
 
 **Projet :** {project_name}
 **Nombre d'articles :** {len([l for l in lines if not l.get('is_section')])}
-**Montant total HT estimé :** {total_ht:,.2f} €
+**Montant total HT estimé (médian) :** {total_ht:,.0f} CHF
+**Fourchette :** {total_min:,.0f} – {total_max:,.0f} CHF
+**Taux d'incertitude estimé :** ±{incertitude} %
+
+> Prix unitaires issus de la base de référence Suisse romande (indice 2025), ajustés au canton. À valider en consultation.
+
+## Hypothèses retenues
+""" + ("\n".join(f"- {h}" for h in hypotheses) if hypotheses else "- Aucune hypothèse spécifique signalée.") + """
 
 ## Détail par article
 
-| N° | Désignation | Unité | Quantité | PU HT | Total HT |
-|----|-------------|-------|----------|-------|----------|
+| N° | Désignation | Unité | Quantité | PU médian | Total |
+|----|-------------|-------|----------|-----------|-------|
 """ + "\n".join(
-        f"| {l.get('article', '')} | {l.get('designation', '')[:80]} | {l.get('unite', '')} | {l.get('quantite', '')} | {l.get('prix_unitaire', '')} € | {((l.get('quantite') or 0) * (l.get('prix_unitaire') or 0)):.2f} € |"
+        f"| {l.get('article', '')} | {l.get('designation', '')[:70]} | {l.get('unite', '')} | {l.get('quantite', '')} | {l.get('prix_unitaire', '')} CHF | {((l.get('quantite') or 0) * (l.get('prix_unitaire') or 0)):,.0f} CHF |"
         for l in lines[:80] if not l.get("is_section")
     )
 
     pdf_bytes = render_pdf_from_html(
         body_html=markdown_to_html(recap_md),
         title=f"DPGF — Lot {lot}",
-        subtitle=f"Montant total HT : {total_ht:,.2f} €",
+        subtitle=f"Montant total HT médian : {total_ht:,.0f} CHF",
         project_name=project_name,
         lot=lot,
         reference=f"DPGF-{datetime.now().strftime('%Y%m%d-%H%M')}",
