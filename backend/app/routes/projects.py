@@ -223,3 +223,44 @@ async def export_dossier(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/{project_id}/deadlines")
+async def list_deadlines(project_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Liste les échéances d'un projet."""
+    admin = get_supabase_admin()
+    rows = (
+        admin.table("project_deadlines").select("*")
+        .eq("project_id", project_id).eq("organization_id", user.organization_id)
+        .order("due_date").execute()
+    )
+    return {"deadlines": rows.data or []}
+
+
+@router.post("/{project_id}/deadlines", status_code=201)
+async def create_deadline(
+    project_id: str,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """Ajoute une échéance (ex: dépôt AEAI, permis de construire)."""
+    from app.services.calendar_export import add_deadline
+    if not body.get("label") or not body.get("due_date"):
+        raise HTTPException(status_code=400, detail="label et due_date requis")
+    return add_deadline(
+        organization_id=user.organization_id, project_id=project_id,
+        label=body["label"], due_date=body["due_date"],
+        phase_key=body.get("phase_key"),
+    )
+
+
+@router.get("/{project_id}/calendar.ics")
+async def project_calendar(project_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Export .ics des échéances d'un projet (Google Calendar / Outlook / Apple)."""
+    from fastapi.responses import Response
+    from app.services.calendar_export import build_ics_for_project
+    ics = build_ics_for_project(project_id, user.organization_id)
+    return Response(
+        content=ics, media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="echeances.ics"'},
+    )

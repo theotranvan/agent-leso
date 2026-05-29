@@ -207,6 +207,11 @@ PROJECT_JOURNEY: list[ProjectPhase] = [
                 "Traitement des remarques de la commune ou du canton.",
             ),
             PhaseAction(
+                "rapport_chantier",
+                "Rapport de visite de chantier",
+                "Compte-rendu structuré à partir de photos et notes de terrain.",
+            ),
+            PhaseAction(
                 "metres_automatiques_ifc",
                 "Métrés automatiques IFC",
                 "Quantitatifs extraits de la maquette BIM.",

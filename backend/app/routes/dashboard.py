@@ -368,3 +368,79 @@ async def get_notifications(user: Annotated[AuthUser, Depends(get_current_user)]
     """Liste des notifications proactives actives."""
     from app.services.notification_service import build_notifications
     return {"notifications": build_notifications(user.organization_id)}
+
+
+@router.get("/board")
+async def projects_board(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Vue kanban : affaires groupées par phase SIA avec compteurs d'actions.
+
+    Pour le chef de projet : voir toutes ses affaires par phase en un coup d'œil,
+    avec le nombre de documents à valider sur chacune.
+    """
+    from app.agent.project_journey import PROJECT_JOURNEY
+
+    admin = get_supabase_admin()
+    org_id = user.organization_id
+
+    projects = (
+        admin.table("projects")
+        .select("id, name, current_phase, commune, canton, sre_m2, labels, status")
+        .eq("organization_id", org_id).eq("status", "active").execute()
+    )
+    proj_rows = projects.data or []
+
+    # Compteurs de tâches à valider par projet
+    tasks = (
+        admin.table("tasks")
+        .select("project_id, review_status, status")
+        .eq("organization_id", org_id).eq("status", "completed").execute()
+    )
+    to_validate_by_project: dict[str, int] = {}
+    for t in tasks.data or []:
+        if t.get("review_status") in ("pending_review", "ready_to_approve", "needs_revision"):
+            pid = t.get("project_id")
+            if pid:
+                to_validate_by_project[pid] = to_validate_by_project.get(pid, 0) + 1
+
+    # Échéances proches par projet
+    from datetime import date, timedelta
+    soon = (date.today() + timedelta(days=14)).isoformat()
+    deadlines = (
+        admin.table("project_deadlines")
+        .select("project_id, label, due_date")
+        .eq("organization_id", org_id).eq("completed", False)
+        .lte("due_date", soon).execute()
+    )
+    deadline_by_project: dict[str, dict] = {}
+    for d in deadlines.data or []:
+        pid = d.get("project_id")
+        if pid and pid not in deadline_by_project:
+            deadline_by_project[pid] = {"label": d["label"], "due_date": d["due_date"]}
+
+    # Construction des colonnes par phase
+    columns = []
+    for phase in sorted(PROJECT_JOURNEY, key=lambda x: x.order):
+        if phase.key == "initiation":
+            continue  # on ne montre pas la colonne "création"
+        phase_projects = [
+            {
+                **p,
+                "to_validate": to_validate_by_project.get(p["id"], 0),
+                "next_deadline": deadline_by_project.get(p["id"]),
+            }
+            for p in proj_rows
+            if (p.get("current_phase") or "avant_projet") == phase.key
+        ]
+        columns.append({
+            "phase_key": phase.key,
+            "sia_code": phase.sia_code,
+            "label": phase.label,
+            "projects": phase_projects,
+            "count": len(phase_projects),
+        })
+
+    return {
+        "columns": columns,
+        "total_projects": len(proj_rows),
+        "total_to_validate": sum(to_validate_by_project.values()),
+    }

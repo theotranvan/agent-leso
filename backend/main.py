@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.middleware import SecurityHeadersMiddleware, limiter
 from app.routes import (
-    aeai, auth, bim as bim_routes, billing, dashboard, documents,
+    aeai, auth, bim as bim_routes, billing, certification, dashboard, documents,
     idc, norms, onboarding, projects, settings as settings_routes, structure, tasks,
     thermique, v4_agents, veille,
 )
@@ -117,6 +117,8 @@ app.include_router(tasks.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 app.include_router(onboarding.router, prefix=API_PREFIX)
+app.include_router(certification.router, prefix=API_PREFIX)
+app.include_router(certification.public_router, prefix=API_PREFIX)
 app.include_router(settings_routes.router, prefix=API_PREFIX)
 
 # V2 Swiss-first

@@ -149,3 +149,48 @@ async def validate_premodel(
         resource_id=premodel_id,
     )
     return r.data[0]
+
+
+@router.post("/extract-envelope")
+async def extract_envelope(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """Extrait l'enveloppe thermique d'un IFC pour pré-remplir le justificatif SIA 380/1.
+
+    Body : { "ifc_document_id": "..." }  ou  { "ifc_storage_path": "..." }
+    Retourne surfaces, U-values, volume, complétude et champs à compléter.
+    """
+    from app.services.ifc_thermal_extractor import extract_envelope_for_thermal
+
+    admin = get_supabase_admin()
+    storage = get_storage()
+
+    doc_id = body.get("ifc_document_id")
+    storage_path = body.get("ifc_storage_path")
+
+    if doc_id:
+        doc = (
+            admin.table("documents").select("storage_path")
+            .eq("id", doc_id).eq("organization_id", user.organization_id)
+            .maybe_single().execute()
+        )
+        if not doc.data:
+            raise HTTPException(status_code=404, detail="Document IFC introuvable")
+        storage_path = doc.data["storage_path"]
+
+    if not storage_path:
+        raise HTTPException(status_code=400, detail="ifc_document_id ou ifc_storage_path requis")
+
+    try:
+        ifc_bytes = storage.download(storage_path)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Téléchargement IFC échoué : {e}")
+
+    result = extract_envelope_for_thermal(ifc_bytes)
+    if not result.get("extracted"):
+        raise HTTPException(
+            status_code=422,
+            detail=result.get("error", "Impossible de lire la maquette IFC"),
+        )
+    return result

@@ -19,6 +19,42 @@ async function authHeadersNoContent(): Promise<HeadersInit> {
   return { Authorization: `Bearer ${token}` };
 }
 
+// Erreur API enrichie : code HTTP + message technique + message humain
+export class ApiError extends Error {
+  status: number;
+  detail: string;
+  userMessage: string;
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.name = 'ApiError';
+    this.status = status;
+    this.detail = detail;
+    this.userMessage = humanizeError(status, detail);
+  }
+}
+
+// Traduit un statut/détail technique en message clair pour l'ingénieur
+function humanizeError(status: number, detail: string): string {
+  const d = (detail || '').toLowerCase();
+  if (d.includes('quota')) return detail; // message quota déjà explicite
+  switch (status) {
+    case 400: return detail || 'La demande est incomplète ou invalide.';
+    case 401: return 'Votre session a expiré. Reconnectez-vous pour continuer.';
+    case 403: return detail || "Vous n'avez pas les droits pour cette action.";
+    case 404: return "L'élément demandé est introuvable. Il a peut-être été supprimé.";
+    case 409: return detail || 'Conflit : cette action entre en conflit avec un état existant.';
+    case 413: return 'Le fichier est trop volumineux.';
+    case 422: return detail || 'Certaines données sont mal renseignées.';
+    case 429: return 'Trop de requêtes. Patientez un instant avant de réessayer.';
+    case 500:
+    case 502:
+    case 503:
+      return 'Une erreur technique est survenue de notre côté. Réessayez dans un instant.';
+    default:
+      return detail || 'Une erreur est survenue. Réessayez.';
+  }
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -26,7 +62,7 @@ async function handle<T>(res: Response): Promise<T> {
       const body = await res.json();
       detail = body.detail || detail;
     } catch {}
-    throw new Error(detail);
+    throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -276,6 +312,26 @@ export const api = {
   notifications: async () => {
     const res = await fetch(`${API_URL}/api/dashboard/notifications`, { headers: await authHeaders() });
     return handle<{ notifications: any[] }>(res);
+  },
+  projectsBoard: async () => {
+    const res = await fetch(`${API_URL}/api/dashboard/board`, { headers: await authHeaders() });
+    return handle<{ columns: any[]; total_projects: number; total_to_validate: number }>(res);
+  },
+  veilleDigest: async () => {
+    const res = await fetch(`${API_URL}/api/veille/digest`, { headers: await authHeaders() });
+    return handle<{ nb_alerts: number; summary_md: string; alerts: any[]; canton: string; period: string }>(res);
+  },
+  extractEnvelopeFromIfc: async (ifcDocumentId: string) => {
+    const res = await fetch(`${API_URL}/api/bim/extract-envelope`, {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ifc_document_id: ifcDocumentId }),
+    });
+    return handle<any>(res);
+  },
+  certificationStatus: async () => {
+    const res = await fetch(`${API_URL}/api/certification/status`, { headers: await authHeaders() });
+    return handle<any>(res);
   },
 
   // Onboarding

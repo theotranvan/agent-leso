@@ -5,6 +5,7 @@ import {
   LayoutDashboard, FolderKanban, ListChecks, CreditCard, Settings, LogOut, Sparkles,
   Flame, Building, Layers, Building2, Bell, BookOpen, Shield, ShieldCheck,
   FileCheck2, MessageSquareWarning, Ruler, Zap, ClipboardCheck, BarChart3,
+  KanbanSquare, Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 const navGeneral = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projets', icon: FolderKanban },
+  { href: '/board', label: 'Mes affaires', icon: KanbanSquare },
   { href: '/compliance', label: 'Conformité', icon: ShieldCheck },
   { href: '/validation', label: 'Validation', icon: ClipboardCheck },
   { href: '/tasks/new', label: 'Nouvelle tâche', icon: Sparkles },
@@ -36,6 +38,7 @@ const navV4 = [
 
 const navAccount = [
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/certification', label: 'Certification', icon: Award },
   { href: '/billing', label: 'Facturation', icon: CreditCard },
   { href: '/settings', label: 'Paramètres', icon: Settings },
 ];

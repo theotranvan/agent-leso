@@ -170,6 +170,9 @@ async def execute_task(task_id: str) -> dict[str, Any]:
         elif task_type == "metres_automatiques_ifc":
             from app.agent.swiss import metres_agent
             result = await metres_agent.execute(task)
+        elif task_type == "rapport_chantier":
+            from app.agent.swiss import chantier_agent
+            result = await chantier_agent.execute(task)
 
         else:
             raise ValueError(f"Type de tâche non supporté: {task_type}")

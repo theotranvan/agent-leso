@@ -63,6 +63,11 @@ export default function LoginPage() {
                 required
               />
             </div>
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+                Mot de passe oublié ?
+              </Link>
+            </div>
             {error && <div className="text-sm text-destructive">{error}</div>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}

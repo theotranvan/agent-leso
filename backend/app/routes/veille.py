@@ -35,3 +35,10 @@ async def run_now(user: Annotated[AuthUser, Depends(require_admin)]):
     """
     result = await run_veille_romande()
     return result
+
+
+@router.get("/digest")
+async def get_monthly_digest(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Digest mensuel de veille personnalisé pour le bureau de l'utilisateur."""
+    from app.services.veille_digest import build_monthly_digest
+    return await build_monthly_digest(user.organization_id)
