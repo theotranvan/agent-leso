@@ -122,3 +122,104 @@ async def list_project_tasks(project_id: str, user: Annotated[AuthUser, Depends(
     admin = get_supabase_admin()
     tasks = admin.table("tasks").select("*").eq("project_id", project_id).eq("organization_id", user.organization_id).order("created_at", desc=True).limit(limit).execute()
     return {"tasks": tasks.data or []}
+
+
+@router.get("/{project_id}/journey")
+async def get_project_journey(project_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Parcours d'affaire : état d'avancement par phase SIA + action recommandée.
+
+    Guide l'ingénieur à travers le cycle de vie du projet. Indicatif, non bloquant.
+    """
+    from app.agent.project_journey import compute_journey_state
+
+    admin = get_supabase_admin()
+    project = (
+        admin.table("projects").select("*")
+        .eq("id", project_id).eq("organization_id", user.organization_id)
+        .maybe_single().execute()
+    )
+    if not project.data:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+
+    # Récupère les tâches du projet pour calculer l'avancement
+    tasks = (
+        admin.table("tasks")
+        .select("task_type, status, review_status")
+        .eq("project_id", project_id)
+        .eq("organization_id", user.organization_id)
+        .execute()
+    )
+    rows = tasks.data or []
+    completed = [t["task_type"] for t in rows if t.get("status") == "completed"]
+    approved = [t["task_type"] for t in rows if t.get("review_status") == "approved"]
+
+    # Phases désactivées au niveau organisation (modularité)
+    org = (
+        admin.table("organizations").select("disabled_journey_phases")
+        .eq("id", user.organization_id).maybe_single().execute()
+    )
+    disabled = (org.data or {}).get("disabled_journey_phases") or []
+
+    state = compute_journey_state(
+        completed_task_types=completed,
+        approved_task_types=approved,
+        current_phase=project.data.get("current_phase"),
+        disabled_phases=disabled,
+    )
+    return state
+
+
+@router.patch("/{project_id}/phase")
+async def set_project_phase(
+    project_id: str,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    body: dict,
+):
+    """Déclare manuellement la phase courante d'un projet (l'ingénieur garde la main)."""
+    from app.agent.project_journey import PHASE_BY_KEY
+
+    phase = body.get("current_phase")
+    if phase and phase not in PHASE_BY_KEY:
+        raise HTTPException(status_code=400, detail="Phase inconnue")
+
+    admin = get_supabase_admin()
+    result = (
+        admin.table("projects").update({"current_phase": phase})
+        .eq("id", project_id).eq("organization_id", user.organization_id)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    return {"project_id": project_id, "current_phase": phase}
+
+
+@router.get("/{project_id}/export-dossier")
+async def export_dossier(
+    project_id: str,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    only_approved: bool = True,
+):
+    """Export dossier AO complet en ZIP (point 5)."""
+    from fastapi.responses import StreamingResponse
+    import io
+    from app.services.ao_export import build_ao_dossier_zip
+
+    try:
+        zip_bytes, filename, summary = await build_ao_dossier_zip(
+            project_id, user.organization_id, only_approved=only_approved,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if summary["documents_included"] == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun document à exporter. "
+                   + ("Validez d'abord des documents." if only_approved else ""),
+        )
+
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

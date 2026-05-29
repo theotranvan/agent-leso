@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, FolderKanban, ListChecks, CreditCard, Settings, LogOut, Sparkles,
   Flame, Building, Layers, Building2, Bell, BookOpen, Shield, ShieldCheck,
-  FileCheck2, MessageSquareWarning, Ruler, Zap, ClipboardCheck,
+  FileCheck2, MessageSquareWarning, Ruler, Zap, ClipboardCheck, BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
@@ -35,6 +35,7 @@ const navV4 = [
 ];
 
 const navAccount = [
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/billing', label: 'Facturation', icon: CreditCard },
   { href: '/settings', label: 'Paramètres', icon: Settings },
 ];

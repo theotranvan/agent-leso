@@ -245,6 +245,74 @@ export const api = {
     }>(res);
   },
 
+  // Parcours d'affaire (journey)
+  getProjectJourney: async (projectId: string) => {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/journey`, { headers: await authHeaders() });
+    return handle<{
+      phases: any[]; global_progress: number;
+      next_recommended: any; current_phase: string;
+    }>(res);
+  },
+  setProjectPhase: async (projectId: string, phase: string) => {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/phase`, {
+      method: 'PATCH',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_phase: phase }),
+    });
+    return handle<any>(res);
+  },
+  exportDossierUrl: (projectId: string, onlyApproved = true) =>
+    `${API_URL}/api/projects/${projectId}/export-dossier?only_approved=${onlyApproved}`,
+
+  // Dashboard ingénieur + analytics + notifications
+  engineerDashboard: async () => {
+    const res = await fetch(`${API_URL}/api/dashboard/engineer`, { headers: await authHeaders() });
+    return handle<any>(res);
+  },
+  analytics: async () => {
+    const res = await fetch(`${API_URL}/api/dashboard/analytics`, { headers: await authHeaders() });
+    return handle<any>(res);
+  },
+  notifications: async () => {
+    const res = await fetch(`${API_URL}/api/dashboard/notifications`, { headers: await authHeaders() });
+    return handle<{ notifications: any[] }>(res);
+  },
+
+  // Onboarding
+  onboarding: {
+    getState: async () => {
+      const res = await fetch(`${API_URL}/api/onboarding/state`, { headers: await authHeaders() });
+      return handle<{ completed: boolean; step: number; steps: any[] }>(res);
+    },
+    stepOrganization: async (body: any) => {
+      const res = await fetch(`${API_URL}/api/onboarding/step/organization`, {
+        method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return handle<any>(res);
+    },
+    stepBranding: async (body: any) => {
+      const res = await fetch(`${API_URL}/api/onboarding/step/branding`, {
+        method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return handle<any>(res);
+    },
+    stepFirstProject: async (body: any) => {
+      const res = await fetch(`${API_URL}/api/onboarding/step/first-project`, {
+        method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return handle<{ step: number; completed: boolean; project_id: string }>(res);
+    },
+    skip: async () => {
+      const res = await fetch(`${API_URL}/api/onboarding/skip`, {
+        method: 'POST', headers: await authHeaders(),
+      });
+      return handle<any>(res);
+    },
+  },
+
   // Settings — charte client (branding)
   settings: {
     getBranding: async () => {

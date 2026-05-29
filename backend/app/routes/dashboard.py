@@ -243,3 +243,128 @@ async def compliance_overview(user: Annotated[AuthUser, Depends(get_current_user
     out.sort(key=lambda x: x.get("last_activity_at") or x.get("created_at") or "", reverse=True)
 
     return {"projects": out}
+
+
+@router.get("/engineer")
+async def engineer_dashboard(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Dashboard ingénieur (point 3) : vue orientée action quotidienne.
+
+    Ce que l'ingénieur veut voir en ouvrant l'app : affaires de la semaine,
+    documents à valider, échéances proches, consommation, prochaines actions.
+    """
+    from app.services.notification_service import build_notifications
+
+    admin = get_supabase_admin()
+    org_id = user.organization_id
+    now = datetime.utcnow()
+    week_ago = (now - timedelta(days=7)).isoformat()
+
+    # Affaires actives
+    projects = (
+        admin.table("projects").select("id, name, current_phase, status")
+        .eq("organization_id", org_id).eq("status", "active").execute()
+    )
+    active_projects = projects.data or []
+
+    # Tâches de la semaine
+    tasks_week = (
+        admin.table("tasks").select("id, task_type, status, created_at, review_status")
+        .eq("organization_id", org_id).gte("created_at", week_ago).execute()
+    )
+    tw = tasks_week.data or []
+
+    # File de validation
+    to_validate = [
+        t for t in tw
+        if t.get("status") == "completed"
+        and t.get("review_status") in ("pending_review", "ready_to_approve", "needs_revision")
+    ]
+
+    # Notifications proactives
+    notifications = build_notifications(org_id)
+
+    # Consommation tokens du mois
+    org = (
+        admin.table("organizations")
+        .select("tokens_used_this_month, token_quota_monthly, tasks_used_this_month, plan")
+        .eq("id", org_id).maybe_single().execute()
+    )
+    odata = org.data or {}
+    tokens_used = odata.get("tokens_used_this_month") or 0
+    tokens_quota = odata.get("token_quota_monthly") or 0
+
+    return {
+        "kpis": {
+            "active_projects": len(active_projects),
+            "tasks_this_week": len(tw),
+            "to_validate": len(to_validate),
+            "tokens_used": tokens_used,
+            "tokens_quota": tokens_quota,
+            "tokens_pct": round(tokens_used / tokens_quota * 100) if tokens_quota else 0,
+            "plan": odata.get("plan", "starter"),
+        },
+        "to_validate": to_validate[:8],
+        "active_projects": active_projects[:8],
+        "notifications": notifications,
+    }
+
+
+@router.get("/analytics")
+async def analytics_dashboard(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Analytics BET (point 6) : temps économisé, taux d'approbation, types fréquents."""
+    admin = get_supabase_admin()
+    org_id = user.organization_id
+    month_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+
+    tasks = (
+        admin.table("tasks").select("task_type, status, review_status, confidence_score")
+        .eq("organization_id", org_id).gte("created_at", month_ago).execute()
+    )
+    rows = tasks.data or []
+    completed = [t for t in rows if t.get("status") == "completed"]
+
+    # Estimation du temps économisé (jours-ingénieur par type de tâche)
+    TIME_SAVED_DAYS = {
+        "redaction_cctp": 7.5, "justificatif_sia_380_1": 2.5,
+        "note_calcul_sia_260_267": 4.0, "chiffrage_dpgf": 2.75,
+        "coordination_inter_lots": 1.5, "aeai_checklist_generation": 0.6,
+        "idc_geneve_rapport": 0.65, "dossier_mise_enquete": 2.0,
+        "doe_compilation": 1.5, "simulation_energetique_rapide": 0.5,
+        "controle_reglementaire_vaud": 0.8, "metres_automatiques_ifc": 1.0,
+    }
+    days_saved = sum(TIME_SAVED_DAYS.get(t["task_type"], 0.3) for t in completed)
+    chf_saved = round(days_saved * 850)  # taux ingénieur moyen Suisse romande
+
+    # Taux d'approbation directe vs renvoi
+    approved = sum(1 for t in completed if t.get("review_status") == "approved")
+    rejected = sum(1 for t in completed if t.get("review_status") == "rejected")
+    total_reviewed = approved + rejected
+    approval_rate = round(approved / total_reviewed * 100) if total_reviewed else 0
+
+    # Types de documents les plus fréquents
+    from collections import Counter
+    type_counts = Counter(t["task_type"] for t in completed)
+    top_types = [{"task_type": k, "count": v} for k, v in type_counts.most_common(6)]
+
+    # Confiance moyenne
+    scores = [t["confidence_score"] for t in completed if t.get("confidence_score") is not None]
+    avg_confidence = round(sum(scores) / len(scores)) if scores else None
+
+    return {
+        "period_days": 30,
+        "documents_produced": len(completed),
+        "days_saved": round(days_saved, 1),
+        "chf_saved": chf_saved,
+        "approval_rate": approval_rate,
+        "approved": approved,
+        "rejected": rejected,
+        "avg_confidence": avg_confidence,
+        "top_types": top_types,
+    }
+
+
+@router.get("/notifications")
+async def get_notifications(user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Liste des notifications proactives actives."""
+    from app.services.notification_service import build_notifications
+    return {"notifications": build_notifications(user.organization_id)}

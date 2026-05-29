@@ -17,8 +17,9 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Dropzone } from '@/components/ui/dropzone';
 import { TASK_TYPE_LABELS, formatDate, formatDateTime, formatBytes } from '@/lib/utils';
 import { useActiveProject } from '@/lib/active-project';
+import { ProjectJourney } from '@/components/project/project-journey';
 
-type Tab = 'tasks' | 'documents' | 'compliance';
+type Tab = 'journey' | 'tasks' | 'documents' | 'compliance';
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -30,7 +31,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('tasks');
+  const [tab, setTab] = useState<Tab>('journey');
   const [uploading, setUploading] = useState(false);
 
   const fetchAll = async () => {
@@ -133,6 +134,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Tabs */}
       <div className="border-b">
         <nav className="flex gap-1">
+          <TabButton active={tab === 'journey'} onClick={() => setTab('journey')}>
+            Parcours
+          </TabButton>
           <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} count={tasks.length}>
             Tâches
           </TabButton>
@@ -146,6 +150,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tab content */}
+      {tab === 'journey' && <ProjectJourney projectId={id} />}
       {tab === 'tasks' && <TasksTab tasks={tasks} projectId={id} />}
       {tab === 'documents' && (
         <DocumentsTab
