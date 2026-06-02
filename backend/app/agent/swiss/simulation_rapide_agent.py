@@ -150,6 +150,12 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
       - project_name, author
     """
     params = task.get("input_params") or {}
+    # Tolère les deux structures d'appel : champs à plat (form générique) OU
+    # nichés sous "programme" (endpoints /api/v4/simulation-rapide). Les clés de
+    # plus haut niveau l'emportent en cas de doublon.
+    if isinstance(params.get("programme"), dict):
+        params = {**params["programme"], **params}
+
     org_id = task["organization_id"]
     project_id = task.get("project_id")
 
