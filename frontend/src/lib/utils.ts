@@ -41,6 +41,21 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   alerte_norme: 'Alerte norme',
   email_notification: 'Notification email',
   extraction_metadata: 'Extraction métadonnées',
+  // Suisse romande
+  simulation_energetique_rapide: 'Simulation énergétique rapide',
+  justificatif_sia_380_1: 'Justificatif SIA 380/1',
+  note_calcul_sia_260_267: 'Note structure SIA 260-267',
+  dossier_mise_enquete: 'Dossier mise en enquête',
+  reponse_observations_autorite: 'Réponse aux observations',
+  metres_automatiques_ifc: 'Métrés automatiques IFC',
+  controle_reglementaire_geneve: 'Contrôle réglementaire',
+  aeai_checklist_generation: 'Checklist AEAI',
+  aeai_rapport: 'Rapport AEAI',
+  descriptif_can_sia_451: 'Descriptif CAN SIA 451',
+  idc_geneve_rapport: 'IDC Genève',
+  idc_extraction_facture: 'Extraction facture IDC',
+  prebim_generation: 'Génération Pré-BIM',
+  veille_romande: 'Veille romande',
 };
 
 export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
