@@ -691,7 +691,13 @@ function buildTaskPayload(
       contraintes: form.contraintes,
     });
   } else if (taskType === 'chiffrage_dpgf') {
-    Object.assign(p, { lot: form.lot, surface: form.surface, notes: form.notes });
+    // L'agent chiffre à partir de metre_text (ou metre_document_id), pas de
+    // champs surface/notes isolés : on compose un métré minimal lisible.
+    p.lot = form.lot;
+    const metreLines: string[] = [];
+    if (form.surface) metreLines.push(`Surface concernée : ${form.surface} m²`);
+    if (form.notes) metreLines.push(String(form.notes));
+    if (metreLines.length) p.metre_text = metreLines.join('\n');
   } else if (taskType === 'controle_reglementaire_geneve') {
     p.project_data = {
       canton: form.canton, address: form.address,
@@ -707,11 +713,13 @@ function buildTaskPayload(
       special_context: form.special_context || '',
     });
   } else if (taskType === 'compte_rendu_reunion') {
-    Object.assign(p, {
-      meeting_title: form.meeting_title,
-      participants: form.participants,
-      notes: form.notes,
-    });
+    // L'agent lit "objet" (pas meeting_title) et itère sur participants :
+    // il faut une LISTE, sinon une string serait parcourue caractère par caractère.
+    p.objet = form.meeting_title || 'Réunion de projet';
+    p.participants = form.participants
+      ? String(form.participants).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    p.notes = form.notes;
   }
 
   return base;

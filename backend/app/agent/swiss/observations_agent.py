@@ -79,7 +79,8 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 
     # 1. Récupération du texte des observations
     observations_text = params.get("observations_text") or ""
-    doc_id = params.get("observations_document_id")
+    # Tolère les deux nommages selon l'appelant (form générique vs endpoint v4).
+    doc_id = params.get("observations_document_id") or params.get("autorite_pdf_document_id")
     source_name = "Courrier saisi manuellement"
 
     if doc_id:
@@ -112,7 +113,7 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     # 3. Génération des réponses via LLM Sonnet (1 appel pour tout le courrier)
     authority = params.get("authority", "autorité cantonale")
     project_name = params.get("project_name", "")
-    project_ctx = params.get("project_context") or {}
+    project_ctx = params.get("project_context") or params.get("project_data") or {}
 
     system = get_prompt_ch("observations_autorite")
     user_content = f"""Produire une LETTRE DE RÉPONSE à un courrier d'observations transmis par {authority}.
