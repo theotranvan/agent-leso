@@ -18,39 +18,39 @@ async def overview(user: Annotated[AuthUser, Depends(get_current_user)]):
     admin = get_supabase_admin()
     org_id = user.organization_id
 
-    # Compteurs
     projects = admin.table("projects").select("id", count="exact").eq("organization_id", org_id).eq("status", "active").execute()
-    documents = admin.table("documents").select("id", count="exact").eq("organization_id", org_id).execute()
     tasks_total = admin.table("tasks").select("id", count="exact").eq("organization_id", org_id).execute()
+    tasks_running = admin.table("tasks").select("id", count="exact").eq("organization_id", org_id).in_("status", ["pending", "running"]).execute()
     tasks_month = admin.table("tasks").select("id, cost_euros", count="exact").eq("organization_id", org_id).gte(
         "created_at", (datetime.utcnow() - timedelta(days=30)).isoformat()
     ).execute()
 
     org = admin.table("organizations").select("plan, tasks_used_this_month, tasks_limit").eq("id", org_id).maybe_single().execute()
+    plan = (org.data.get("plan") if org.data else None) or "starter"
 
-    # Coût total du mois
     cost_this_month = sum((t.get("cost_euros") or 0) for t in (tasks_month.data or []))
 
-    # Dernières tâches
-    recent = admin.table("tasks").select("id, task_type, status, result_preview, created_at").eq("organization_id", org_id).order("created_at", desc=True).limit(10).execute()
+    recent = admin.table("tasks").select("id, task_type, status, result_url, result_preview, created_at").eq("organization_id", org_id).order("created_at", desc=True).limit(10).execute()
 
-    # Alertes réglementaires récentes non traitées
-    alerts = admin.table("regulatory_alerts").select("*").eq("processed", False).order("published_at", desc=True).limit(5).execute()
+    recent_projects_res = admin.table("projects").select("id, name, canton, affectation").eq("organization_id", org_id).order("updated_at", desc=True).limit(5).execute()
+
+    alerts = admin.table("regulatory_alerts").select("id, title, published_at, source").eq("processed", False).order("published_at", desc=True).limit(5).execute()
 
     return {
-        "counts": {
-            "projects": projects.count or 0,
-            "documents": documents.count or 0,
+        "stats": {
+            "projects_count": projects.count or 0,
             "tasks_total": tasks_total.count or 0,
+            "running_tasks": tasks_running.count or 0,
             "tasks_month": tasks_month.count or 0,
         },
-        "plan": org.data.get("plan") if org.data else "starter",
         "quota": {
             "used": org.data.get("tasks_used_this_month", 0) if org.data else 0,
             "limit": org.data.get("tasks_limit", 500) if org.data else 500,
+            "plan": plan,
         },
         "cost_this_month_eur": round(cost_this_month, 2),
         "recent_tasks": recent.data or [],
+        "recent_projects": recent_projects_res.data or [],
         "alerts": alerts.data or [],
     }
 
