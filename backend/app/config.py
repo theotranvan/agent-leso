@@ -22,20 +22,20 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = "bet-documents"
 
     # Stripe
-    STRIPE_SECRET_KEY: str
-    STRIPE_WEBHOOK_SECRET: str
-    STRIPE_PRICE_STARTER: str
-    STRIPE_PRICE_PRO: str
-    STRIPE_PRICE_ENTERPRISE: str
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_STARTER: str = ""
+    STRIPE_PRICE_PRO: str = ""
+    STRIPE_PRICE_ENTERPRISE: str = ""
 
     # Email
-    RESEND_API_KEY: str
+    RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "agent@bet-agent.com"
     ADMIN_EMAIL: str = "admin@bet-agent.com"
 
     # Légifrance PISTE
-    LEGIFRANCE_CLIENT_ID: str
-    LEGIFRANCE_CLIENT_SECRET: str
+    LEGIFRANCE_CLIENT_ID: str = ""
+    LEGIFRANCE_CLIENT_SECRET: str = ""
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
