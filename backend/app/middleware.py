@@ -2,6 +2,7 @@
 import logging
 from typing import Annotated, Optional
 
+import httpx
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -27,12 +28,37 @@ class AuthUser(BaseModel):
     access_token: str
 
 
+_jwks_cache: dict | None = None
+
+
+def _get_jwks(force_refresh: bool = False) -> dict:
+    global _jwks_cache
+    if _jwks_cache is None or force_refresh:
+        url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        _jwks_cache = httpx.get(url, timeout=10).json()
+    return _jwks_cache
+
+
 def verify_supabase_jwt(token: str) -> dict:
     try:
-        return jwt.decode(
-            token, settings.SUPABASE_JWT_SECRET,
-            algorithms=[settings.JWT_ALGORITHM], audience="authenticated",
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+
+        if alg == "HS256":
+            return jwt.decode(
+                token, settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"], audience="authenticated",
+            )
+
+        try:
+            return jwt.decode(
+                token, _get_jwks(), algorithms=[alg], audience="authenticated",
+            )
+        except JWTError:
+            return jwt.decode(
+                token, _get_jwks(force_refresh=True), algorithms=[alg],
+                audience="authenticated",
+            )
     except JWTError as e:
         logger.warning(f"JWT invalide: {e}")
         raise HTTPException(status_code=401, detail="Token invalide ou expiré",
