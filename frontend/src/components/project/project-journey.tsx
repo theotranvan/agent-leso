@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   projectId: string;
+  onEditProject?: () => void;
 }
 
 const STATUS_META: Record<string, { color: string; bg: string }> = {
@@ -17,7 +18,24 @@ const STATUS_META: Record<string, { color: string; bg: string }> = {
   not_started: { color: '#9ca3af', bg: '#f3f4f6' },
 };
 
-export function ProjectJourney({ projectId }: Props) {
+// Chaque action mène à sa page dédiée quand elle existe (interface riche),
+// sinon au formulaire générique pré-sélectionné sur ce type.
+const TASK_TYPE_ROUTES: Record<string, string> = {
+  justificatif_sia_380_1: '/thermique',
+  note_calcul_sia_260_267: '/structure',
+  idc_geneve_rapport: '/idc',
+  idc_extraction_facture: '/idc',
+  aeai_checklist_generation: '/aeai',
+  aeai_rapport: '/aeai',
+  metres_automatiques_ifc: '/metres',
+  simulation_energetique_rapide: '/simulation-rapide',
+  prebim_generation: '/bim',
+  dossier_mise_enquete: '/dossier-enquete',
+  reponse_observations_autorite: '/observations',
+  veille_romande: '/veille',
+};
+
+export function ProjectJourney({ projectId, onEditProject }: Props) {
   const router = useRouter();
   const [state, setState] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +78,15 @@ export function ProjectJourney({ projectId }: Props) {
   if (!state) return null;
 
   const startAction = (taskType: string) => {
-    if (taskType === 'project_setup') return;
+    if (taskType === 'project_setup') {
+      onEditProject?.();
+      return;
+    }
+    const dedicated = TASK_TYPE_ROUTES[taskType];
+    if (dedicated) {
+      router.push(`${dedicated}?project=${projectId}`);
+      return;
+    }
     router.push(`/tasks/new?type=${taskType}&project=${projectId}`);
   };
 
@@ -165,7 +191,14 @@ export function ProjectJourney({ projectId }: Props) {
                             <div className="text-xs text-amber-600">{action.advisory}</div>
                           )}
                         </div>
-                        {action.task_type !== 'project_setup' && !action.done && (
+                        {action.task_type === 'project_setup' ? (
+                          <button
+                            onClick={() => startAction(action.task_type)}
+                            className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-secondary"
+                          >
+                            {action.done ? 'Modifier' : 'Compléter'}
+                          </button>
+                        ) : !action.done && (
                           <button
                             onClick={() => startAction(action.task_type)}
                             className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-secondary"
