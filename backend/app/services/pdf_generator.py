@@ -215,12 +215,12 @@ def markdown_to_html(md: str) -> str:
             header = table_rows[0]
             html_parts.append("<thead><tr>")
             for cell in header:
-                html_parts.append(f"<th>{cell}</th>")
+                html_parts.append(f"<th>{_inline(cell)}</th>")
             html_parts.append("</tr></thead><tbody>")
             for row in table_rows[1:]:
                 html_parts.append("<tr>")
                 for cell in row:
-                    html_parts.append(f"<td>{cell}</td>")
+                    html_parts.append(f"<td>{_inline(cell)}</td>")
                 html_parts.append("</tr>")
             html_parts.append("</tbody></table>")
             in_table = False
@@ -249,7 +249,10 @@ def markdown_to_html(md: str) -> str:
         else:
             flush_table()
 
-        if line.startswith("### "):
+        if line.strip() in ("---", "***", "___"):
+            flush_list()
+            html_parts.append("<hr>")
+        elif line.startswith("### "):
             flush_list()
             html_parts.append(f"<h3>{_inline(line[4:])}</h3>")
         elif line.startswith("## "):
