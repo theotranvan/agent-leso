@@ -371,7 +371,7 @@ function AdaptiveFields({
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {AFFECTATIONS_SIA.map((a) => (
-                <SelectItem key={a.code} value={a.code}>{a.label}</SelectItem>
+                <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>

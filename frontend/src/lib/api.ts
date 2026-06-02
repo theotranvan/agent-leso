@@ -821,7 +821,8 @@ export const api = {
         const url = new URL(`${API_URL}/api/v4/observations`);
         if (project_id) url.searchParams.set('project_id', project_id);
         const res = await fetch(url, { headers: await authHeaders() });
-        return handle<{ observations: any[] }>(res);
+        // Le backend renvoie { responses: [...] } ; on tolère aussi { observations }.
+        return handle<{ responses?: any[]; observations?: any[] }>(res);
       },
     },
     simulationRapide: {

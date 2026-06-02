@@ -87,7 +87,7 @@ export default function AEAIDetailPage() {
   const handleExportPDF = async () => {
     setExporting(true);
     try {
-      const res = await api.aeai.exportPDF(id);
+      const res = await api.aeai.exportPdf(id);
       if (res.pdf_url) {
         window.open(res.pdf_url, '_blank');
       }
