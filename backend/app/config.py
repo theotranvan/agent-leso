@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
 
     # Security
-    ENCRYPTION_KEY: str
+    # Optionnelle : requise par le Blueprint mais non utilisée pour chiffrer des
+    # données partagées. La rendre optionnelle évite que le worker (où la clé est
+    # en sync:false) crashe au boot si elle n'a pas été saisie manuellement.
+    ENCRYPTION_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
 
     # Monitoring
