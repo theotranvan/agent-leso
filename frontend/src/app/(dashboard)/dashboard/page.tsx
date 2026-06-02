@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  FolderKanban, ListChecks, Clock, ArrowRight, Flame, Building, Layers,
-  Building2, Shield, Bell, FileCheck2, MessageSquareWarning, Ruler, Zap,
-  Sparkles, AlertCircle, Download, ChevronRight,
+  FolderKanban, ListChecks, Clock, ArrowRight, Sparkles, AlertCircle,
+  Download, ChevronRight, FolderPlus, Wand2, ClipboardCheck, Check,
+  Flame, Building, Building2, Ruler, FileCheck2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { TaskStatusBadge } from '@/components/ui/task-status';
@@ -92,13 +92,17 @@ export default function DashboardPage() {
       .reduce((sum: number, t: any) => sum + (DAYS_SAVED_BY_TASK[t.task_type] || 0.5), 0);
   })();
 
+  const projectsCount = overview?.stats?.projects_count ?? 0;
+  const tasksTotal = overview?.stats?.tasks_total ?? overview?.recent_tasks?.length ?? 0;
+  const toValidate = overview?.recent_tasks?.filter((t: any) => t.status === 'completed').length ?? 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header de page */}
       <div>
-        <h1 className="text-2xl font-semibold">Bonjour</h1>
+        <h1 className="text-2xl font-semibold">Bonjour 👋</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Vue d'ensemble de ton activité et des livrables récents.
+          Voici par où commencer et où en est ton activité.
         </p>
       </div>
 
@@ -108,11 +112,19 @@ export default function DashboardPage() {
         </Banner>
       )}
 
+      {/* ÉTAPES GUIDÉES — le cœur de l'accueil */}
+      <GuidedSteps
+        loading={loading}
+        projectsCount={projectsCount}
+        tasksTotal={tasksTotal}
+        toValidate={toValidate}
+      />
+
       {/* KPIs humains */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
           label="Projets actifs"
-          value={loading ? null : (overview?.stats?.projects_count ?? 0)}
+          value={loading ? null : projectsCount}
           icon={FolderKanban}
         />
         <KpiCard
@@ -152,7 +164,7 @@ export default function DashboardPage() {
                 icon={ListChecks}
                 title="Pas encore de tâche"
                 description="Crée ta première tâche pour voir l'agent à l'œuvre."
-                action={{ label: 'Nouvelle tâche', href: '/tasks/new' }}
+                action={{ label: 'Générer un livrable', href: '/tasks/new' }}
               />
             ) : (
               <div className="divide-y">
@@ -210,7 +222,10 @@ export default function DashboardPage() {
 
       {/* Accès rapide aux 6 modules */}
       <section>
-        <h2 className="text-base font-medium mb-3">Accès rapide</h2>
+        <h2 className="text-base font-medium mb-1">Outils les plus utilisés</h2>
+        <p className="text-sm text-muted-foreground mb-3">
+          Chaque outil produit un livrable prêt à relire.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {MODULES.map((m) => (
             <Link
@@ -231,6 +246,131 @@ export default function DashboardPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+// ============================================================
+// Accueil guidé : 3 étapes adaptatives selon l'état du compte
+// ============================================================
+function GuidedSteps({
+  loading, projectsCount, tasksTotal, toValidate,
+}: {
+  loading: boolean; projectsCount: number; tasksTotal: number; toValidate: number;
+}) {
+  // Détermine l'étape "active" (la prochaine action recommandée)
+  const step1Done = projectsCount > 0;
+  const step2Done = tasksTotal > 0;
+  // Étape courante = la première non faite
+  const current = !step1Done ? 1 : !step2Done ? 2 : 3;
+
+  const steps = [
+    {
+      n: 1,
+      icon: FolderPlus,
+      title: 'Crée un projet',
+      desc: 'Renseigne le canton, l’affectation et l’adresse. Tout part de là.',
+      cta: 'Nouveau projet',
+      href: '/projects',
+      done: step1Done,
+      doneLabel: step1Done ? `${projectsCount} projet${projectsCount > 1 ? 's' : ''}` : '',
+    },
+    {
+      n: 2,
+      icon: Wand2,
+      title: 'Génère un livrable',
+      desc: 'CCTP, simulation énergétique, métrés… L’agent rédige pour toi.',
+      cta: 'Générer un livrable',
+      href: '/tasks/new',
+      done: step2Done,
+      doneLabel: step2Done ? `${tasksTotal} tâche${tasksTotal > 1 ? 's' : ''}` : '',
+    },
+    {
+      n: 3,
+      icon: ClipboardCheck,
+      title: 'Valide & exporte',
+      desc: 'Relis, ajuste si besoin, approuve et télécharge le PDF final.',
+      cta: 'Voir à valider',
+      href: '/validation',
+      done: false,
+      doneLabel: toValidate > 0 ? `${toValidate} prêt${toValidate > 1 ? 's' : ''}` : '',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-36 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {steps.map((s) => {
+          const isCurrent = s.n === current;
+          const Icon = s.icon;
+          return (
+            <Link
+              key={s.n}
+              href={s.href}
+              className={[
+                'relative group p-4 rounded-xl border transition-all',
+                isCurrent
+                  ? 'border-primary/40 bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                  : 'bg-card hover:border-muted-foreground/30 hover:shadow-sm',
+              ].join(' ')}
+            >
+              {/* badge numéro / check */}
+              <div className="flex items-center justify-between mb-3">
+                <div
+                  className={[
+                    'inline-flex w-9 h-9 rounded-lg items-center justify-center',
+                    s.done
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : isCurrent
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground',
+                  ].join(' ')}
+                >
+                  {s.done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" strokeWidth={1.8} />}
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Étape {s.n}
+                </span>
+              </div>
+
+              <p className="font-medium text-sm flex items-center gap-2">
+                {s.title}
+                {s.doneLabel && (
+                  <span className="text-[11px] font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    {s.doneLabel}
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-1">{s.desc}</p>
+
+              <div
+                className={[
+                  'mt-3 inline-flex items-center gap-1 text-xs font-medium',
+                  isCurrent ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
+                ].join(' ')}
+              >
+                {isCurrent && (
+                  <span className="relative flex h-1.5 w-1.5 mr-0.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+                  </span>
+                )}
+                {s.cta} <ArrowRight className="h-3 w-3" />
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
