@@ -2,42 +2,42 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, FolderKanban, ListChecks, CreditCard, Settings, LogOut, Sparkles,
-  Flame, Building, Layers, Building2, Bell, BookOpen, Shield, ShieldCheck,
-  FileCheck2, MessageSquareWarning, Ruler, Zap, ClipboardCheck, BarChart3,
-  KanbanSquare, Award,
+  LayoutDashboard, FolderKanban, CreditCard, Settings, LogOut, Sparkles,
+  Flame, Building, Layers, Building2, Bell, Shield, ShieldCheck,
+  Ruler, ClipboardCheck, BarChart3, KanbanSquare, Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 
-const navGeneral = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/projects', label: 'Projets', icon: FolderKanban },
-  { href: '/board', label: 'Mes affaires', icon: KanbanSquare },
-  { href: '/compliance', label: 'Conformité', icon: ShieldCheck },
-  { href: '/validation', label: 'Validation', icon: ClipboardCheck },
-  { href: '/tasks/new', label: 'Nouvelle tâche', icon: Sparkles },
+// 1. Le quotidien : par où on commence
+const navStart = [
+  { href: '/dashboard', label: 'Accueil', icon: LayoutDashboard },
+  { href: '/projects', label: 'Mes projets', icon: FolderKanban },
+  { href: '/tasks/new', label: 'Générer un livrable', icon: Sparkles },
 ];
 
-const navCH = [
+// 2. Les outils métier dédiés (interfaces riches, au-delà du formulaire générique)
+const navTools = [
   { href: '/thermique', label: 'Thermique SIA', icon: Flame },
   { href: '/structure', label: 'Structure SIA', icon: Building },
-  { href: '/bim', label: 'Pré-BIM', icon: Layers },
   { href: '/idc', label: 'IDC Genève', icon: Building2 },
   { href: '/aeai', label: 'AEAI (incendie)', icon: Shield },
-  { href: '/veille', label: 'Veille CH', icon: Bell },
-];
-
-const navV4 = [
-  { href: '/dossier-enquete', label: 'Dossier enquête', icon: FileCheck2 },
-  { href: '/observations', label: 'Observations', icon: MessageSquareWarning },
   { href: '/metres', label: 'Métrés IFC', icon: Ruler },
-  { href: '/simulation-rapide', label: 'Simulation rapide', icon: Zap },
+  { href: '/bim', label: 'Pré-BIM', icon: Layers },
 ];
 
+// 3. Suivi : ce qui est en cours, à valider, à surveiller
+const navTrack = [
+  { href: '/board', label: 'Mes affaires', icon: KanbanSquare },
+  { href: '/validation', label: 'À valider', icon: ClipboardCheck },
+  { href: '/compliance', label: 'Conformité', icon: ShieldCheck },
+  { href: '/veille', label: 'Veille romande', icon: Bell },
+];
+
+// 4. Compte
 const navAccount = [
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/certification', label: 'Certification', icon: Award },
   { href: '/billing', label: 'Facturation', icon: CreditCard },
   { href: '/settings', label: 'Paramètres', icon: Settings },
@@ -63,18 +63,12 @@ export function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <NavSection items={navGeneral} pathname={pathname} />
-        <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Suisse romande
-        </p>
-        <NavSection items={navCH} pathname={pathname} />
-        <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Livrables avancés
-        </p>
-        <NavSection items={navV4} pathname={pathname} />
-        <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Compte
-        </p>
+        <NavSection items={navStart} pathname={pathname} />
+        <NavLabel>Outils métier</NavLabel>
+        <NavSection items={navTools} pathname={pathname} />
+        <NavLabel>Suivi</NavLabel>
+        <NavSection items={navTrack} pathname={pathname} />
+        <NavLabel>Compte</NavLabel>
         <NavSection items={navAccount} pathname={pathname} />
       </nav>
       <div className="border-t p-3">
@@ -87,6 +81,14 @@ export function Sidebar() {
   );
 }
 
+
+function NavLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-5 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
 
 function NavSection({
   items,
