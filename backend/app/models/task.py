@@ -6,16 +6,24 @@ from pydantic import BaseModel, Field
 
 TaskStatus = Literal["pending", "running", "completed", "failed"]
 TaskType = Literal[
-    # Opus 4.6 - critique
+    # Opus - critique
     "note_calcul_structure", "verification_eurocode",
     "calcul_thermique_re2020", "calcul_acoustique",
-    # Sonnet 4.6 - standard
+    "dossier_mise_enquete", "reponse_observations_autorite",
+    "metres_automatiques_ifc",
+    # Sonnet - standard
     "redaction_cctp", "memoire_technique", "chiffrage_dpgf", "chiffrage_dqe",
     "coordination_inter_lots", "dossier_permis_construire",
     "analyse_ifc", "doe_compilation",
-    # Haiku 4.5 - léger
+    "controle_reglementaire_geneve", "aeai_checklist_generation",
+    "aeai_rapport", "descriptif_can_sia_451",
+    "note_calcul_sia_260_267", "justificatif_sia_380_1",
+    "idc_geneve_rapport", "prebim_generation",
+    # Haiku - léger
     "veille_reglementaire", "resume_document", "compte_rendu_reunion",
     "alerte_norme", "email_notification", "extraction_metadata",
+    "simulation_energetique_rapide", "idc_extraction_facture",
+    "veille_romande",
 ]
 
 
