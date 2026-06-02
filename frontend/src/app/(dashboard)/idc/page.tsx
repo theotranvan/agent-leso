@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VECTEURS_ENERGETIQUES } from '@/lib/ch';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDate } from '@/lib/utils';
 
 export default function IDCPage() {
@@ -59,21 +60,16 @@ export default function IDCPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            IDC Genève
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gestion annuelle de l'Indice de Dépense de Chaleur (LEn-GE / REn-GE)
-          </p>
-        </div>
+      <PageHeader
+        title="IDC Genève"
+        description="Indice de Dépense de Chaleur (LEn-GE / REn-GE). Ajoute un bâtiment, importe ses factures d'énergie, l'agent calcule l'IDC et pré-remplit le formulaire OCEN."
+        icon={Building2}
+      >
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4 mr-2" />
           Ajouter un bâtiment
         </Button>
-      </div>
+      </PageHeader>
 
       {showForm && (
         <Card>

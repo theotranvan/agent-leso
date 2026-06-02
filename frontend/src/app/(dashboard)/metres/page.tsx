@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function MetresPage() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -39,15 +40,11 @@ export default function MetresPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Calculator className="h-6 w-6 text-teal-600" />
-        <div>
-          <h1 className="text-2xl font-semibold">Métrés automatiques depuis IFC</h1>
-          <p className="text-sm text-muted-foreground">
-            Extraction SIA 416 + DPGF pré-rempli par CFC en quelques secondes
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Métrés automatiques depuis IFC"
+        description="Charge un fichier IFC : l'agent extrait les surfaces SIA 416, volumes et quantités, puis produit un DPGF pré-rempli par CFC en quelques secondes."
+        icon={Calculator}
+      />
 
       <Card>
         <CardHeader>

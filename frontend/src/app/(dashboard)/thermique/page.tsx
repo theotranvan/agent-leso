@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CantonPicker } from '@/components/swiss/CantonPicker';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function ThermiquePage() {
   const [models, setModels] = useState<any[]>([]);
@@ -59,21 +60,16 @@ export default function ThermiquePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Flame className="h-6 w-6" />
-            Thermique SIA 380/1
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Pipeline thermique suisse : saisie → fichier Lesosai → justificatif officiel
-          </p>
-        </div>
+      <PageHeader
+        title="Thermique SIA 380/1"
+        description="Pipeline thermique suisse : saisie des données → fichier Lesosai → justificatif officiel. Crée un modèle, lance le calcul, récupère le PDF."
+        icon={Flame}
+      >
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouveau modèle
         </Button>
-      </div>
+      </PageHeader>
 
       {showForm && (
         <Card>

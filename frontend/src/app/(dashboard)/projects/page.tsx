@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDate, LOT_LABELS } from '@/lib/utils';
 
 export default function ProjectsPage() {
@@ -63,16 +64,16 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projets</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gérez vos opérations et leurs documents techniques</p>
-        </div>
+      <PageHeader
+        title="Mes projets"
+        description="Chaque projet regroupe ses documents et livrables. C'est le point de départ : crée-en un, puis génère tes livrables à l'intérieur."
+        icon={FolderKanban}
+      >
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouveau projet
         </Button>
-      </div>
+      </PageHeader>
 
       {showForm && (
         <Card>
