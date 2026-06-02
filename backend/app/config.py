@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = "bet-documents"
 
     # Stripe
-        STRIPE_SECRET_KEY: str = ""
+    STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_STARTER: str = ""
     STRIPE_PRICE_PRO: str = ""
