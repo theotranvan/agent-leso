@@ -81,7 +81,6 @@ services:
           type: redis
           name: bet-agent-redis
           property: connectionString
-      - fromGroup: bet-agent-shared
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: OPENAI_API_KEY
