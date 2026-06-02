@@ -669,17 +669,21 @@ function buildTaskPayload(
   } else if (taskType === 'metres_automatiques_ifc') {
     p.ifc_document_id = uploadedDocId;
   } else if (taskType === 'reponse_observations_autorite') {
-    p.autorite_pdf_document_id = uploadedDocId;
-    p.project_data = { canton: form.canton, address: form.address };
-  } else if (taskType === 'simulation_energetique_rapide') {
-    p.programme = {
-      canton: form.canton || 'GE',
-      affectation: form.affectation,
+    // L'agent attend observations_document_id + project_context (pas project_data)
+    p.observations_document_id = uploadedDocId;
+    p.project_context = {
+      canton: form.canton,
       sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
-      standard: form.standard || 'sia_380_1_neuf',
-      heating_vector: form.heating_vector || 'chauffage_distance',
-      facteur_forme: form.facteur_forme || 'standard',
     };
+    p.project_address = form.address || '';
+  } else if (taskType === 'simulation_energetique_rapide') {
+    // L'agent lit ces champs à plat dans input_params (pas sous "programme")
+    p.canton = form.canton || 'GE';
+    p.affectation = form.affectation;
+    p.sre_m2 = form.sre_m2 ? Number(form.sre_m2) : undefined;
+    p.standard = form.standard || 'sia_380_1_neuf';
+    p.heating_vector = form.heating_vector || 'chauffage_distance';
+    p.facteur_forme = form.facteur_forme || 'standard';
   } else if (taskType === 'redaction_cctp') {
     Object.assign(p, {
       lot: form.lot, type_ouvrage: form.type_ouvrage,
