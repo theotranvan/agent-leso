@@ -60,7 +60,10 @@ async function handle<T>(res: Response): Promise<T> {
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      detail = body.detail || detail;
+      const raw = body.detail;
+      if (typeof raw === 'string') detail = raw;
+      else if (Array.isArray(raw)) detail = raw.map((e: any) => e.msg || JSON.stringify(e)).join(', ');
+      else if (raw != null) detail = JSON.stringify(raw);
     } catch {}
     throw new ApiError(res.status, detail);
   }
