@@ -10,9 +10,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from app.connectors.thermic import SimulationResult as V3SimulationResult, ThermicInputs
+from app.connectors.thermic import SimulationResult as V3SimulationResult
+from app.connectors.thermic import ThermicInputs
 from app.connectors.thermic.gbxml_generator import GbxmlGenerator
-from app.connectors.thermic.lesosai_file import LesosaiFileConnector as V3LesosaiFileConnector
+from app.connectors.thermic.lesosai_file import (
+    LesosaiFileConnector as V3LesosaiFileConnector,
+)
 from app.connectors.thermic.stub import StubThermicConnector
 from app.services.thermique.engine_interface import ThermalEngine, ThermalEngineResult
 

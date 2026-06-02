@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from app.connectors.idc.facture_extractor import (
-    CONFIDENCE_OK_THRESHOLD,
     FactureExtractor,
 )
 
@@ -48,4 +46,6 @@ class TestFactureExtractor:
         assert FactureExtractor._is_sane_value(10, "mazout") is False  # trop peu
         assert FactureExtractor._is_sane_value(1_000_000, "mazout") is False  # trop
         assert FactureExtractor._is_sane_value(10_000, "gaz") is True
-        assert FactureExtractor._is_sane_value(1000, "kwh") is False
+        # Vecteurs en kWh (chauffage à distance, électrique, PAC) : plage 100 → 50M
+        assert FactureExtractor._is_sane_value(1000, "electrique") is True
+        assert FactureExtractor._is_sane_value(50, "chauffage_distance") is False  # trop peu

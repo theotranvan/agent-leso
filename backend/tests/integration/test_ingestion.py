@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.agent.ingestion import (
     TASK_DOCUMENT_REQUIREMENTS,
     IngestionResult,
@@ -30,7 +28,12 @@ class TestIngestionRequirements:
         required = {"required_types", "keywords", "max_documents"}
         for tt, reqs in TASK_DOCUMENT_REQUIREMENTS.items():
             assert set(reqs.keys()) >= required, f"{tt} manque {required - set(reqs.keys())}"
-            assert isinstance(reqs["max_documents"], int) and reqs["max_documents"] > 0
+            # max_documents >= 0 : un module sans document requis (ex. simulation
+            # rapide à partir d'un programme texte) déclare légitimement 0.
+            assert isinstance(reqs["max_documents"], int) and reqs["max_documents"] >= 0
+            # Si des types de documents sont requis, la limite doit être strictement positive.
+            if reqs["required_types"]:
+                assert reqs["max_documents"] > 0, f"{tt} requiert des docs mais max_documents=0"
 
     def test_metres_requires_ifc_only(self) -> None:
         reqs = TASK_DOCUMENT_REQUIREMENTS["metres_automatiques_ifc"]

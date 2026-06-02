@@ -13,9 +13,27 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.middleware import SecurityHeadersMiddleware, limiter
 from app.routes import (
-    aeai, auth, bim as bim_routes, billing, certification, dashboard, documents,
-    idc, norms, onboarding, projects, settings as settings_routes, structure, tasks,
-    thermique, v4_agents, veille,
+    aeai,
+    auth,
+    billing,
+    certification,
+    dashboard,
+    documents,
+    idc,
+    norms,
+    onboarding,
+    projects,
+    structure,
+    tasks,
+    thermique,
+    v4_agents,
+    veille,
+)
+from app.routes import (
+    bim as bim_routes,
+)
+from app.routes import (
+    settings as settings_routes,
 )
 
 logging.basicConfig(

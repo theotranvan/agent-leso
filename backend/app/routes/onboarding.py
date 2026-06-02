@@ -9,7 +9,7 @@ Parcours en 3 étapes :
 dashboard déjà peuplé plutôt qu'un écran vide.
 """
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 

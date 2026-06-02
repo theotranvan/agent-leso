@@ -226,13 +226,14 @@ def temp_cecb_file(tmp_path: Path) -> Path:
 def sample_facture_mazout_bytes() -> bytes:
     """Facture PDF texte réaliste pour tests d'extraction."""
     try:
-        from pypdf import PdfWriter  # pypdf v3+
+        from pypdf import PdfWriter  # pypdf v3+  # noqa: F401
     except ImportError:
         # Fallback : génération via reportlab
         try:
+            import io
+
             from reportlab.lib.pagesizes import A4
             from reportlab.pdfgen import canvas
-            import io
 
             buf = io.BytesIO()
             c = canvas.Canvas(buf, pagesize=A4)

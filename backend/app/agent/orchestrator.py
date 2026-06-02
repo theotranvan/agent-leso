@@ -104,7 +104,14 @@ async def execute_task(task_id: str) -> dict[str, Any]:
 
     try:
         # Dispatch vers le module
-        from app.agent.modules import cctp, chiffrage, coordination, doe, note_calcul, rapport
+        from app.agent.modules import (
+            cctp,
+            chiffrage,
+            coordination,
+            doe,
+            note_calcul,
+            rapport,
+        )
 
         # ==================== Dispatch V1 (France) ====================
         if task_type == "redaction_cctp":
@@ -243,8 +250,8 @@ async def execute_task(task_id: str) -> dict[str, Any]:
             ip = task.get("input_params") or {}
             approver_emails = ip.get("approver_emails") or ip.get("recipient_emails")
             if review_status != "approved" and approver_emails and confidence_dict:
-                from app.services.validation_service import generate_approval_token
                 from app.services.email_service import send_approval_request_email
+                from app.services.validation_service import generate_approval_token
                 approve_tok = generate_approval_token(
                     task_id=task_id, organization_id=task["organization_id"],
                     user_id=task.get("user_id"), action="approve",

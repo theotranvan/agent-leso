@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from app.database import get_supabase_admin

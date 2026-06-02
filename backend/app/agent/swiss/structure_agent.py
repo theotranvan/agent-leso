@@ -5,7 +5,11 @@ from typing import Any
 
 from app.agent.router import call_llm
 from app.agent.swiss.prompts_ch import get_prompt_ch
-from app.services.pdf_generator import markdown_to_html, render_pdf_from_html, render_visa_block
+from app.services.pdf_generator import (
+    markdown_to_html,
+    render_pdf_from_html,
+    render_visa_block,
+)
 from app.services.structure.double_check import double_check
 from app.services.structure.saf_generator import generate_saf_xlsx
 from app.services.structure.saf_parser import parse_saf_results
@@ -178,11 +182,13 @@ async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
       - saf_results_storage_path: str (requis si step='generate_note')
       - project_name, project_address, author, engineer_validated
     """
-    import base64
     from datetime import datetime
-    from typing import Any
+
     from app.database import get_storage, get_supabase_admin
-    from app.services.pdf_generator import markdown_to_html, render_pdf_from_html, render_visa_block
+    from app.services.pdf_generator import (
+        markdown_to_html,
+        render_pdf_from_html,
+    )
 
     params = task.get("input_params") or {}
     org_id = task["organization_id"]

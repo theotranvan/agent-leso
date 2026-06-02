@@ -46,7 +46,6 @@ async def search_recent_fedlex(keywords: list[str], days_back: int = 7) -> list[
     Cette implémentation utilise le flux RSS des mises à jour Fedlex.
     Si Fedlex change de format, adapter ici.
     """
-    since = datetime.utcnow() - timedelta(days=days_back)
     results: list[dict] = []
 
     async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "BET-Agent/2.0"}) as client:

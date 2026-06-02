@@ -14,7 +14,11 @@ router = APIRouter(prefix="/certification", tags=["certification"])
 @router.get("/status")
 async def certification_status(user: Annotated[AuthUser, Depends(get_current_user)]):
     """État de certification du bureau + progression."""
-    from app.services.certification import compute_certification, get_or_create_badge_token, get_badge_embed_html
+    from app.services.certification import (
+        compute_certification,
+        get_badge_embed_html,
+        get_or_create_badge_token,
+    )
 
     cert = compute_certification(user.organization_id)
     cert["badge_token"] = get_or_create_badge_token(user.organization_id)

@@ -102,7 +102,10 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         try:
             # Priorité : check communal VD précis si commune connue
             if canton == "VD" and commune:
-                from app.knowledge_base.urbanisme.communes_vd import check_conformite_commune, get_commune_zone
+                from app.knowledge_base.urbanisme.communes_vd import (
+                    check_conformite_commune,
+                    get_commune_zone,
+                )
                 if get_commune_zone(commune, zone_key):
                     urba_check = check_conformite_commune(
                         commune=commune,
@@ -116,7 +119,9 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
                     )
             # Fallback : zone cantonale générique
             if urba_check is None:
-                from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
+                from app.knowledge_base.urbanisme.indices import (
+                    check_conformite_urbanistique,
+                )
                 urba_check = check_conformite_urbanistique(
                     canton=canton,
                     zone_key=zone_key,

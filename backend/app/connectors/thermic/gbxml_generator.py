@@ -268,9 +268,16 @@ class GbxmlGenerator(ThermicConnector):
         default_u_key: str,
     ) -> GbxmlSurface | None:
         gid = getattr(element, "GlobalId", None) or f"{element.is_a()}_{element.id()}"
-        area = self._extract_quantities(element).get("NetArea") \
-            or self._extract_quantities(element).get("GrossArea") \
+        quantities = self._extract_quantities(element)
+        # Les fenêtres/portes portent leur surface dans la quantité "Area"
+        # (Qto_WindowBaseQuantities / Qto_DoorBaseQuantities), les parois opaques
+        # dans NetArea/GrossArea. On couvre les deux conventions.
+        area = (
+            quantities.get("NetArea")
+            or quantities.get("GrossArea")
+            or quantities.get("Area")
             or 0.0
+        )
         if area <= 0:
             return None
 

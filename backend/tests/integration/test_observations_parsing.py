@@ -1,14 +1,11 @@
 """Tests du parsing d'observations DALE/DGT - 100% déterministe."""
 from __future__ import annotations
 
-import pytest
-
 from app.agent.swiss.observations_agent import (
     THEMATIC_KEYWORDS,
     _classify_theme,
     _parse_observations,
 )
-
 
 COURRIER_DALE_EXEMPLE = """
 Département du territoire - Office des autorisations de construire

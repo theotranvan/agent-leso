@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from app.connectors.thermic import ThermicInputs
 from app.connectors.thermic.gbxml_generator import GbxmlGenerator
 from app.connectors.thermic.stub import StubThermicConnector

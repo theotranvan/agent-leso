@@ -1,11 +1,9 @@
 """Routes thermique : modèles, pipeline Lesosai stub/file, import résultats."""
 import logging
-import uuid
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
 
 from app.agent.swiss.thermique_agent import run_thermal_pipeline
 from app.database import get_storage, get_supabase_admin
@@ -248,7 +246,6 @@ async def import_lesosai_results(
 
     # Génère le justificatif final en passant les résultats extraits
     # On remplace les résultats du stub par les vrais
-    from app.agent.swiss.thermique_agent import run_thermal_pipeline as _run
     project_name = ""
     project_address = ""
     if model.get("project_id"):
@@ -262,7 +259,11 @@ async def import_lesosai_results(
     # On appelle donc directement le LLM avec les résultats parsés
     from app.agent.router import call_llm
     from app.agent.swiss.prompts_ch import get_prompt_ch
-    from app.services.pdf_generator import markdown_to_html, render_pdf_from_html, render_visa_block
+    from app.services.pdf_generator import (
+        markdown_to_html,
+        render_pdf_from_html,
+        render_visa_block,
+    )
 
     system = get_prompt_ch("thermique_ch")
     user_content = f"""Rédiger le justificatif thermique SIA 380/1 FINAL à partir des résultats officiels Lesosai.
@@ -392,7 +393,9 @@ async def v3_generate_gbxml(
     """V3 : génère uniquement le gbXML v0.37 (pour import Lesosai ou outil tiers)."""
     import tempfile
     from pathlib import Path
+
     from fastapi.responses import Response
+
     from app.connectors.thermic import ThermicInputs
     from app.connectors.thermic.gbxml_generator import GbxmlGenerator
 

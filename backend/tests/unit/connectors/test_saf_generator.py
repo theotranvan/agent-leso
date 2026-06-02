@@ -15,7 +15,6 @@ from app.connectors.structural.saf_generator import (
     SafGenerator,
 )
 
-
 SAMPLE_MODEL_DATA = {
     "nodes": [
         {"id": "N1", "x": 0.0, "y": 0.0, "z": 0.0},

@@ -16,8 +16,6 @@ from datetime import datetime
 from typing import Any
 
 from app.connectors.thermic.base import (
-    EnergyClass,
-    SIA_380_1_DEFAULT_U_VALUES,
     limite_qh_for_affectation,
     qh_to_energy_class,
 )
@@ -84,6 +82,18 @@ COMPOSITIONS_BY_STANDARD: dict[str, dict[str, float]] = {
         "window": 2.8,
         "door": 3.0,
     },
+}
+
+
+# Récupération de chaleur sur l'air de ventilation (rendement du récupérateur)
+# MINERGIE impose une ventilation contrôlée double-flux avec récupérateur de chaleur
+# (η ≥ 70% pour MINERGIE, ≥ 80% pour MINERGIE-P). Sans cette récupération, les pertes
+# de ventilation dominent le bilan et déclarent non conformes des bâtiments qui le sont
+# largement. SIA 380/1 de base / rénovation / existant : on reste sur l'hypothèse
+# conservatrice d'une aération naturelle ou simple flux (pas de récupération).
+VENTILATION_HEAT_RECOVERY: dict[str, float] = {
+    "minergie": 0.70,
+    "minergie_p": 0.80,
 }
 
 
@@ -289,8 +299,11 @@ def _simulate(
     n_vol_h = 1.0 if not affectation.startswith("logement") else 0.5
     # Volume = SRE × 2.8m (hypothèse hauteur moyenne)
     volume = sre_m2 * 2.8
-    # Pertes ventilation : V · n · 0.34 · HDD · 24 / 1000 (0.34 = cp·rho air en Wh/m³K)
-    pertes_ventilation = volume * n_vol_h * 0.34 * hdd * 24 / 1000
+    # Pertes ventilation brutes : V · n · 0.34 · HDD · 24 / 1000 (0.34 = cp·rho air en Wh/m³K)
+    pertes_ventilation_brutes = volume * n_vol_h * 0.34 * hdd * 24 / 1000
+    # Récupération de chaleur (double-flux) selon standard visé
+    recovery = VENTILATION_HEAT_RECOVERY.get(standard, 0.0)
+    pertes_ventilation = pertes_ventilation_brutes * (1 - recovery)
 
     # Qh total
     qh_total_kwh = pertes_nettes + pertes_ventilation
@@ -327,6 +340,7 @@ def _simulate(
         "fraction_ouvertures": fraction_ouvertures,
         "pertes_transmission_kwh": round(pertes_transmission, 0),
         "pertes_ventilation_kwh": round(pertes_ventilation, 0),
+        "ventilation_recovery_pct": round(recovery * 100, 0),
         "apports_gratuits_pct": round(apports_gratuits_factor * 100, 0),
     }
 
@@ -338,12 +352,12 @@ def _build_report_md(
     author: str,
 ) -> str:
     lines = [
-        f"# Simulation énergétique rapide — SIA 380/1",
+        "# Simulation énergétique rapide — SIA 380/1",
         "",
         f"**Projet** : {project_name or 'Non renseigné'}",
         f"**Date** : {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-        f"**Méthode** : calcul forfaitaire simplifié (pertes transmission + ventilation, apports gratuits).",
-        f"**À vocation de pré-étude** : ne remplace pas un calcul SIA 380/1 officiel via Lesosai ou équivalent.",
+        "**Méthode** : calcul forfaitaire simplifié (pertes transmission + ventilation, apports gratuits).",
+        "**À vocation de pré-étude** : ne remplace pas un calcul SIA 380/1 officiel via Lesosai ou équivalent.",
         "",
         "## Variante principale",
         "",
@@ -373,7 +387,9 @@ def _build_report_md(
         "### Bilan énergie",
         "",
         f"- Pertes par transmission : **{int(main['pertes_transmission_kwh'])} kWh/an**",
-        f"- Pertes par ventilation : **{int(main['pertes_ventilation_kwh'])} kWh/an**",
+        f"- Pertes par ventilation : **{int(main['pertes_ventilation_kwh'])} kWh/an**"
+        + (f" (récupération double-flux {int(main['ventilation_recovery_pct'])}%)"
+           if main.get('ventilation_recovery_pct') else ""),
         f"- Apports gratuits pris en compte : **{int(main['apports_gratuits_pct'])}%**",
         "",
     ]

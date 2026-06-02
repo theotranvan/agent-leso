@@ -12,11 +12,9 @@ soumission officielle.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
-from pathlib import Path
-from typing import Any
 
 from app.connectors.idc.idc_calculator import IDCComputationResult
 
@@ -99,7 +97,7 @@ class OCENFormGenerator:
     ) -> bytes:
         """Retourne les bytes du PDF."""
         try:
-            from weasyprint import HTML, CSS
+            from weasyprint import CSS, HTML
         except ImportError as exc:
             raise RuntimeError("WeasyPrint non installé") from exc
 

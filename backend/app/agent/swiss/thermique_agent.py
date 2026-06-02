@@ -5,8 +5,12 @@ from typing import Any
 
 from app.agent.router import call_llm
 from app.agent.swiss.prompts_ch import get_prompt_ch
-from app.ch.constants import station_default_for_canton, STATIONS_CLIMATIQUES_SIA_2028
-from app.services.pdf_generator import markdown_to_html, render_pdf_from_html, render_visa_block
+from app.ch.constants import STATIONS_CLIMATIQUES_SIA_2028, station_default_for_canton
+from app.services.pdf_generator import (
+    markdown_to_html,
+    render_pdf_from_html,
+    render_visa_block,
+)
 from app.services.thermique.registry import get_engine
 
 logger = logging.getLogger(__name__)

@@ -61,7 +61,6 @@ def extract_envelope_for_thermal(ifc_bytes: bytes) -> dict[str, Any]:
     # Agrégation des surfaces et U-values par composant d'enveloppe
     surfaces = defaultdict(float)
     u_values = defaultdict(list)
-    u_source = {}
 
     for el in thermal_elements:
         comp = IFC_TO_ENVELOPE.get(el["type"])

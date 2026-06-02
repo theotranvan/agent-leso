@@ -38,7 +38,7 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     docs_list = "\n".join(f"- {d['filename']} ({d['file_type']})" for d in (docs.data or []))
 
     intervenants_str = "\n".join(f"- {i}" for i in intervenants) if intervenants else "À compléter"
-    lots_str = "\n".join(f"- {l}" for l in lots) if lots else "À identifier"
+    lots_str = "\n".join(f"- {ln}" for ln in lots) if lots else "À identifier"
 
     user_content = f"""Compiler un DOE (Dossier d'Ouvrages Exécutés) complet pour le projet suivant.
 

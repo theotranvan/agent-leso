@@ -1,5 +1,4 @@
 """Fixtures pytest."""
-import os
 import sys
 from pathlib import Path
 
@@ -10,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 # Collecte fixtures V3 (IFC, CECB, PDF, mocks)
-pytest_plugins = ["tests.fixtures.conftest"]
+pytest_plugins = ["tests.fixtures.shared_fixtures"]
 
 
 @pytest.fixture(autouse=True)

@@ -4,7 +4,6 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-
 VecteurType = Literal["gaz", "mazout", "chauffage_distance", "pac_air_eau",
                       "pac_sol_eau", "pellet", "buche", "electrique", "solaire_thermique"]
 

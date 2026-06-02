@@ -1,6 +1,5 @@
 """Intégration Stripe pour la facturation SaaS."""
 import logging
-from typing import Optional
 
 import stripe
 
@@ -102,7 +101,12 @@ def _handle_checkout_completed(session: dict) -> None:
     if session_type == "credit_pack":
         try:
             import asyncio
-            from app.services.token_quota import CREDIT_PACK_PRICE_CHF, CREDIT_PACK_TOKENS, add_credit_pack
+
+            from app.services.token_quota import (
+                CREDIT_PACK_PRICE_CHF,
+                CREDIT_PACK_TOKENS,
+                add_credit_pack,
+            )
 
             quantity = int(session.get("metadata", {}).get("quantity", 1) or 1)
             tokens = int(session.get("metadata", {}).get("tokens_per_pack", CREDIT_PACK_TOKENS) or CREDIT_PACK_TOKENS)
@@ -199,7 +203,7 @@ def _handle_payment_failed(invoice: dict) -> None:
         send_alert_email(
             to=[result.data["email"]],
             subject="Paiement échoué — action requise",
-            body_html=f"<p>Le paiement de votre abonnement BET Agent a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
+            body_html="<p>Le paiement de votre abonnement BET Agent a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
         )
 
 

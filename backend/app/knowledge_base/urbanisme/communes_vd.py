@@ -13,7 +13,6 @@ la version en vigueur auprès de la commune ou sur le guichet cantonal.
 """
 from __future__ import annotations
 
-
 # Indices par commune → zone communale.
 # IUS = indice d'utilisation du sol, COS = coefficient d'occupation du sol.
 COMMUNES_VD = {

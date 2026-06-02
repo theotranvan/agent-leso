@@ -8,7 +8,7 @@ from typing import Any
 
 from app.agent.router import call_llm
 from app.agent.swiss.prompts_ch import get_prompt_ch
-from app.ch.aeai_templates import AEAI_TEMPLATES, get_template_for_building
+from app.ch.aeai_templates import get_template_for_building
 from app.database import get_storage, get_supabase_admin
 from app.services.pdf_generator import markdown_to_html, render_pdf_from_html
 
@@ -25,7 +25,6 @@ async def execute_checklist(task: dict[str, Any]) -> dict[str, Any]:
       - nb_occupants_max: int
       - special_context: str (optionnel - ex: "parking souterrain 2 niveaux")
     """
-    from app.models.aeai import AEAIChecklistItem
 
     params = task.get("input_params") or {}
     org_id = task["organization_id"]

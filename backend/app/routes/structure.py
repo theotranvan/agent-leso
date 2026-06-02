@@ -5,7 +5,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.agent.swiss.structure_agent import build_saf_and_sheet, run_structure_note_pipeline
+from app.agent.swiss.structure_agent import (
+    build_saf_and_sheet,
+    run_structure_note_pipeline,
+)
 from app.database import get_storage, get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user
 from app.models.structural import StructuralModelInput
@@ -244,6 +247,7 @@ async def v3_generate_saf(
     Retourne le xlsx directement.
     """
     from fastapi.responses import Response
+
     from app.connectors.structural import StructuralInputs
     from app.connectors.structural.saf_generator import SafGenerator
 
@@ -287,6 +291,7 @@ async def v3_double_check(
     import json
     import tempfile
     from pathlib import Path
+
     from app.connectors.structural.results_parser import SafResultsParser
 
     try:

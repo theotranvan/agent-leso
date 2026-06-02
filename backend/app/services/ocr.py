@@ -37,6 +37,7 @@ def ocr_pdf_scanned(pdf_bytes: bytes, lang: str = "fra+eng", dpi: int = 200) -> 
 async def ocr_fallback_claude(image_bytes: bytes) -> str:
     """Fallback OCR Claude Haiku Vision."""
     from anthropic import AsyncAnthropic
+
     from app.config import settings
     client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     b64 = base64.standard_b64encode(image_bytes).decode("utf-8")

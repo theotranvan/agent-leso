@@ -45,7 +45,7 @@ THEMATIC_KEYWORDS: dict[str, list[str]] = {
     "energie_sia_380_1": ["énergie", "energie", "sia 380", "qh", "chauffage", "ep ", "enveloppe thermique", "u-value"],
     "incendie_aeai": ["incendie", "aeai", "compartimentage", "évacuation", "echappement", "feu"],
     "structure_sia_260": ["sia 260", "sia 262", "charge", "poutre", "poteau", "structure", "séisme", "sisme"],
-    "idc_ocen": ["idc", "indice", "depense chaleur", "ocen", "assainissement"],
+    "idc_ocen": ["idc", "indice de dépense", "indice de depense", "dépense de chaleur", "depense chaleur", "ocen", "assainissement"],
     "acoustique_sia_181": ["acoustique", "bruit", "sia 181", "nuisance sonore"],
     "gabarit_zone": ["gabarit", "hauteur", "distance", "limite", "zone", "alignement", "ius", "ibus"],
     "accessibilite_sia_500": ["accessib", "sia 500", "mobilité réduite", "pmr", "handicap"],
@@ -209,13 +209,11 @@ def _parse_observations(text: str) -> list[dict[str, Any]]:
 
     # Tentative avec chacun des patterns, on prend celui qui trouve le plus
     best_matches: list[tuple[int, int]] = []  # (num, position)
-    best_pattern_name = None
 
     for pattern in OBSERVATION_PATTERNS:
         matches = [(int(m.group(1)), m.start()) for m in pattern.finditer(text)]
         if len(matches) > len(best_matches):
             best_matches = matches
-            best_pattern_name = pattern.pattern
 
     if not best_matches:
         return []

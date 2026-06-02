@@ -102,6 +102,7 @@ async def approve_via_token_route(token: str):
     Retourne une page HTML simple de confirmation.
     """
     from fastapi.responses import HTMLResponse
+
     from app.services.validation_service import approve_via_token
 
     try:
@@ -139,7 +140,7 @@ async def get_task_review(task_id: str, user: Annotated[AuthUser, Depends(get_cu
     Au lieu de relire tout le document, l'ingénieur voit le score de confiance
     et seulement les alertes signalées par l'agent.
     """
-    from app.services.validation_service import get_review_alerts, can_user_validate
+    from app.services.validation_service import can_user_validate, get_review_alerts
 
     admin = get_supabase_admin()
     task = (
@@ -290,7 +291,7 @@ async def retry_task(
 # V5 — Régénération intelligente avec feedback structuré
 # ============================================================
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field  # noqa: E402
 
 # Max 5 régénérations par tâche — constante partagée avec le frontend
 MAX_REGENERATIONS_PER_TASK = 5

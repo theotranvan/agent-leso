@@ -13,7 +13,6 @@ Sources par canton :
 """
 import logging
 from datetime import datetime
-from typing import Any
 
 import httpx
 

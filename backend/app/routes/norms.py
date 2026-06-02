@@ -2,7 +2,7 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
 from app.database import get_supabase_admin
 from app.middleware import AuthUser, get_current_user

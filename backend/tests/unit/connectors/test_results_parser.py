@@ -1,10 +1,8 @@
 """Tests unitaires pour SafResultsParser (double-check analytique qL²/8)."""
 from __future__ import annotations
 
-from io import BytesIO
 from pathlib import Path
 
-import pytest
 from openpyxl import Workbook
 
 from app.connectors.structural.base import AnomalyLevel
@@ -13,7 +11,6 @@ from app.connectors.structural.results_parser import (
     DIVERGENCE_WARNING_THRESHOLD_PCT,
     SafResultsParser,
 )
-
 
 # Modèle structurel de test : 1 poutre sur 2 appuis, L=6m, chargement réparti
 MODEL_SIMPLE_BEAM = {

@@ -6,7 +6,7 @@ import {
   Lock, Award, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase } from '@/lib/supabase-server';
 
 export default async function LandingPage() {
   const supabase = await createServerSupabase();

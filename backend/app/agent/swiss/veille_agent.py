@@ -1,7 +1,7 @@
 """Agent veille réglementaire romande."""
 import json
 import logging
-from datetime import datetime
+from typing import Any
 
 from app.agent.router import call_llm
 from app.agent.swiss.prompts_ch import get_prompt_ch
@@ -87,7 +87,6 @@ async def run_veille_romande() -> dict:
     # 4. Envoi email pour alertes critiques
     if critical_alerts:
         try:
-            from app.config import settings
             from app.services.email_service import send_alert_email
             orgs = admin.table("organizations").select("id,email,name,canton").eq("active", True).execute()
 
@@ -124,7 +123,6 @@ async def run_veille_romande() -> dict:
 
 async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
     """Wrapper orchestrateur pour veille_romande."""
-    from typing import Any
 
     pipeline = await run_veille_romande()
 

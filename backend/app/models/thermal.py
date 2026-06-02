@@ -1,5 +1,4 @@
 """Modèles Pydantic pour le module thermique."""
-from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
