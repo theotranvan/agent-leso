@@ -284,10 +284,10 @@ function NewTaskInner() {
         {/* Projet lié - toujours visible */}
         <div>
           <Label>Projet lié (optionnel)</Label>
-          <Select value={projectId} onValueChange={setProjectId}>
+          <Select value={projectId || '__none'} onValueChange={(v) => setProjectId(v === '__none' ? '' : v)}>
             <SelectTrigger><SelectValue placeholder="Aucun projet" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Aucun</SelectItem>
+              <SelectItem value="__none">Aucun</SelectItem>
               {projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
               ))}
