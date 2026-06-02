@@ -302,6 +302,23 @@ export const api = {
   },
   exportDossierUrl: (projectId: string, onlyApproved = true) =>
     `${API_URL}/api/projects/${projectId}/export-dossier?only_approved=${onlyApproved}`,
+  // Téléchargement authentifié du dossier ZIP (le endpoint exige le Bearer token,
+  // donc on ne peut pas utiliser un simple <a href>).
+  exportDossier: async (projectId: string, onlyApproved = true): Promise<Blob> => {
+    const res = await fetch(
+      `${API_URL}/api/projects/${projectId}/export-dossier?only_approved=${onlyApproved}`,
+      { headers: await authHeaders() },
+    );
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === 'string') detail = body.detail;
+      } catch {}
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
+  },
 
   // Dashboard ingénieur + analytics + notifications
   engineerDashboard: async () => {
