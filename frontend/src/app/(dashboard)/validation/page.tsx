@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDate } from '@/lib/utils';
 
 const TASK_LABELS: Record<string, string> = {
@@ -96,12 +97,11 @@ export default function ValidationPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">File de validation</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Documents prêts à valider, triés par niveau de confiance. Concentrez-vous sur les points signalés.
-        </p>
-      </div>
+      <PageHeader
+        title="À valider"
+        description="Étape 3 : les livrables générés par l'agent, triés par niveau de confiance. Relis les points signalés, puis approuve et exporte le PDF final."
+        icon={ShieldCheck}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">

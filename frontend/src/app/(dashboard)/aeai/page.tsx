@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AEAI_BUILDING_TYPES } from '@/lib/ch';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDate } from '@/lib/utils';
 
 export default function AEAIPage() {
@@ -77,20 +78,15 @@ export default function AEAIPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Flame className="h-6 w-6" />
-            Checklists AEAI (incendie)
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Pré-remplissage automatique par typologie selon prescriptions AEAI 2015
-          </p>
-        </div>
+      <PageHeader
+        title="Checklists AEAI (incendie)"
+        description="Pré-remplissage automatique par typologie de bâtiment selon les prescriptions AEAI 2015. Génère, ajuste, exporte en PDF."
+        icon={Flame}
+      >
         <Button onClick={() => setCreating(!creating)}>
           <Plus className="h-4 w-4 mr-2" /> Nouvelle checklist
         </Button>
-      </div>
+      </PageHeader>
 
       {creating && (
         <Card>

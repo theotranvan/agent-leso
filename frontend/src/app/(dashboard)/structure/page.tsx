@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function StructurePage() {
   const [models, setModels] = useState<any[]>([]);
@@ -65,21 +66,16 @@ export default function StructurePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Building className="h-6 w-6" />
-            Structure SIA 260-267
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Génération SAF · import résultats · double-check analytique · note de calcul
-          </p>
-        </div>
+      <PageHeader
+        title="Structure SIA 260-267"
+        description="Génération SAF pour Scia/RFEM, import des résultats, double-check analytique puis note de calcul. La note finale n'est produite qu'après validation ingénieur."
+        icon={Building}
+      >
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouveau modèle
         </Button>
-      </div>
+      </PageHeader>
 
       <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
         <strong>⚠ Responsabilité ingénieur :</strong> la note de calcul finale n'est générée qu'après
