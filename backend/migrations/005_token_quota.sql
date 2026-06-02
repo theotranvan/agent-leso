@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS token_usage (
 
 CREATE INDEX IF NOT EXISTS idx_token_usage_org_created ON token_usage(organization_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_token_usage_task ON token_usage(task_id);
-CREATE INDEX IF NOT EXISTS idx_token_usage_org_month ON token_usage(organization_id, date_trunc('month', created_at));
+CREATE INDEX IF NOT EXISTS idx_token_usage_org_month ON token_usage(organization_id, date_trunc('month', created_at AT TIME ZONE 'UTC'));
 
 ALTER TABLE token_usage ENABLE ROW LEVEL SECURITY;
 
