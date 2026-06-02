@@ -14,7 +14,6 @@ selon entreprise, conjoncture, accessibilité chantier, volume.
 """
 from __future__ import annotations
 
-
 # ==========================================================================
 # LOT CHAUFFAGE (CFC 230) — prix moyens CHF HT
 # ==========================================================================

@@ -6,19 +6,18 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from io import BytesIO
 from typing import Any
 
 from app.connectors.idc.facture_extractor import FactureExtractor
 from app.connectors.idc.idc_calculator import (
     DJU_NORMAL_GENEVA_COINTRIN,
     IDC_THRESHOLDS_KWH_M2_AN,
+    MJ_PER_KWH,
+    VECTEUR_PCI,
     IDCCalculator,
     IDCComputationInput,
     IDCConsumption,
     IDCStatus,
-    MJ_PER_KWH,
-    VECTEUR_PCI,
 )
 
 logger = logging.getLogger(__name__)

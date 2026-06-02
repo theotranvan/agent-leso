@@ -96,7 +96,8 @@ async def _create_task(
 
     # Enqueue via ARQ
     try:
-        from arq.connections import create_pool, RedisSettings
+        from arq.connections import RedisSettings, create_pool
+
         from app.config import settings
         pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
         await pool.enqueue_job("run_task", task_id)

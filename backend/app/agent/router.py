@@ -44,7 +44,12 @@ from dataclasses import dataclass
 from typing import Optional
 
 from anthropic import APIError, AsyncAnthropic, RateLimitError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import settings
 

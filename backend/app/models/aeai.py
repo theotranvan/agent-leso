@@ -1,9 +1,7 @@
 """Modèles Pydantic pour AEAI checklists."""
-from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
-
 
 BuildingType = Literal[
     "habitation_faible", "habitation_moyenne", "habitation_elevee",

@@ -36,7 +36,7 @@ def seed_norms():
         except Exception as e:
             logger.error(f"✗ Erreur {norm['reference']}: {e}")
 
-    logger.info(f"\n=== Seed terminé ===")
+    logger.info("\n=== Seed terminé ===")
     logger.info(f"Insérées : {inserted}")
     logger.info(f"Déjà présentes : {skipped}")
     logger.info(f"Total catalogue : {len(all_norms)}")
@@ -45,6 +45,6 @@ def seed_norms():
 if __name__ == "__main__":
     try:
         seed_norms()
-    except Exception as e:
+    except Exception:
         logger.exception("Seed échoué")
         sys.exit(1)

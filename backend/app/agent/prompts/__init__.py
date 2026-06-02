@@ -1,8 +1,8 @@
 """Helpers de construction de prompts partagés entre agents."""
 # Ré-export des constantes et fonctions legacy (ancien prompts.py)
 from app.agent.prompts._legacy import (  # noqa: F401
-    get_system_prompt,
     get_normes_for_lot,
+    get_system_prompt,
 )
 
 # Nouveau (V5) : instructions de régénération structurées

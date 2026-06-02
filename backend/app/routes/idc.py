@@ -5,10 +5,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.ch.cantons.geneve import FORMULAIRES_GE, idc_status
+from app.ch.cantons.geneve import FORMULAIRES_GE
 from app.database import get_storage, get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user
-from app.models.idc import IDCBuildingCreate, IDCDeclarationCreate, IDCInvoiceItem
+from app.models.idc import IDCBuildingCreate, IDCDeclarationCreate
 from app.services.pdf_generator import markdown_to_html, render_pdf_from_html
 from app.services.swiss.idc_geneva import (
     compute_annual_from_invoices,
@@ -317,6 +317,7 @@ async def v3_compute_idc(
       }
     """
     from datetime import date
+
     from app.connectors.idc import IDCCalculator, IDCComputationInput
     from app.connectors.idc.idc_calculator import IDCConsumption
 
@@ -389,8 +390,10 @@ async def v3_generate_ocen_form(
     body: dict,
 ):
     """V3 : génère un PDF préparatoire de déclaration OCEN."""
-    from fastapi.responses import Response
     from datetime import date
+
+    from fastapi.responses import Response
+
     from app.connectors.idc import IDCCalculator, IDCComputationInput
     from app.connectors.idc.idc_calculator import IDCConsumption
     from app.connectors.idc.ocen_form_generator import OCENFormGenerator, OCENFormInput
@@ -413,12 +416,7 @@ async def v3_generate_ocen_form(
         if not consumptions:
             raise HTTPException(400, "Consommations requises")
 
-        idc_result = calc.compute(IDCComputationInput(
-            sre_m2=sre, vector=vector,
-            affectation=calc_in.get("affectation", "logement_collectif"),
-            consumptions=consumptions, year=year,
-            dju_year_measured=float(calc_in["dju_year"]) if calc_in.get("dju_year") else None,
-        )) if False else IDCCalculator().compute(IDCComputationInput(
+        idc_result = IDCCalculator().compute(IDCComputationInput(
             sre_m2=sre, vector=vector,
             affectation=calc_in.get("affectation", "logement_collectif"),
             consumptions=consumptions, year=year,

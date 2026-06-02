@@ -1,5 +1,4 @@
 """Tests basiques de smoke pour valider que l'app démarre."""
-import pytest
 
 
 def test_config_loads():
@@ -9,7 +8,7 @@ def test_config_loads():
 
 
 def test_routing_table_complete():
-    from app.agent.router import ROUTING_TABLE, MODEL_HAIKU, MODEL_OPUS, MODEL_SONNET
+    from app.agent.router import MODEL_HAIKU, MODEL_OPUS, MODEL_SONNET, ROUTING_TABLE
     # Vérifie que tous les modèles sont représentés
     assert MODEL_OPUS in ROUTING_TABLE.values()
     assert MODEL_SONNET in ROUTING_TABLE.values()
@@ -26,7 +25,7 @@ def test_prompts_exist():
 
 
 def test_cost_estimation():
-    from app.agent.router import estimate_cost_eur, MODEL_SONNET
+    from app.agent.router import MODEL_SONNET, estimate_cost_eur
     cost = estimate_cost_eur(MODEL_SONNET, 1_000_000, 500_000)
     # 3$ input + 7.5$ output = 10.5$ ≈ 9.66€
     assert 5 < cost < 15

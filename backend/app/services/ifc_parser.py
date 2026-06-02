@@ -134,7 +134,8 @@ def _bbox_intersects(a: tuple, b: tuple, tol: float = 0.01) -> bool:
 
 def detect_clashes(ifc_models_bytes: list[tuple[str, bytes]]) -> list[dict]:
     """Détection de conflits inter-lots via bounding boxes IFC."""
-    from ifcopenshell.geom import settings as gs, create_shape
+    from ifcopenshell.geom import create_shape
+    from ifcopenshell.geom import settings as gs
     s = gs()
     s.set(s.USE_WORLD_COORDS, True)
     elements = []

@@ -12,7 +12,7 @@ en base pour un suivi (table notifications).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from app.database import get_supabase_admin

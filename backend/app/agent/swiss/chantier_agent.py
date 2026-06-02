@@ -177,8 +177,8 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 async def _render_pdf(html: str, project_name: str, visit_date: str, org_id: str) -> bytes:
     """Rend le rapport en PDF à la charte du bureau."""
     try:
-        from app.services.pdf_generator import render_pdf_from_html
         from app.knowledge_base.templates.charter import get_org_branding
+        from app.services.pdf_generator import render_pdf_from_html
         branding = get_org_branding(org_id)
         return render_pdf_from_html(
             body_html=html,

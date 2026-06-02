@@ -27,7 +27,6 @@ from __future__ import annotations
 import csv
 import logging
 import time
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 

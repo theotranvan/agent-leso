@@ -6,7 +6,6 @@ utilisée par app/agent/swiss/structure_agent.py.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from app.connectors.structural import StructuralInputs
 from app.connectors.structural.saf_generator import SafGenerator

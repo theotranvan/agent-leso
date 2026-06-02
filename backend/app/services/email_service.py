@@ -243,6 +243,6 @@ def send_welcome_email(
 """
     return send_email(
         to=to,
-        subject=f"Bienvenue chez BET Agent — votre projet démo est prêt",
+        subject="Bienvenue chez BET Agent — votre projet démo est prêt",
         body_html=body_html,
     )

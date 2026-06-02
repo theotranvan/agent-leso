@@ -1,11 +1,8 @@
 """Tests d'intégration simulation_rapide_agent - 100% déterministe, pas de LLM."""
 from __future__ import annotations
 
-import pytest
-
 from app.agent.swiss.simulation_rapide_agent import (
     COMPOSITIONS_BY_STANDARD,
-    FACTEUR_FORME,
     HDD_CANTONAL,
     PRIMARY_FACTOR,
     _simulate,

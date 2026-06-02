@@ -11,7 +11,6 @@ Retourne une spec compatible PreBIMGenerator.
 import json
 import logging
 import re
-from typing import Any
 
 from app.agent.router import call_llm
 

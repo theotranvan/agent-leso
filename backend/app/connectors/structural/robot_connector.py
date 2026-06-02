@@ -36,7 +36,6 @@ C'est le prix à payer pour rester honnête vs l'écosystème Autodesk.
 from __future__ import annotations
 
 import csv
-import io
 import logging
 import os
 import tempfile
@@ -44,18 +43,16 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 from app.connectors.structural.base import (
     AnalysisResult,
-    ConnectorError,
     ConnectorTimeoutError,
     StructuralConnector,
     StructuralInputs,
 )
 from app.connectors.structural.results_parser import SafResultsParser
 from app.connectors.structural.saf_generator import (
-    MATERIAL_PROPERTIES,
     SIA_260_COMBINATIONS,
     STANDARD_LOAD_CASES,
     SafGenerator,

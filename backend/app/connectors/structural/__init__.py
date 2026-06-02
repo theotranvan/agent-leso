@@ -2,9 +2,9 @@
 from app.connectors.structural.base import (
     AnalysisResult,
     MemberCheck,
+    StructuralAnomaly,
     StructuralConnector,
     StructuralInputs,
-    StructuralAnomaly,
 )
 
 __all__ = [

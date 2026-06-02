@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.database import get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user
-from app.models.project import Project, ProjectCreate, ProjectUpdate
+from app.models.project import ProjectCreate, ProjectUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -200,8 +200,10 @@ async def export_dossier(
     only_approved: bool = True,
 ):
     """Export dossier AO complet en ZIP (point 5)."""
-    from fastapi.responses import StreamingResponse
     import io
+
+    from fastapi.responses import StreamingResponse
+
     from app.services.ao_export import build_ao_dossier_zip
 
     try:
@@ -258,6 +260,7 @@ async def create_deadline(
 async def project_calendar(project_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
     """Export .ics des échéances d'un projet (Google Calendar / Outlook / Apple)."""
     from fastapi.responses import Response
+
     from app.services.calendar_export import build_ics_for_project
     ics = build_ics_for_project(project_id, user.organization_id)
     return Response(

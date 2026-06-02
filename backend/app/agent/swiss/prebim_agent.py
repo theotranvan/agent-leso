@@ -48,8 +48,6 @@ async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
       - program_text: str (si from_text)
       - spec: dict (si from_spec)
     """
-    from datetime import datetime
-    from typing import Any
     from app.database import get_storage, get_supabase_admin
 
     params = task.get("input_params") or {}

@@ -2,6 +2,7 @@
 import json
 import logging
 from datetime import datetime
+from typing import Any
 
 from app.agent.router import call_llm
 from app.agent.swiss.prompts_ch import get_prompt_ch
@@ -25,7 +26,9 @@ async def run_geneva_control(project_data: dict, project_name: str = "", author:
     zone_key = project_data.get("zone")
     if zone_key and project_data.get("surface_terrain_m2"):
         try:
-            from app.knowledge_base.urbanisme.indices import check_conformite_urbanistique
+            from app.knowledge_base.urbanisme.indices import (
+                check_conformite_urbanistique,
+            )
             urba_check = check_conformite_urbanistique(
                 canton=canton,
                 zone_key=zone_key,
@@ -111,7 +114,7 @@ Transformer cette checklist en RAPPORT PROFESSIONNEL en markdown :
 async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
     """Wrapper orchestrateur pour controle_reglementaire_geneve / vaud / canton."""
     from datetime import datetime
-    from typing import Any
+
     from app.database import get_storage, get_supabase_admin
 
     params = task.get("input_params") or {}

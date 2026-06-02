@@ -1,7 +1,6 @@
 """Bibliothèque de clauses types CCTP — Lot VENTILATION (CFC 244)."""
 from __future__ import annotations
 
-
 CFC_244_VENTILATION = {
     "cfc": "244",
     "intitule": "Installations de ventilation et climatisation",

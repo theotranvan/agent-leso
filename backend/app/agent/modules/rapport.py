@@ -1,5 +1,4 @@
 """Module Rapport - CR réunion, mémoire technique, résumé, veille réglementaire."""
-import json
 import logging
 from datetime import datetime
 from typing import Any
@@ -209,18 +208,14 @@ Produire le mémoire technique complet en markdown, convaincant et argumenté, a
 async def _resume_document(task: dict[str, Any]) -> dict[str, Any]:
     """Résumé d'un document existant."""
     params = task.get("input_params") or {}
-    org_id = task["organization_id"]
-    project_id = task.get("project_id")
 
     document_id = params.get("document_id")
     doc_text = ""
-    filename_source = ""
 
     if document_id:
         admin = get_supabase_admin()
         doc = admin.table("documents").select("*").eq("id", document_id).maybe_single().execute()
         if doc.data:
-            filename_source = doc.data["filename"]
             doc_text = doc.data.get("extracted_text") or ""
             if not doc_text:
                 # Re-extraction à la volée

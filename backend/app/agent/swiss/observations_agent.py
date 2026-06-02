@@ -209,13 +209,11 @@ def _parse_observations(text: str) -> list[dict[str, Any]]:
 
     # Tentative avec chacun des patterns, on prend celui qui trouve le plus
     best_matches: list[tuple[int, int]] = []  # (num, position)
-    best_pattern_name = None
 
     for pattern in OBSERVATION_PATTERNS:
         matches = [(int(m.group(1)), m.start()) for m in pattern.finditer(text)]
         if len(matches) > len(best_matches):
             best_matches = matches
-            best_pattern_name = pattern.pattern
 
     if not best_matches:
         return []

@@ -7,8 +7,6 @@ Permet de brancher plusieurs implémentations :
 - InternalEngine : moteur alternatif (V3)
 """
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any
 
 
 class ThermalEngineResult:

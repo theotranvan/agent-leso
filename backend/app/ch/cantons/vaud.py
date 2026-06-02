@@ -19,7 +19,6 @@ FORMULAIRES_VD = {
 
 
 def checklist_vd(project_data: dict) -> list[dict]:
-    is_renovation = project_data.get("operation_type") == "renovation"
     is_neuf = project_data.get("operation_type") == "neuf"
     return [
         {

@@ -14,7 +14,11 @@ from app.services.ifc_parser import (
     extract_thermal_properties,
     parse_ifc_metadata,
 )
-from app.services.pdf_generator import markdown_to_html, render_pdf_from_html, render_visa_block
+from app.services.pdf_generator import (
+    markdown_to_html,
+    render_pdf_from_html,
+    render_visa_block,
+)
 
 logger = logging.getLogger(__name__)
 

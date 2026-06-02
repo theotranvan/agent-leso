@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.agent.ingestion import (
     TASK_DOCUMENT_REQUIREMENTS,
     IngestionResult,

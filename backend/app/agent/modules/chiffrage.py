@@ -154,16 +154,16 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
     )
 
     # PDF récapitulatif
-    total_ht = sum((l.get("quantite") or 0) * (l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
-    total_min = sum((l.get("quantite") or 0) * (l.get("prix_min") or l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
-    total_max = sum((l.get("quantite") or 0) * (l.get("prix_max") or l.get("prix_unitaire") or 0) for l in lines if not l.get("is_section"))
+    total_ht = sum((ln.get("quantite") or 0) * (ln.get("prix_unitaire") or 0) for ln in lines if not ln.get("is_section"))
+    total_min = sum((ln.get("quantite") or 0) * (ln.get("prix_min") or ln.get("prix_unitaire") or 0) for ln in lines if not ln.get("is_section"))
+    total_max = sum((ln.get("quantite") or 0) * (ln.get("prix_max") or ln.get("prix_unitaire") or 0) for ln in lines if not ln.get("is_section"))
     incertitude = data.get("taux_incertitude_pct", 15)
     hypotheses = data.get("hypotheses_globales", [])
 
     recap_md = f"""# Récapitulatif DPGF — Lot {lot}
 
 **Projet :** {project_name}
-**Nombre d'articles :** {len([l for l in lines if not l.get('is_section')])}
+**Nombre d'articles :** {len([ln for ln in lines if not ln.get('is_section')])}
 **Montant total HT estimé (médian) :** {total_ht:,.0f} CHF
 **Fourchette :** {total_min:,.0f} – {total_max:,.0f} CHF
 **Taux d'incertitude estimé :** ±{incertitude} %
@@ -178,8 +178,8 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
 | N° | Désignation | Unité | Quantité | PU médian | Total |
 |----|-------------|-------|----------|-----------|-------|
 """ + "\n".join(
-        f"| {l.get('article', '')} | {l.get('designation', '')[:70]} | {l.get('unite', '')} | {l.get('quantite', '')} | {l.get('prix_unitaire', '')} CHF | {((l.get('quantite') or 0) * (l.get('prix_unitaire') or 0)):,.0f} CHF |"
-        for l in lines[:80] if not l.get("is_section")
+        f"| {ln.get('article', '')} | {ln.get('designation', '')[:70]} | {ln.get('unite', '')} | {ln.get('quantite', '')} | {ln.get('prix_unitaire', '')} CHF | {((ln.get('quantite') or 0) * (ln.get('prix_unitaire') or 0)):,.0f} CHF |"
+        for ln in lines[:80] if not ln.get("is_section")
     )
 
     # Charte client pour le PDF
@@ -214,7 +214,6 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
     storage.upload(pdf_path, pdf_bytes, content_type="application/pdf")
 
     excel_url = storage.get_signed_url(excel_path, expires_in=604800)
-    pdf_url = storage.get_signed_url(pdf_path, expires_in=604800)
 
     admin = get_supabase_admin()
     for fname, fpath, ftype in [(excel_filename, excel_path, "xlsx"), (pdf_filename, pdf_path, "pdf")]:
@@ -291,7 +290,7 @@ Aucun autre texte."""
     signed_url = storage.get_signed_url(path, expires_in=604800)
 
     total = sum(
-        sum((l.get("quantite") or 0) * (l.get("prix_unitaire") or 0) for l in lines)
+        sum((ln.get("quantite") or 0) * (ln.get("prix_unitaire") or 0) for ln in lines)
         for lines in lots_data.values()
     )
 

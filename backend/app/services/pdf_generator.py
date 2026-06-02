@@ -4,10 +4,9 @@ Templates Jinja2 avec en-tête, pied de page, table des matières, numérotation
 """
 import logging
 from datetime import datetime
-from typing import Optional
 
-from jinja2 import Environment, BaseLoader
-from weasyprint import HTML, CSS
+from jinja2 import BaseLoader, Environment
+from weasyprint import HTML
 
 logger = logging.getLogger(__name__)
 

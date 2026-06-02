@@ -7,10 +7,8 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 
 from app.connectors.thermic.base import (
-    ConnectorError,
     EnergyClass,
     SimulationResult,
     ThermicConnector,

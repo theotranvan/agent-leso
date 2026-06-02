@@ -13,9 +13,6 @@ Chaque item de checklist a :
 """
 from __future__ import annotations
 
-from typing import Literal
-
-
 # ==========================================================================
 # CLASSIFICATION HAUTEUR (AEAI 10-15f)
 # ==========================================================================

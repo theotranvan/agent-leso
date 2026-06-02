@@ -26,7 +26,6 @@ et reproductible. C'est un filet de sécurité mécanique, pas une seconde opini
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any

@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from app.connectors.idc.facture_extractor import (
-    CONFIDENCE_OK_THRESHOLD,
     FactureExtractor,
 )
 

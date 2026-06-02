@@ -1,10 +1,18 @@
 """Routes documents - upload, pipeline RAG, téléchargement URLs signées."""
 import logging
 import uuid
-from pathlib import Path
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 
 from app.config import settings
 from app.database import get_storage, get_supabase_admin
@@ -119,8 +127,9 @@ async def _process_document_pipeline(document_id: str, organization_id: str, pro
 
         elif file_type == "docx":
             try:
-                import docx
                 from io import BytesIO
+
+                import docx
                 d = docx.Document(BytesIO(file_bytes))
                 extracted_text = "\n\n".join(p.text for p in d.paragraphs if p.text.strip())
             except Exception as e:

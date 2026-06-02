@@ -16,11 +16,10 @@ from __future__ import annotations
 from typing import Literal
 
 from app.knowledge_base.cctp.lot_chauffage import LOT_CHAUFFAGE
-from app.knowledge_base.cctp.lot_ventilation import LOT_VENTILATION
-from app.knowledge_base.cctp.lot_sanitaire import LOT_SANITAIRE
 from app.knowledge_base.cctp.lot_electricite import LOT_ELECTRICITE
 from app.knowledge_base.cctp.lot_mcr import LOT_MCR
-
+from app.knowledge_base.cctp.lot_sanitaire import LOT_SANITAIRE
+from app.knowledge_base.cctp.lot_ventilation import LOT_VENTILATION
 
 # Registre principal : tous les lots disponibles
 LOTS_REGISTRY = {

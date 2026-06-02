@@ -180,7 +180,6 @@ def generate_dqe_excel(
         # Reference au total du lot dans la feuille récap
         # On suppose que le total HT est en F{last_row} — on calcule par SUM sur la plage
         last_line = 5 + len(lines) + 1  # header à ligne 5
-        total_ref = f"'{sheet_name}'!F{last_line + 1}"  # "TOTAL HT" est 2 lignes après la dernière data
         # Pour éviter les casse-pieds, on recalcule:
         ws_recap.cell(row=row, column=1, value=lot_name)
         ws_recap.cell(row=row, column=2, value=f"=SUM('{sheet_name}'!F6:F{last_line})")

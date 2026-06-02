@@ -7,8 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.config import settings
 from app.database import get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user, limiter
-from app.models.organization import Organization
-from app.models.user import User, UserCreate, UserInvite
+from app.models.user import UserCreate, UserInvite
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])

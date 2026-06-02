@@ -10,15 +10,14 @@ Utilise ifcopenshell.api pour une construction propre (plutôt que create_entity
 """
 import logging
 import tempfile
-import uuid
-from pathlib import Path
-from typing import Any
 
 import ifcopenshell
 import ifcopenshell.api
 import ifcopenshell.guid
 
-from app.services.bim.wall_library import COMPOSITIONS_TYPES, compute_u_value, get_composition
+from app.services.bim.wall_library import (
+    get_composition,
+)
 
 logger = logging.getLogger(__name__)
 

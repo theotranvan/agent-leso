@@ -114,7 +114,10 @@ complète avec les contraintes, rédige l'introduction et les clauses générale
 Conserve toutes les valeurs techniques et normes fournies."""
 
     # Régénération
-    from app.agent.prompts import build_regeneration_instructions, get_model_override_for_regeneration
+    from app.agent.prompts import (
+        build_regeneration_instructions,
+        get_model_override_for_regeneration,
+    )
     regen_context = params.get("regeneration_context")
     regen_block = build_regeneration_instructions(regen_context)
     if regen_block:
