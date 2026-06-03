@@ -283,15 +283,24 @@ async def engineer_dashboard(user: Annotated[AuthUser, Depends(get_current_user)
     # Notifications proactives
     notifications = build_notifications(org_id)
 
-    # Consommation tokens du mois
+    # Consommation tokens du mois — select("*") + limit(1) pour éviter le crash
+    # PostgREST "Missing response 204" si une colonne de quota manque en base.
     org = (
         admin.table("organizations")
-        .select("tokens_used_this_month, token_quota_monthly, tasks_used_this_month, plan")
-        .eq("id", org_id).maybe_single().execute()
+        .select("*").eq("id", org_id).limit(1).execute()
     )
-    odata = org.data or {}
-    tokens_used = odata.get("tokens_used_this_month") or 0
-    tokens_quota = odata.get("token_quota_monthly") or 0
+    odata = (org.data or [{}])[0]
+    # tolère les deux conventions de nommage présentes dans la base
+    tokens_used = (
+        odata.get("tokens_used_this_month")
+        or odata.get("tokens_used_current_month")
+        or 0
+    )
+    tokens_quota = (
+        odata.get("token_quota_monthly")
+        or odata.get("tokens_limit_monthly")
+        or 0
+    )
 
     return {
         "kpis": {

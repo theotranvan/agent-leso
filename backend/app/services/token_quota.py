@@ -371,16 +371,28 @@ async def get_monthly_usage(organization_id: str) -> dict[str, Any]:
     from app.database import get_supabase_admin
     admin = get_supabase_admin()
 
-    org = admin.table("organizations").select(
-        "plan, tokens_limit_monthly, tokens_used_current_month, tokens_pack_remaining"
-    ).eq("id", organization_id).maybe_single().execute()
-    if not org.data:
+    # select("*") + limit(1) plutôt que maybe_single() sur des colonnes
+    # précises : évite le crash PostgREST "Missing response 204" si une colonne
+    # de quota n'existe pas encore en base (migrations partielles) ou si la
+    # ligne est absente.
+    org_q = admin.table("organizations").select("*").eq("id", organization_id).limit(1).execute()
+    org_row = (org_q.data or [{}])[0]
+    if not org_row:
         raise ValueError("Organisation introuvable")
 
-    plan = org.data.get("plan") or "pilot"
-    limit = int(org.data.get("tokens_limit_monthly") or QUOTA_PLANS.get(plan, QUOTA_PLANS["pilot"]))
-    used = int(org.data.get("tokens_used_current_month") or 0)
-    pack = int(org.data.get("tokens_pack_remaining") or 0)
+    plan = org_row.get("plan") or "pilot"
+    # tolère les deux conventions de nommage présentes dans la base
+    limit = int(
+        org_row.get("tokens_limit_monthly")
+        or org_row.get("token_quota_monthly")
+        or QUOTA_PLANS.get(plan, QUOTA_PLANS["pilot"])
+    )
+    used = int(
+        org_row.get("tokens_used_current_month")
+        or org_row.get("tokens_used_this_month")
+        or 0
+    )
+    pack = int(org_row.get("tokens_pack_remaining") or 0)
 
     used_pct = int((used / max(limit, 1)) * 100) if limit else 0
     remaining_monthly = max(0, limit - used)

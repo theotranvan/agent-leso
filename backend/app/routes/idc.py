@@ -138,12 +138,30 @@ async def create_declaration(
         for inv in body.invoices
     ]
     affectation = "logement_collectif" if (building.get("nb_logements") or 0) > 1 else "logement_individuel"
-    calc = compute_annual_from_invoices(
+    raw_calc = compute_annual_from_invoices(
         invoices_data,
         sre_m2=float(building["sre_m2"]),
         vector=building["heating_energy_vector"],
         affectation=affectation,
     )
+
+    # Normalisation des clés : le service renvoie idc_*_an / total_energy_kwh /
+    # status (str) ; le reste de la route (insert + formulaire PDF) attend des
+    # noms stables (consumption_kwh, idc_*_mj_m2, status:dict).
+    energy_kwh = raw_calc.get("total_energy_kwh") or 0
+    calc = {
+        **raw_calc,
+        "consumption_kwh": energy_kwh,
+        "energy_mj": energy_kwh * 3.6,
+        "idc_brut_mj_m2": raw_calc.get("idc_raw_kwh_m2_an", 0) * 3.6,
+        "idc_normalise_mj_m2": raw_calc.get("idc_mj_m2_an", 0),
+        "nb_invoices": raw_calc.get("nb_factures", len(invoices_data)),
+        "status": {
+            "label": raw_calc.get("classification_label", "—"),
+            "level": raw_calc.get("status", "—"),
+            "action": raw_calc.get("action_required", "—"),
+        },
+    }
 
     # Create declaration
     decl = admin.table("idc_annual_declarations").insert({
