@@ -6,6 +6,27 @@ ci-dessous (à faire dans les dashboards Supabase / Render / Vercel).
 
 ---
 
+## 0. Créer l'équipe Conti (8 ingénieurs, sans invitation email)
+
+Tous les 8 partagent **une seule organisation** → ils voient et travaillent sur
+les **mêmes projets**. Le 1er est admin, les 7 autres membres (accès complet).
+
+```bash
+cd backend
+# avec les mêmes variables d'env que l'API (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, …)
+python -m scripts.seed_team --org "Conti" \
+  --emails "chef@conti.ch,ing2@conti.ch,ing3@conti.ch,ing4@conti.ch,ing5@conti.ch,ing6@conti.ch,ing7@conti.ch,ing8@conti.ch"
+```
+
+- Le script crée l'org + les 8 comptes (connexion immédiate, sans email de
+  confirmation) et **affiche un tableau email / mot de passe** à distribuer.
+- Idempotent : relançable sans créer de doublons.
+- Concurrence : les 8 peuvent créer projets, documents et tâches **en même temps
+  sur le même projet** sans collision (chaque tâche/document est une ligne
+  indépendante ; le compteur de quota est incrémenté de façon atomique).
+  Seule l'édition simultanée des *métadonnées* d'un même projet (nom, canton…)
+  suit la règle « dernier qui enregistre gagne » — sans risque de corruption.
+
 ## 1. Supabase (le plus important pour l'équipe)
 
 - [ ] **Storage** : un bucket **privé** nommé `bet-documents` existe.
