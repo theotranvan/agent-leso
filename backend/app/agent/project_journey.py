@@ -252,11 +252,21 @@ PHASE_ORDER = [p.key for p in sorted(PROJECT_JOURNEY, key=lambda x: x.order)]
 # CALCUL DE L'ÉTAT D'AVANCEMENT
 # ==========================================================================
 
+# Mapping canton → variante de contrôle réglementaire
+_CANTON_CONTROL = {"GE": "controle_reglementaire_geneve", "VD": "controle_reglementaire_vaud"}
+
+
+def _control_for_canton(canton: str | None) -> str:
+    """Type de tâche de contrôle réglementaire adapté au canton du projet."""
+    return _CANTON_CONTROL.get((canton or "").upper(), "controle_reglementaire_canton")
+
+
 def compute_journey_state(
     completed_task_types: list[str],
     approved_task_types: list[str] | None = None,
     current_phase: str | None = None,
     disabled_phases: list[str] | None = None,
+    canton: str | None = None,
 ) -> dict[str, Any]:
     """Calcule l'état d'avancement d'une affaire dans le parcours.
 
@@ -265,12 +275,21 @@ def compute_journey_state(
         approved_task_types: types de tâches approuvées (validation ingénieur)
         current_phase: phase courante déclarée du projet
         disabled_phases: phases désactivées par l'organisation (modularité)
+        canton: canton du projet, pour adapter la vérification réglementaire
 
     Returns un état complet par phase avec progression et action recommandée.
     """
     completed = set(completed_task_types or [])
     approved = set(approved_task_types or [])
     disabled = set(disabled_phases or [])
+
+    # La vérification réglementaire s'adapte au canton du projet (GE/VD/autre).
+    # Quelle que soit la variante saisie en dur dans le parcours, on la remplace
+    # par celle du canton, et on la considère faite si une variante l'est.
+    control_type = _control_for_canton(canton)
+    canton_label = (canton or "").upper()
+    control_done = any(t.startswith("controle_reglementaire_") for t in completed)
+    control_approved = any(t.startswith("controle_reglementaire_") for t in approved)
 
     phases_state = []
     next_recommended = None
@@ -284,14 +303,22 @@ def compute_journey_state(
         done_required = 0
 
         for action in phase.actions:
-            is_done = action.task_type in completed
-            is_approved = action.task_type in approved
+            # Adapte la vérification réglementaire au canton du projet
+            is_control = action.task_type.startswith("controle_reglementaire_")
+            eff_task_type = control_type if is_control else action.task_type
+            eff_label = (
+                f"Vérification réglementaire{f' ({canton_label})' if canton_label else ''}"
+                if is_control else action.label
+            )
+
+            is_done = control_done if is_control else (action.task_type in completed)
+            is_approved = control_approved if is_control else (action.task_type in approved)
             # Prérequis non satisfaits → on conseille, on ne bloque pas
             missing_reqs = [r for r in action.requires if r not in completed]
 
             actions_state.append({
-                "task_type": action.task_type,
-                "label": action.label,
+                "task_type": eff_task_type,
+                "label": eff_label,
                 "description": action.description,
                 "optional": action.optional,
                 "done": is_done,
@@ -318,8 +345,8 @@ def compute_journey_state(
                 next_recommended = {
                     "phase_key": phase.key,
                     "phase_label": phase.label,
-                    "task_type": action.task_type,
-                    "label": action.label,
+                    "task_type": eff_task_type,
+                    "label": eff_label,
                 }
 
         total_required = len(required_actions)
