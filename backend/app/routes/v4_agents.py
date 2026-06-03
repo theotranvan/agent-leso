@@ -85,7 +85,7 @@ async def _create_task(
     admin.table("tasks").insert({
         "id": task_id,
         "organization_id": user.organization_id,
-        "user_id": user.user_id,
+        "user_id": user.id,
         "project_id": project_id,
         "task_type": task_type,
         "status": "queued",
@@ -259,7 +259,7 @@ async def simulation_rapide_sync(
     task_dict: dict[str, Any] = {
         "id": str(uuid.uuid4()),
         "organization_id": user.organization_id,
-        "user_id": user.user_id,
+        "user_id": user.id,
         "project_id": body.project_id,
         "input_params": {
             "project_name": body.project_name,
@@ -374,7 +374,7 @@ async def extract_metres_sync(
     task_dict: dict[str, Any] = {
         "id": str(uuid.uuid4()),
         "organization_id": user.organization_id,
-        "user_id": user.user_id,
+        "user_id": user.id,
         "project_id": project_id,
         "input_params": {
             "project_name": project_name,
