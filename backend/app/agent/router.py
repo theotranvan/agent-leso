@@ -247,8 +247,11 @@ def estimate_cost_chf(model: str, input_tokens: int, output_tokens: int) -> floa
 
 
 @retry(
-    stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=2, min=1, max=10),
+    # Les rate-limits Claude se réinitialisent par minute : avec 8 ingénieurs en
+    # parallèle, on retente plus longtemps (jusqu'à ~30s) et plus de fois pour
+    # absorber les pics 429 transitoires sans faire échouer la tâche.
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=2, max=30),
     retry=retry_if_exception_type((APIError, RateLimitError)),
     reraise=True,
 )
