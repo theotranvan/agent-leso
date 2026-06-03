@@ -270,6 +270,10 @@ async def simulation_rapide_sync(
     try:
         result = await simulation_rapide_agent.execute(task_dict)
         audit_log(user, "simulation_rapide_sync", {"sre_m2": programme.get("sre_m2")})
+        # Retire les champs non sérialisables en JSON (bytes du PDF) avant de
+        # renvoyer la réponse : ils ne servent que pour l'email côté worker.
+        # Sinon la sérialisation échoue APRÈS le return → 500 non rattrapable.
+        result.pop("email_bytes", None)
         return result
     except ValueError as e:
         raise HTTPException(400, str(e))
