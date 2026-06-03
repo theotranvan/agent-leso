@@ -88,7 +88,7 @@ async def _create_task(
         "user_id": user.id,
         "project_id": project_id,
         "task_type": task_type,
-        "status": "queued",
+        "status": "pending",
         "input_params": input_params,
         "attempts": 0,
         "created_at": datetime.utcnow().isoformat(),

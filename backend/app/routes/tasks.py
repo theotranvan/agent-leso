@@ -398,7 +398,7 @@ async def regenerate_task(
     }
 
     admin.table("tasks").update({
-        "status": "queued",
+        "status": "pending",
         "error_message": None,
         "input_params": input_params,
         "regeneration_count": next_attempt,
