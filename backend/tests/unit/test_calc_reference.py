@@ -299,3 +299,180 @@ class TestMetresReference:
     def test_all_cfc_codes_are_three_digits(self):
         for ifc, cfc in IFC_TO_CFC.items():
             assert cfc.isdigit() and len(cfc) == 3, f"CFC invalide pour {ifc}: {cfc}"
+
+
+# ---------------------------------------------------------------------------
+# 5. STRUCTURE — MOTEUR RÉEL (double-check M = qL²/8 via parse_csv)
+# ---------------------------------------------------------------------------
+import csv as _csv
+import tempfile
+from pathlib import Path
+
+from app.connectors.structural.results_parser import SafResultsParser
+
+
+def _model_poutre_6m():
+    """Poutre simplement appuyée N1(0,0,0)–N2(6,0,0), charge permanente 10 kN/m."""
+    return {
+        "nodes": [
+            {"id": "N1", "x": 0.0, "y": 0.0, "z": 0.0},
+            {"id": "N2", "x": 6.0, "y": 0.0, "z": 0.0},
+        ],
+        "members": [
+            {"id": "B1", "type": "beam", "node_start": "N1", "node_end": "N2",
+             "section": "HEA200", "material": "S235"},
+        ],
+        "loads": [
+            {"id": "L1", "target": "B1", "type": "uniform_vertical",
+             "value_kN_m": 10.0, "category": "Permanent"},
+        ],
+    }
+
+
+def _csv_results(rows: list[dict]) -> Path:
+    fd = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".csv", delete=False, newline="", encoding="utf-8")
+    writer = _csv.DictWriter(fd, fieldnames=["member_id", "M_kNm", "V_kN", "N_kN"])
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
+    fd.close()
+    return Path(fd.name)
+
+
+class TestStructureEngineReference:
+    def test_beam_moment_double_check_exact(self):
+        """Le moteur recalcule M = q_ELU·L²/8 et le compare au logiciel.
+
+        q = 10 kN/m permanent → q_ELU = 10·1.35 = 13.5 kN/m, L = 6 m
+        M_analytique = 13.5·6²/8 = 60.75 kNm
+        Résultat logiciel identique ⇒ écart 0 % ⇒ pas d'anomalie bloquante.
+        """
+        csv_path = _csv_results([{"member_id": "B1", "M_kNm": 60.75, "V_kN": 40.5, "N_kN": 0}])
+        try:
+            res = SafResultsParser().parse_csv_results_and_check(csv_path, _model_poutre_6m())
+        finally:
+            csv_path.unlink(missing_ok=True)
+        beam = next(a for a in res.anomalies if a.check_type == "beam_M_qL2_8")
+        assert beam.analytical_value == pytest.approx(60.75, abs=0.01)
+        assert beam.divergence_pct == pytest.approx(0.0, abs=0.5)
+
+    def test_beam_divergence_flagged(self):
+        """Un résultat logiciel franchement faux doit être signalé comme anomalie."""
+        csv_path = _csv_results([{"member_id": "B1", "M_kNm": 90.0, "V_kN": 40, "N_kN": 0}])
+        try:
+            res = SafResultsParser().parse_csv_results_and_check(csv_path, _model_poutre_6m())
+        finally:
+            csv_path.unlink(missing_ok=True)
+        beam = next(a for a in res.anomalies if a.check_type == "beam_M_qL2_8")
+        # |60.75 - 90| / 60.75 = 48.1 % → bien au-delà du seuil de 15 %
+        assert beam.divergence_pct > 15.0
+        assert beam.analytical_value == pytest.approx(60.75, abs=0.01)
+
+    def test_deflection_formula_reference(self):
+        """Flèche d'une poutre sur 2 appuis : f = 5·q·L⁴/(384·E·I).
+
+        Référence documentaire (le dimensionnement fin est délégué au logiciel
+        externe Scia/RFEM ; cette identité sert de garde-fou de plausibilité).
+        q = 10 kN/m = 10e3 N/m, L = 6 m, E = 210e9 Pa (S235),
+        I = 3692e-8 m⁴ (HEA200)
+        f = 5·10e3·6⁴ / (384·210e9·3692e-8) = 6.48e7 / 2.977e9 ≈ 0.0218 m (21.8 mm)
+        """
+        q, L, E, I = 10e3, 6.0, 210e9, 3692e-8
+        f = 5 * q * L**4 / (384 * E * I)
+        assert f == pytest.approx(0.0218, abs=0.001)
+
+
+# ---------------------------------------------------------------------------
+# 6. MÉTRÉS — MOTEUR RÉEL sur un IFC synthétique à surfaces CONNUES
+# ---------------------------------------------------------------------------
+from app.agent.swiss.metres_agent import _extract_metres
+
+
+def _build_ifc_with_spaces(spaces):
+    """Construit un IFC minimal : 1 étage + N IfcSpace avec quantités connues.
+
+    spaces : liste de (GrossFloorArea, NetFloorArea, NetVolume).
+    """
+    import ifcopenshell
+    import ifcopenshell.api
+
+    f = ifcopenshell.api.run("project.create_file")
+    proj = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcProject", name="REF")
+    ifcopenshell.api.run("unit.assign_unit", f)
+    ifcopenshell.api.run("context.add_context", f, context_type="Model")
+    site = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcSite", name="S")
+    bld = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuilding", name="B")
+    storey = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuildingStorey", name="RDC")
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[site], relating_object=proj)
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[bld], relating_object=site)
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[storey], relating_object=bld)
+    for i, (gfa, nfa, nv) in enumerate(spaces):
+        sp = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcSpace", name=f"L{i}")
+        ifcopenshell.api.run("aggregate.assign_object", f, products=[sp], relating_object=storey)
+        qto = ifcopenshell.api.run("pset.add_qto", f, product=sp, name="Qto_SpaceBaseQuantities")
+        ifcopenshell.api.run("pset.edit_qto", f, qto=qto, properties={
+            "GrossFloorArea": gfa, "NetFloorArea": nfa, "NetVolume": nv})
+    return f.to_string().encode("utf-8")
+
+
+class TestMetresEngineReference:
+    def test_extracts_known_surfaces(self):
+        """SB/SU/volume = somme des quantités des espaces ; SRE = 0.95·SB.
+
+        2 espaces : GFA 100+150 = 250 ; NFA 90+135 = 225 ; NV 280+420 = 700
+        SRE attendu = round(250·0.95, 1) = 237.5 m²
+        """
+        ifc_bytes = _build_ifc_with_spaces([(100.0, 90.0, 280.0), (150.0, 135.0, 420.0)])
+        m = _extract_metres(ifc_bytes)
+        assert m["sb_m2"] == pytest.approx(250.0, abs=0.1)
+        assert m["su_m2"] == pytest.approx(225.0, abs=0.1)
+        assert m["volume_m3"] == pytest.approx(700.0, abs=0.1)
+        assert m["sre_m2"] == pytest.approx(237.5, abs=0.1)
+        assert m["nb_spaces"] == 2
+
+    def test_sre_is_95pct_of_sb(self):
+        ifc_bytes = _build_ifc_with_spaces([(400.0, 360.0, 1120.0)])
+        m = _extract_metres(ifc_bytes)
+        assert m["sre_m2"] == pytest.approx(round(m["sb_m2"] * 0.95, 1), abs=0.1)
+
+
+# ---------------------------------------------------------------------------
+# 7. GARDE-FOUS — l'outil REFUSE une entrée aberrante au lieu de calculer faux
+# ---------------------------------------------------------------------------
+from pydantic import ValidationError
+
+from app.models.thermal import Opening, Wall
+
+
+class TestGuardRails:
+    def test_negative_u_value_rejected(self):
+        with pytest.raises(ValidationError):
+            Wall(area=10.0, u_value=-0.5)
+
+    def test_zero_u_value_rejected(self):
+        with pytest.raises(ValidationError):
+            Wall(area=10.0, u_value=0.0)
+
+    def test_absurd_u_value_rejected(self):
+        with pytest.raises(ValidationError):
+            Wall(area=10.0, u_value=999.0)
+
+    def test_valid_u_value_accepted(self):
+        assert Wall(area=10.0, u_value=0.17).u_value == 0.17
+
+    def test_g_value_out_of_range_rejected(self):
+        with pytest.raises(ValidationError):
+            Opening(area=5.0, u_value=1.1, g_value=1.5)
+
+    def test_negative_area_rejected(self):
+        with pytest.raises(ValidationError):
+            Wall(area=-3.0, u_value=0.2)
+
+    def test_idc_rejects_zero_sre(self):
+        with pytest.raises(ValueError):
+            _idc("mazout", 5000, "litre", 0)
+
+    def test_simulation_rejects_zero_sre(self):
+        with pytest.raises(ZeroDivisionError):
+            _sim(sre_m2=0.0)
