@@ -69,7 +69,12 @@ async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
     else:
         raise ValueError(f"mode inconnu: {mode}")
 
+    # Le pipeline fournit un chemin de fichier IFC (ifc_path) : on le lit en
+    # octets pour l'upload. (Fallback sur ifc_bytes si déjà fourni.)
     ifc_bytes = pipeline.get("ifc_bytes") or b""
+    if not ifc_bytes and pipeline.get("ifc_path"):
+        with open(pipeline["ifc_path"], "rb") as f:
+            ifc_bytes = f.read()
     report = pipeline.get("report") or {}
 
     storage = get_storage()
