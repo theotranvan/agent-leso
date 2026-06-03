@@ -317,16 +317,26 @@ def main() -> int:
           status in (200, 201) and bool(pb.get("id") or pb.get("ifc_url")),
           f"HTTP {status} {pb.get('detail','')}")
 
-    # ----------------------------------------------- OBSERVATIONS (async queue)
-    print("\n[ Réponse aux observations (mise en queue) ]")
-    status, obs = _req("POST", f"{api}/api/v4/observations", H, {
-        "project_id": project_id, "authority": "DALE",
-        "observations_text": "L'autorité demande des précisions sur la hauteur "
-                             "du bâtiment et le respect du gabarit LCI.",
-    })
-    check("POST /api/v4/observations (202 accepté)",
-          status in (200, 202) and bool(obs.get("id") or obs.get("task_id")),
-          f"HTTP {status} {obs.get('detail','')}")
+    # ----------------------------------------------- OBSERVATIONS (upload + queue)
+    print("\n[ Réponse aux observations (upload PDF + mise en queue) ]")
+    # 1) upload du courrier autorité (comme le fait l'UI)
+    obs_pdf = _tiny_pdf("Courrier DALE - observations sur la hauteur du batiment")
+    up_body, up_ct = _multipart({"category": "observations", "project_id": project_id or ""},
+                                "file", "courrier_dale.pdf", obs_pdf, "application/pdf")
+    status, up = _req("POST", f"{api}/api/v4/upload", {**HA, "Content-Type": up_ct},
+                      raw_body=up_body)
+    doc_id = up.get("document_id")
+    check("POST /api/v4/upload (courrier autorité)", status == 200 and bool(doc_id),
+          f"HTTP {status} {up.get('detail','')}")
+    # 2) génération de la réponse à partir du document uploadé
+    if doc_id:
+        status, obs = _req("POST", f"{api}/api/v4/observations", H, {
+            "project_id": project_id, "project_name": "E2E",
+            "autorite_pdf_document_id": doc_id,
+        })
+        check("POST /api/v4/observations (202 accepté)",
+              status in (200, 202) and bool(obs.get("id") or obs.get("task_id")),
+              f"HTTP {status} {obs.get('detail','')}")
 
     # ------------------------------------------------------------- DASHBOARDS
     print("\n[ Dashboards & veille ]")

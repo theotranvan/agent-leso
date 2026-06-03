@@ -35,9 +35,6 @@ from app.routes import (
 from app.routes import (
     settings as settings_routes,
 )
-from app.routes import (
-    health_e2e,
-)
 
 logging.basicConfig(
     level=settings.LOG_LEVEL,
@@ -118,9 +115,6 @@ async def root():
 async def health():
     """Healthcheck pour UptimeRobot / Render."""
     return {"status": "healthy", "environment": settings.ENVIRONMENT}
-
-
-app.include_router(health_e2e.router)
 
 
 @app.exception_handler(Exception)
