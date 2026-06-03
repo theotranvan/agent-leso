@@ -65,7 +65,7 @@ async def update_branding(
     await audit_log(
         action="branding_updated",
         organization_id=user.organization_id,
-        user_id=user.user_id,
+        user_id=user.id,
         resource_type="organization",
         resource_id=user.organization_id,
         metadata={"fields": list(branding.keys())},
