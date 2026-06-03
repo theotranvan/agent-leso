@@ -293,3 +293,8 @@ def build_checklist(building_type: str, height_m: float | None = None, nb_occupa
     if "height_m" in sig.parameters:
         return fn(height_m=height_m)
     return fn()
+
+
+# Alias rétro-compatible : l'agent AEAI importe `get_template_for_building`.
+# C'est la même factory que build_checklist (mêmes paramètres).
+get_template_for_building = build_checklist
