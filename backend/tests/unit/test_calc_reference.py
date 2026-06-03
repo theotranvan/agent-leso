@@ -172,26 +172,30 @@ class TestThermiqueReference:
         """Qh recalculé à la main (cas de référence ci-dessus).
 
         Transmission : UA·HDD·24/1000 = 316.4625·3050·24/1000 = 23165.06 kWh
-        Apports gratuits logement = 25 % → pertes nettes transmission ·0.75 = 17373.79
         Ventilation : V·n·0.34·HDD·24/1000 ; V=1000·2.8=2800, n=0.5
           = 2800·0.5·0.34·3050·24/1000 = 34843.2 kWh ; récupération 0 % (neuf)
-        Qh = (17373.79 + 34843.2) / 1000 = 52.217 → 52.2 kWh/m²·an
+        Apports gratuits logement = 25 %, appliqués au TOTAL des pertes
+        (bilan SIA 380/1 : Qh = (Qt + Qv)·(1 − ηg)) :
+          Qh = (23165.06 + 34843.2)·0.75 / 1000 = 43.506 → 43.5 kWh/m²·an
+        Un neuf SIA 380/1 compact à GE est ainsi conforme (≤ 44).
         """
         r = _sim()
         assert r["pertes_transmission_kwh"] == pytest.approx(23165.0, abs=1.0)
         assert r["pertes_ventilation_kwh"] == pytest.approx(34843.0, abs=1.0)
-        assert r["qh_kwh_m2_an"] == pytest.approx(52.2, abs=0.1)
+        assert r["qh_kwh_m2_an"] == pytest.approx(43.5, abs=0.1)
         # MJ = kWh × 3.6
-        assert r["qh_mj_m2_an"] == pytest.approx(52.2 * 3.6, abs=0.2)
+        assert r["qh_mj_m2_an"] == pytest.approx(43.5 * 3.6, abs=0.2)
+        # Cohérence physique : un neuf compact GE doit passer la limite SIA (44).
+        assert r["compliant"] is True
 
     def test_ep_exact(self):
         """Ep = (Qh + ECS) × facteur primaire.
 
         gaz → facteur 1.05 ; ECS logement = 20 kWh/m²·an
-        Ep = (52.2 + 20) × 1.05 = 75.81 → 75.8
+        Ep = (43.5 + 20) × 1.05 = 66.675 → 66.7
         """
         r = _sim(heating_vector="gaz")
-        assert r["ep_kwh_m2_an"] == pytest.approx((52.2 + 20.0) * 1.05, abs=0.2)
+        assert r["ep_kwh_m2_an"] == pytest.approx((43.5 + 20.0) * 1.05, abs=0.2)
 
     def test_heat_recovery_reduces_qh(self):
         # MINERGIE-P (récupération 80 %) << neuf sans récupération, même géométrie.
