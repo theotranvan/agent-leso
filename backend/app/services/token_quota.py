@@ -397,28 +397,37 @@ async def get_monthly_usage(organization_id: str) -> dict[str, Any]:
     used_pct = int((used / max(limit, 1)) * 100) if limit else 0
     remaining_monthly = max(0, limit - used)
 
-    # Coût estimé mois courant via view
+    # Coût estimé mois courant — tolère l'absence de la table token_usage
+    # (migration 005 pas encore appliquée) sans casser l'endpoint.
     start_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    usage_month = admin.table("token_usage").select(
-        "model, tokens_in, tokens_out, cost_chf"
-    ).eq("organization_id", organization_id).gte(
-        "created_at", start_month.isoformat(),
-    ).execute()
-
-    cost_chf_month = sum(float(row.get("cost_chf") or 0) for row in (usage_month.data or []))
+    cost_chf_month = 0.0
     by_model: dict[str, dict[str, Any]] = {}
-    for row in usage_month.data or []:
-        m = row["model"]
-        if m not in by_model:
-            by_model[m] = {"tokens": 0, "cost_chf": 0, "calls": 0}
-        by_model[m]["tokens"] += (row.get("tokens_in") or 0) + (row.get("tokens_out") or 0)
-        by_model[m]["cost_chf"] += float(row.get("cost_chf") or 0)
-        by_model[m]["calls"] += 1
+    try:
+        usage_month = admin.table("token_usage").select(
+            "model, tokens_in, tokens_out, cost_chf"
+        ).eq("organization_id", organization_id).gte(
+            "created_at", start_month.isoformat(),
+        ).execute()
+        cost_chf_month = sum(float(row.get("cost_chf") or 0) for row in (usage_month.data or []))
+        for row in usage_month.data or []:
+            m = row["model"]
+            if m not in by_model:
+                by_model[m] = {"tokens": 0, "cost_chf": 0, "calls": 0}
+            by_model[m]["tokens"] += (row.get("tokens_in") or 0) + (row.get("tokens_out") or 0)
+            by_model[m]["cost_chf"] += float(row.get("cost_chf") or 0)
+            by_model[m]["calls"] += 1
+    except Exception as exc:
+        logger.warning("token_usage indisponible (migration 005 ?) : %s", exc)
 
-    # Packs actifs
-    packs_q = admin.table("credit_packs").select("*").eq(
-        "organization_id", organization_id,
-    ).order("purchased_at", desc=True).limit(20).execute()
+    # Packs actifs — tolère l'absence de la table credit_packs
+    try:
+        packs_q = admin.table("credit_packs").select("*").eq(
+            "organization_id", organization_id,
+        ).order("purchased_at", desc=True).limit(20).execute()
+        credit_packs = packs_q.data or []
+    except Exception as exc:
+        logger.warning("credit_packs indisponible (migration 005 ?) : %s", exc)
+        credit_packs = []
 
     return {
         "plan": plan,
@@ -430,7 +439,7 @@ async def get_monthly_usage(organization_id: str) -> dict[str, Any]:
         "used_pct": used_pct,
         "cost_chf_estimated": round(cost_chf_month, 2),
         "by_model": by_model,
-        "credit_packs": packs_q.data or [],
+        "credit_packs": credit_packs,
         "pack_info": {
             "tokens_per_pack": CREDIT_PACK_TOKENS,
             "price_chf_per_pack": CREDIT_PACK_PRICE_CHF,

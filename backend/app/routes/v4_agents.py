@@ -367,7 +367,6 @@ async def extract_metres_sync(
         "filename": filename,
         "file_type": ext,
         "storage_path": path,
-        "size_bytes": len(content),
         "processed": False,
     }).execute()
 
@@ -437,7 +436,6 @@ async def upload_document_v4(
         "filename": filename,
         "file_type": ext,
         "storage_path": path,
-        "size_bytes": len(content),
         "processed": False,
     }).execute()
 
