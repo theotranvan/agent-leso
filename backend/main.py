@@ -89,11 +89,14 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# CORS restrictif
+# CORS — permissif par défaut (allow_origins=*), verrouillable via ALLOWED_ORIGINS.
+# allow_credentials n'est activé que sur une liste explicite (spec CORS : interdit
+# avec "*"). L'app s'authentifie par token Bearer, donc * sans credentials suffit.
+_cors_origins = settings.cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_origins != ["*"],
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Stripe-Signature"],
 )
