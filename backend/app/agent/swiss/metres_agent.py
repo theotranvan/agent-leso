@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from app.database import get_storage, get_supabase_admin
-from app.services.excel_generator import generate_dpgf_xlsx
+from app.services.excel_generator import generate_dpgf_excel
 from app.services.pdf_generator import markdown_to_html, render_pdf_from_html
 
 logger = logging.getLogger(__name__)
@@ -80,9 +80,10 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 
     # DPGF Excel pré-rempli (structure par CFC)
     dpgf_items = _build_dpgf_items(metres)
-    xlsx_bytes = generate_dpgf_xlsx(
+    xlsx_bytes = generate_dpgf_excel(
         project_name=params.get("project_name", "Projet"),
-        items=dpgf_items,
+        lot="Métrés automatiques (CFC)",
+        lines=dpgf_items,
     )
 
     # PDF récapitulatif métrés
@@ -412,13 +413,13 @@ def _build_dpgf_items(metres: dict[str, Any]) -> list[dict[str, Any]]:
         label = cfc_labels.get(cfc, f"CFC {cfc}")
         quantity = data["surface_m2"] if data["surface_m2"] > 0 else data["count"]
         unit = "m²" if data["surface_m2"] > 0 else "u"
+        # Format attendu par generate_dpgf_excel : article/designation/unite/
+        # quantite/prix_unitaire (le chiffreur renseignera les prix ensuite).
         items.append({
-            "lot": f"{cfc} {label}",
+            "article": cfc,
             "designation": f"{label} (métré automatique depuis IFC)",
-            "unit": unit,
-            "quantity": quantity,
-            "unit_price_eur": 0,  # À remplir par le chiffreur
-            "total_eur": 0,
-            "notes": f"Classes IFC sources : {', '.join(data['ifc_classes'])}",
+            "unite": unit,
+            "quantite": round(quantity, 2),
+            "prix_unitaire": 0,
         })
     return items
