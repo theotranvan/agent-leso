@@ -67,6 +67,19 @@ python -m scripts.seed_team --org "Conti" \
 
 ## 4. Smoke test final (5 min, à faire une fois tout déployé)
 
+### Option automatique (recommandée) — depuis ta machine
+```bash
+cd backend
+python scripts/smoke_e2e.py \
+  --api https://bet-agent-api.onrender.com \
+  --supabase https://<projet>.supabase.co --anon <SUPABASE_ANON_KEY> \
+  --email ing2@conti.ch --password '<mot de passe seedé>'
+```
+Le script déroule tout le parcours (login → projet → simulation → tâche queue →
+worker) et affiche PASS/FAIL par étape. 100% PASS = prêt pour l'équipe.
+
+### Option manuelle
+
 1. [ ] L'admin s'inscrit → arrive sur le tableau de bord.
 2. [ ] Réglages → inviter 1 ingénieur → il reçoit l'email → définit son mot de
        passe → accède au même espace (mêmes projets).
