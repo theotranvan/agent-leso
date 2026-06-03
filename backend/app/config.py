@@ -54,7 +54,17 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "production"
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
+    # Origines CORS autorisées. "*" = tout (défaut, pour ne rien casser). Sinon
+    # liste séparée par des virgules, ex: "https://app.exemple.ch,https://exemple.ch"
+    ALLOWED_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = (self.ALLOWED_ORIGINS or "*").strip()
+        if raw == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
     PLAN_LIMITS: dict = Field(default_factory=lambda: {
         "starter": {"tasks": 500, "price_eur": 690, "price_chf": 690},
