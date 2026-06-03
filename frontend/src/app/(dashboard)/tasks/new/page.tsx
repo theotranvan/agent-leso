@@ -140,7 +140,7 @@ function NewTaskInner() {
   const { activeProject } = useActiveProject();
 
   const preselectedType = searchParams.get('type');
-  const preselectedProject = searchParams.get('project_id');
+  const preselectedProject = searchParams.get('project_id') || searchParams.get('project');
 
   const [selected, setSelected] = useState<TaskCategory | null>(
     preselectedType ? TASK_CATEGORIES.find((c) => c.id === preselectedType) || null : null
@@ -162,6 +162,16 @@ function NewTaskInner() {
   useEffect(() => {
     if (!projectId && activeProject?.id) setProjectId(activeProject.id);
   }, [activeProject, projectId]);
+
+  // Pré-remplit canton/affectation depuis le projet actif (adapte au canton)
+  useEffect(() => {
+    if (!activeProject) return;
+    setForm((f: any) => ({
+      ...f,
+      canton: f.canton ?? activeProject.canton ?? undefined,
+      affectation: f.affectation ?? activeProject.affectation ?? undefined,
+    }));
+  }, [activeProject]);
 
   // Redirect si l'utilisateur choisit un module
   useEffect(() => {

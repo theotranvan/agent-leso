@@ -172,6 +172,7 @@ async def get_project_journey(project_id: str, user: Annotated[AuthUser, Depends
         approved_task_types=approved,
         current_phase=project.data.get("current_phase"),
         disabled_phases=disabled,
+        canton=project.data.get("canton"),
     )
     return state
 

@@ -87,7 +87,12 @@ export function ProjectJourney({ projectId, onEditProject }: Props) {
       router.push(`${dedicated}?project=${projectId}`);
       return;
     }
-    router.push(`/tasks/new?type=${taskType}&project=${projectId}`);
+    // Le formulaire générique ne connaît que controle_reglementaire_geneve
+    // (canton sélectionnable) : on y mappe toutes les variantes cantonales.
+    const formType = taskType.startsWith('controle_reglementaire_')
+      ? 'controle_reglementaire_geneve'
+      : taskType;
+    router.push(`/tasks/new?type=${formType}&project=${projectId}`);
   };
 
   return (
