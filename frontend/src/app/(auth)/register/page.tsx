@@ -88,7 +88,7 @@ export default function RegisterPage() {
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
             <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center font-bold">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Créer un compte</CardTitle>
           <CardDescription>Plan Starter {planPrice} / mois · 500 tâches</CardDescription>

@@ -450,7 +450,7 @@ def _build_report_md(
         "",
         "## Responsabilité",
         "",
-        f"Résultat produit par BET Agent. Le thermicien signataire ({author or 'à désigner'}) ",
+        f"Résultat produit par LESO. Le thermicien signataire ({author or 'à désigner'}) ",
         "engage seul sa responsabilité sur la conformité du calcul officiel qui sera produit.",
     ])
 

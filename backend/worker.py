@@ -147,7 +147,7 @@ async def rapport_hebdo_cron(ctx: dict) -> dict:
             <p style="color:#525252">{len(alerts.data)} nouveautés identifiées pour {org['name']}.</p>
             {''.join(sections)}
         </div>"""
-        send_email(org["email"], "[BET Agent] Rapport hebdo de veille réglementaire", body)
+        send_email(org["email"], "[LESO] Rapport hebdo de veille réglementaire", body)
         sent += 1
 
     logger.info(f"📧 Rapport hebdo envoyé à {sent} organisations")

@@ -1,4 +1,4 @@
-"""Knowledge base — fondations métier réelles pour BET Agent.
+"""Knowledge base — fondations métier réelles pour LESO.
 
 Modules :
   - cctp/ : bibliothèque de clauses types CCTP par lot et niveau (SIA 451 + CFC)

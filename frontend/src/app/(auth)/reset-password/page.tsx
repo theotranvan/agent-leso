@@ -61,7 +61,7 @@ export default function ResetPasswordPage() {
         <CardHeader>
           <div className="mb-2 flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Nouveau mot de passe</CardTitle>
           <CardDescription>Choisissez un mot de passe sécurisé</CardDescription>

@@ -1,4 +1,4 @@
-"""Point d'entrée FastAPI - BET Agent SaaS."""
+"""Point d'entrée FastAPI - LESO SaaS."""
 import logging
 from contextlib import asynccontextmanager
 
@@ -56,7 +56,7 @@ if settings.SENTRY_DSN:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
-    logger.info(f"🚀 BET Agent API démarré - env={settings.ENVIRONMENT}")
+    logger.info(f"🚀 LESO API démarré - env={settings.ENVIRONMENT}")
     # V2 - seed des normes CH au démarrage (idempotent)
     if settings.AUTO_SEED_NORMS:
         try:
@@ -77,11 +77,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Seed normes échoué au démarrage : {e}")
     yield
-    logger.info("🛑 BET Agent API arrêté")
+    logger.info("🛑 LESO API arrêté")
 
 
 app = FastAPI(
-    title="BET Agent API",
+    title="LESO API",
     description="SaaS agent IA pour bureaux d'études techniques - Swiss-first",
     version="2.0.0",
     lifespan=lifespan,
@@ -111,7 +111,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.get("/", tags=["meta"])
 async def root():
-    return {"name": "BET Agent API", "version": "2.0.0", "status": "ok"}
+    return {"name": "LESO API", "version": "2.0.0", "status": "ok"}
 
 
 @app.get("/health", tags=["meta"])

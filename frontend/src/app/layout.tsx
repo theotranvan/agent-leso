@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'BET Agent',
+  title: 'LESO',
   description: 'SaaS agent IA pour bureaux d\'études techniques',
 };
 

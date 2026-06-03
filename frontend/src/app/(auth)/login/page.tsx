@@ -42,7 +42,7 @@ function LoginForm() {
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
             <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center font-bold">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Connexion</CardTitle>
           <CardDescription>Accédez à votre espace bureau d'études</CardDescription>

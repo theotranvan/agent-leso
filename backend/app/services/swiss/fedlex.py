@@ -48,7 +48,7 @@ async def search_recent_fedlex(keywords: list[str], days_back: int = 7) -> list[
     """
     results: list[dict] = []
 
-    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "BET-Agent/2.0"}) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "LESO/2.0"}) as client:
         for keyword in keywords[:5]:  # limite 5 pour éviter flood
             try:
                 # Fedlex ne propose pas d'API REST simple ; on fait une recherche HTML minimale
@@ -100,7 +100,7 @@ async def sparql_query(query: str, timeout: float = 30.0) -> dict[str, Any]:
                 headers={
                     "Accept": "application/sparql-results+json",
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "BET-Agent/3.0 (contact: team@bet-agent.ch)",
+                    "User-Agent": "LESO/3.0 (contact: team@bet-agent.ch)",
                 },
             )
             response.raise_for_status()

@@ -332,7 +332,7 @@ async def _send_quota_alert(
         )
 
         payload = {
-            "text": f"{emoji} Quota tokens BET Agent — {status}",
+            "text": f"{emoji} Quota tokens LESO — {status}",
             "blocks": [
                 {
                     "type": "header",

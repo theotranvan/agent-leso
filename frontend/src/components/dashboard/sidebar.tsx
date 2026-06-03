@@ -59,7 +59,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           <div className="h-7 w-7 rounded-md bg-primary text-primary-foreground grid place-items-center text-sm font-bold">B</div>
-          <span>BET Agent</span>
+          <span>LESO</span>
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">

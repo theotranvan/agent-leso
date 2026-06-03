@@ -2,7 +2,7 @@
 
 Objectif : faire gagner ~1h par affaire à l'ingénieur. Au lieu de saisir
 manuellement les surfaces d'enveloppe, les U-values et le volume dans Lesosai,
-BET Agent lit la maquette IFC et pré-remplit ces données. L'ingénieur n'a plus
+LESO lit la maquette IFC et pré-remplit ces données. L'ingénieur n'a plus
 qu'à vérifier et corriger, pas à tout ressaisir.
 
 Le résultat est un dictionnaire prêt à alimenter le justificatif SIA 380/1

@@ -393,7 +393,7 @@ class PreBIMGenerator:
                 "Géométrie orthogonale simple (rectangle de base)",
                 "Zones thermiques = 1 par étage (pas de zonage pièce à pièce)",
                 "Pas de décrochements, balcons, attiques automatiques",
-                "Compositions issues de bibliothèque standard BET Agent",
+                "Compositions issues de bibliothèque standard LESO",
                 "Fenêtres distribuées par ratio orientation (pas de positionnement réel)",
             ],
             "next_steps": [

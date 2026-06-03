@@ -62,10 +62,10 @@ def build_ics_for_organization(organization_id: str) -> str:
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//BET Agent//Echeances//FR",
+        "PRODID:-//LESO//Echeances//FR",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "X-WR-CALNAME:BET Agent — Échéances",
+        "X-WR-CALNAME:LESO — Échéances",
     ]
 
     for r in rows:
@@ -82,7 +82,7 @@ def build_ics_for_organization(organization_id: str) -> str:
             f"DTSTAMP:{now_stamp}",
             f"DTSTART;VALUE=DATE:{_format_date(due)}",
             f"SUMMARY:{_escape_ics(summary)}",
-            f"DESCRIPTION:{_escape_ics(f'Échéance suivie par BET Agent pour le projet {proj_name}.')}",
+            f"DESCRIPTION:{_escape_ics(f'Échéance suivie par LESO pour le projet {proj_name}.')}",
             # Rappel 7 jours avant
             "BEGIN:VALARM",
             "TRIGGER:-P7D",
@@ -116,7 +116,7 @@ def build_ics_for_project(project_id: str, organization_id: str) -> str:
 
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0",
-        "PRODID:-//BET Agent//Echeances//FR", "CALSCALE:GREGORIAN",
+        "PRODID:-//LESO//Echeances//FR", "CALSCALE:GREGORIAN",
         f"X-WR-CALNAME:{_escape_ics(proj_name)} — Échéances",
     ]
     for r in deadlines.data or []:

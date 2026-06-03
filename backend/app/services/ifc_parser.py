@@ -182,7 +182,7 @@ def generate_bcf_xml(clashes: list[dict], project_name: str = "Coordination") ->
         topics.append(f"""  <Topic Guid="{guid}" TopicType="Clash" TopicStatus="Open">
     <Title>Conflit {i}: {c['element_a']['lot']} × {c['element_b']['lot']}</Title>
     <CreationDate>{datetime.utcnow().isoformat()}Z</CreationDate>
-    <CreationAuthor>BET Agent IA</CreationAuthor>
+    <CreationAuthor>LESO IA</CreationAuthor>
     <Description>Élément A: {c['element_a']['type']} "{c['element_a']['name']}" (lot {c['element_a']['lot']}) / Élément B: {c['element_b']['type']} "{c['element_b']['name']}" (lot {c['element_b']['lot']})</Description>
   </Topic>""")
     return f"""<?xml version="1.0" encoding="UTF-8"?>

@@ -1,7 +1,7 @@
 """Connecteur Lesosai en mode watched-folder.
 
 Principe :
-1. BET Agent écrit un fichier d'entrée (gbXML ou XML natif Lesosai) dans INPUT_DIR
+1. LESO écrit un fichier d'entrée (gbXML ou XML natif Lesosai) dans INPUT_DIR
 2. L'opérateur (humain ou script Lesosai) ouvre Lesosai, importe, calcule, exporte
    le rapport CECB XML dans OUTPUT_DIR avec le même identifiant.
 3. Ce connecteur poll OUTPUT_DIR toutes les 10 secondes jusqu'à 30 min par défaut.

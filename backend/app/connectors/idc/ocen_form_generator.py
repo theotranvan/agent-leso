@@ -44,7 +44,7 @@ FORM_TEMPLATE_CSS: str = """
     size: A4;
     margin: 20mm 18mm;
     @bottom-center {
-        content: "BET Agent V3 — Document préparatoire IDC — page " counter(page) " / " counter(pages);
+        content: "LESO V3 — Document préparatoire IDC — page " counter(page) " / " counter(pages);
         font-size: 8pt;
         color: #737373;
     }
@@ -144,7 +144,7 @@ class OCENFormGenerator:
 
 <div class="banner">
     <strong>⚠ Document préparatoire</strong> — Ce formulaire a été généré automatiquement
-    par BET Agent à partir des factures transmises. Il doit être vérifié et signé par
+    par LESO à partir des factures transmises. Il doit être vérifié et signé par
     un professionnel qualifié avant transmission à l'OCEN.
 </div>
 

@@ -74,7 +74,7 @@ export default async function LandingPage() {
   const Logo = () => (
     <Link href="/" className="flex items-center gap-2 font-semibold">
       <div className="h-7 w-7 rounded-md bg-primary text-primary-foreground grid place-items-center text-sm font-bold">B</div>
-      <span>BET Agent</span>
+      <span>LESO</span>
     </Link>
   );
 
@@ -106,7 +106,7 @@ export default async function LandingPage() {
           <span className="text-muted-foreground">Pas en jours.</span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-9">
-          BET Agent redige vos CCTP, notes de calcul, justificatifs thermiques et dossiers
+          LESO redige vos CCTP, notes de calcul, justificatifs thermiques et dossiers
           reglementaires — aux normes suisses, a votre charte. Vous gardez le controle et la signature.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -145,7 +145,7 @@ export default async function LandingPage() {
               Vous le savez : la valeur d'un BET n'est pas dans la paperasse.
             </h2>
             <p className="text-muted-foreground">
-              Pourtant, c'est elle qui mange vos journees. Voici ce que BET Agent fait disparaitre.
+              Pourtant, c'est elle qui mange vos journees. Voici ce que LESO fait disparaitre.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -171,7 +171,7 @@ export default async function LandingPage() {
             Trois etapes. Et le dossier est pret.
           </h2>
           <p className="text-muted-foreground">
-            BET Agent ne vous remplace pas. Il fait le travail ingrat, vous gardez l'expertise et la decision.
+            LESO ne vous remplace pas. Il fait le travail ingrat, vous gardez l'expertise et la decision.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -277,7 +277,7 @@ export default async function LandingPage() {
             Un seul CCTP economise par mois, et l'abonnement est deja rentabilise.
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto mb-10">
-            Un dossier d'appel d'offres complet represente plusieurs jours d'ingenieur. BET Agent
+            Un dossier d'appel d'offres complet represente plusieurs jours d'ingenieur. LESO
             le produit en une fraction du temps. Le reste, c'est de la marge et des affaires
             supplementaires que vous pouvez enfin accepter.
           </p>
@@ -349,7 +349,7 @@ export default async function LandingPage() {
             <Award className="h-4 w-4" /> Bonus
           </div>
           <h2 className="text-2xl font-semibold tracking-tight mb-3">
-            Devenez un bureau certifie BET Agent
+            Devenez un bureau certifie LESO
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             Affichez sur votre site et vos offres que vos dossiers sont produits et verifies avec
@@ -381,7 +381,7 @@ export default async function LandingPage() {
             <a href="#modules" className="hover:text-foreground">Modules</a>
             <Link href="/login" className="hover:text-foreground">Se connecter</Link>
           </div>
-          <div>© {new Date().getFullYear()} BET Agent · Suisse romande</div>
+          <div>© {new Date().getFullYear()} LESO · Suisse romande</div>
         </div>
       </footer>
     </div>

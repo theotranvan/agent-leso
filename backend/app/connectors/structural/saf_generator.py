@@ -402,7 +402,7 @@ class SafGenerator(StructuralConnector):
         import time as _time
         rows = [
             ["SAF Version", SAF_VERSION],
-            ["Generator", "BET Agent V3 - SafGenerator"],
+            ["Generator", "LESO V3 - SafGenerator"],
             ["Generated At", _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())],
             ["Units Length", "m"],
             ["Units Force", "kN"],

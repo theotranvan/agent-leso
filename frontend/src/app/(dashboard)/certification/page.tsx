@@ -40,7 +40,7 @@ export default function CertificationPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Certification bureau</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Valorisez votre usage de BET Agent auprès de vos clients et maîtres d'ouvrage.
+          Valorisez votre usage de LESO auprès de vos clients et maîtres d'ouvrage.
         </p>
       </div>
 

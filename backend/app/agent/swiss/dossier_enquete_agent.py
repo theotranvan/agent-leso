@@ -248,7 +248,7 @@ Consignes :
 
 ---
 
-*Ce dossier préparatoire a été généré par BET Agent. L'architecte et les ingénieurs signataires
+*Ce dossier préparatoire a été généré par LESO. L'architecte et les ingénieurs signataires
 engagent seuls leur responsabilité professionnelle sur la conformité du dossier au moment du dépôt officiel.*
 """
 

@@ -1,9 +1,9 @@
-"""Mode bureau certifié BET Agent.
+"""Mode bureau certifié LESO.
 
-Un bureau qui produit et valide ses dossiers avec BET Agent peut afficher un
-label "Bureau certifié BET Agent" sur son site et ses documents. Ça crée :
+Un bureau qui produit et valide ses dossiers avec LESO peut afficher un
+label "Bureau certifié LESO" sur son site et ses documents. Ça crée :
 - de la fidélisation (le bureau valorise son usage de l'outil)
-- de la publicité gratuite (chaque badge pointe vers BET Agent)
+- de la publicité gratuite (chaque badge pointe vers LESO)
 - de la confiance côté maîtres d'ouvrage (dossiers produits avec un outil reconnu)
 
 La certification est attribuée selon des critères objectifs (nombre de dossiers
@@ -28,9 +28,9 @@ CERT_MIN_APPROVAL_RATE = 70        # taux d'approbation minimum (%)
 
 # Niveaux de certification selon le volume
 CERT_LEVELS = [
-    (100, "Or", "Bureau certifié BET Agent — Or"),
-    (40, "Argent", "Bureau certifié BET Agent — Argent"),
-    (10, "Bronze", "Bureau certifié BET Agent — Bronze"),
+    (100, "Or", "Bureau certifié LESO — Or"),
+    (40, "Argent", "Bureau certifié LESO — Argent"),
+    (10, "Bronze", "Bureau certifié LESO — Bronze"),
 ]
 
 
@@ -124,6 +124,6 @@ def get_badge_embed_html(organization_id: str) -> str | None:
 style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;\
 border:1px solid {level_color};border-radius:8px;text-decoration:none;\
 font-family:sans-serif;font-size:13px;color:#1B3A5C;background:#fff;">
-  <span style="font-weight:600;color:{level_color};">✓ BET Agent</span>
+  <span style="font-weight:600;color:{level_color};">✓ LESO</span>
   <span style="color:#525252;">Bureau certifié {cert['level']}</span>
 </a>"""

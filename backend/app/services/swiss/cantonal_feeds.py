@@ -61,7 +61,7 @@ async def fetch_canton_updates(canton: str, keywords: list[str]) -> list[dict]:
     results: list[dict] = []
     async with httpx.AsyncClient(
         timeout=30.0,
-        headers={"User-Agent": "BET-Agent/2.0 (legal research)"}
+        headers={"User-Agent": "LESO/2.0 (legal research)"}
     ) as client:
         try:
             # Approche générique : on tente une requête de recherche avec chaque mot-clé

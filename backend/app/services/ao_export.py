@@ -180,7 +180,7 @@ def _build_summary(proj: dict, included: list, skipped: list, only_approved: boo
     lines += [
         "",
         "=" * 60,
-        "Document généré par BET Agent. Les documents engageant la",
+        "Document généré par LESO. Les documents engageant la",
         "responsabilité de l'ingénieur ont été validés avant inclusion.",
     ]
     return "\n".join(lines)

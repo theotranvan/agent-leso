@@ -22,7 +22,7 @@ Ce connecteur génère **deux CSV structurés + une notice markdown** :
 
 L'ingénieur Robot exécute ensuite un script Python COM fourni dans la notice
 pour importer le modèle. Ce script est testé sur Robot 2023+ et reproduit
-ici en tant que contenu de la notice (pas exécuté par BET Agent).
+ici en tant que contenu de la notice (pas exécuté par LESO).
 
 Avantages :
 - Pas de dépendance propriétaire
@@ -83,12 +83,12 @@ def load_robot_config() -> RobotConfig:
     )
 
 
-ROBOT_IMPORT_SCRIPT: Final[str] = '''"""Script d'import Robot Structural Analysis - fourni par BET Agent V3.
+ROBOT_IMPORT_SCRIPT: Final[str] = '''"""Script d'import Robot Structural Analysis - fourni par LESO V3.
 
 Prérequis :
 - Windows + Robot 2023 ou plus récent
 - Python 3.8+ avec pywin32 (pip install pywin32)
-- Les CSV générés par BET Agent dans le même dossier que ce script
+- Les CSV générés par LESO dans le même dossier que ce script
 
 Usage :
     python import_from_betagent.py {job_id}
@@ -103,7 +103,7 @@ Ce script utilise l'API COM de Robot pour :
 
 L'utilisateur lance ensuite le calcul manuellement dans Robot.
 Après calcul, l'export SAF ou CSV des résultats est à replacer dans le dossier
-de sortie BET Agent pour déclencher le double-check.
+de sortie LESO pour déclencher le double-check.
 """
 import csv
 import sys
@@ -176,7 +176,7 @@ def main(job_id: str) -> None:
 
     print("Modèle importé. Sauvegarder le projet (.rtd) puis lancer le calcul.")
     print("Une fois le calcul terminé, exporter les résultats au format SAF ou CSV")
-    print("et les déposer dans le dossier de sortie BET Agent.")
+    print("et les déposer dans le dossier de sortie LESO.")
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -369,7 +369,7 @@ Une fois le modèle importé :
 1. Vérifier la géométrie, sections, matériaux dans Robot
 2. Ajouter les charges manuellement (ou via autre CSV à importer)
 3. Lancer le calcul
-4. Exporter les résultats en SAF (xlsx) ou CSV dans le dossier de sortie BET Agent,
+4. Exporter les résultats en SAF (xlsx) ou CSV dans le dossier de sortie LESO,
    nommé `{job_id}_results.xlsx` ou `{job_id}_results.csv`
 
 Format attendu du CSV si non-SAF :
@@ -392,7 +392,7 @@ En cas d'erreur, vérifier :
 - La base de sections et matériaux Robot correspond aux noms exportés
 - Les droits COM (Robot doit être lancé au moins une fois manuellement avant)
 
-Contact BET Agent : support@bet-agent.ch
+Contact LESO : support@bet-agent.ch
 """
         notice_path.write_text(content, encoding="utf-8")
         return notice_path

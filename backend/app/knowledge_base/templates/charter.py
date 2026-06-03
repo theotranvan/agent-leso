@@ -59,8 +59,8 @@ class BrandingConfig:
 
 # Configuration par défaut (fallback)
 DEFAULT_BRANDING = BrandingConfig(
-    organization_name="BET Agent",
-    organization_full_name="BET Agent SA",
+    organization_name="LESO",
+    organization_full_name="LESO SA",
     primary_color="#1B2E4E",
     accent_color="#2E75B6",
 )

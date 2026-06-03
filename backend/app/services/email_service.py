@@ -81,7 +81,7 @@ def send_task_completed_email(
       <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 600;">Document prêt : {label}</h2>
       <p style="margin: 0 0 16px; color: #525252;">Projet : <strong>{project_name}</strong></p>
       {preview_html}
-      <p style="margin: 24px 0 0; color: #525252; font-size: 13px;">Document généré automatiquement par BET Agent. Vous le retrouvez également dans votre espace projet.</p>
+      <p style="margin: 24px 0 0; color: #525252; font-size: 13px;">Document généré automatiquement par LESO. Vous le retrouvez également dans votre espace projet.</p>
     </div>
     """
 
@@ -89,7 +89,7 @@ def send_task_completed_email(
     if attachment_bytes and attachment_filename:
         attachments = [{"filename": attachment_filename, "content": attachment_bytes}]
 
-    return send_email(to, f"[BET Agent] {label} - {project_name}", html, attachments=attachments)
+    return send_email(to, f"[LESO] {label} - {project_name}", html, attachments=attachments)
 
 
 def send_approval_request_email(
@@ -162,7 +162,7 @@ def send_approval_request_email(
 
       <p style="margin:16px 0 0;color:#a3a3a3;font-size:12px;">
         En approuvant, vous engagez votre validation professionnelle sur ce document.
-        Lien valable 72h. Vous pouvez aussi ouvrir le document complet dans votre espace BET Agent.
+        Lien valable 72h. Vous pouvez aussi ouvrir le document complet dans votre espace LESO.
       </p>
     </div>
     """
@@ -198,7 +198,7 @@ def send_welcome_email(
 
     body_html = f"""
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a;">
-  <h1 style="font-size:22px;font-weight:500;margin:0 0 16px;">Bienvenue chez BET Agent</h1>
+  <h1 style="font-size:22px;font-weight:500;margin:0 0 16px;">Bienvenue chez LESO</h1>
   <p style="line-height:1.6;">Bonjour,</p>
   <p style="line-height:1.6;">
     Votre compte <strong>{organization_name}</strong> est maintenant actif avec le plan <strong>{plan_label}</strong>.
@@ -233,16 +233,16 @@ def send_welcome_email(
   <p style="line-height:1.6;margin-top:32px;">
     Une question ? Répondez simplement à cet email.<br>
     À très vite,<br>
-    L'équipe BET Agent
+    L'équipe LESO
   </p>
 
   <p style="font-size:12px;color:#999;border-top:0.5px solid #ddd;padding-top:16px;margin-top:32px;">
-    BET Agent · Lausanne · <a href="{base_url}" style="color:#666;">bet-agent.ch</a>
+    LESO · Lausanne · <a href="{base_url}" style="color:#666;">bet-agent.ch</a>
   </p>
 </div>
 """
     return send_email(
         to=to,
-        subject="Bienvenue chez BET Agent — votre projet démo est prêt",
+        subject="Bienvenue chez LESO — votre projet démo est prêt",
         body_html=body_html,
     )

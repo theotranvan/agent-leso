@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 def serialize_to_lesosai_xml(thermal_model: dict) -> bytes:
     """Produit un XML interne structuré depuis un modèle thermique.
 
-    Format interne BET Agent (pas Lesosai natif), lisible par un humain ou par le
+    Format interne LESO (pas Lesosai natif), lisible par un humain ou par le
     script RPA Lesosai de l'opérateur. Remplace l'ancienne fonction V2.
     """
-    root = ET.Element("LesosaiExport", version="1.0", generator="BET-Agent-V3")
+    root = ET.Element("LesosaiExport", version="1.0", generator="LESO-V3")
     meta = ET.SubElement(root, "Meta")
     ET.SubElement(meta, "ExportedAt").text = datetime.utcnow().isoformat()
     ET.SubElement(meta, "Notice").text = (
-        "Fichier intermédiaire. Format interne BET Agent — à ouvrir en parallèle de Lesosai."
+        "Fichier intermédiaire. Format interne LESO — à ouvrir en parallèle de Lesosai."
     )
 
     project = ET.SubElement(root, "Project")
@@ -153,7 +153,7 @@ def build_operator_sheet_markdown(thermal_model: dict, prepared: dict) -> str:
     lines.append("4. Créer les compositions selon les U-values (section 3)")
     lines.append("5. Reporter les ouvertures (section 4)")
     lines.append("6. Lancer le calcul, exporter le PDF")
-    lines.append("7. Revenir dans BET Agent → Thermique → Importer les résultats")
+    lines.append("7. Revenir dans LESO → Thermique → Importer les résultats")
     return "\n".join(lines)
 
 

@@ -203,7 +203,7 @@ def _handle_payment_failed(invoice: dict) -> None:
         send_alert_email(
             to=[result.data["email"]],
             subject="Paiement échoué — action requise",
-            body_html="<p>Le paiement de votre abonnement BET Agent a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
+            body_html="<p>Le paiement de votre abonnement LESO a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
         )
 
 
@@ -226,7 +226,7 @@ def create_credit_pack_session(
             "price_data": {
                 "currency": "chf",
                 "product_data": {
-                    "name": f"Pack de {CREDIT_PACK_TOKENS:,} tokens BET Agent",
+                    "name": f"Pack de {CREDIT_PACK_TOKENS:,} tokens LESO",
                     "description": "Tokens additionnels consommés après le quota mensuel",
                 },
                 "unit_amount": CREDIT_PACK_PRICE_CHF * 100,  # en centimes CHF
