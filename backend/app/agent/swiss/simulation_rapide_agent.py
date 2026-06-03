@@ -210,30 +210,40 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         author=params.get("author", ""),
     )
 
-    pdf_bytes = render_pdf_from_html(
-        body_html=markdown_to_html(md),
-        title="Simulation énergétique rapide",
-        subtitle=f"{affectation} — canton {canton}",
-        project_name=params.get("project_name", ""),
-        author=params.get("author", ""),
-        reference=f"SIMRAPIDE-{datetime.now().strftime('%Y%m%d-%H%M')}",
-    )
-
-    storage = get_storage()
+    # Génération PDF + archivage : best-effort. Le résultat chiffré (Qh, classe,
+    # conformité) est l'essentiel et doit toujours remonter à l'écran, même si
+    # le storage ou l'insert documents échoue (bucket, droits, colonne…).
+    signed_url = None
+    pdf_bytes = b""
     filename = f"simulation_rapide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    path = f"{org_id}/simulation_rapide/{task['id']}/{filename}"
-    storage.upload(path, pdf_bytes, content_type="application/pdf")
-    signed_url = storage.get_signed_url(path, expires_in=604800)
+    try:
+        pdf_bytes = render_pdf_from_html(
+            body_html=markdown_to_html(md),
+            title="Simulation énergétique rapide",
+            subtitle=f"{affectation} — canton {canton}",
+            project_name=params.get("project_name", ""),
+            author=params.get("author", ""),
+            reference=f"SIMRAPIDE-{datetime.now().strftime('%Y%m%d-%H%M')}",
+        )
+        storage = get_storage()
+        path = f"{org_id}/simulation_rapide/{task['id']}/{filename}"
+        storage.upload(path, pdf_bytes, content_type="application/pdf")
+        signed_url = storage.get_signed_url(path, expires_in=604800)
 
-    admin = get_supabase_admin()
-    admin.table("documents").insert({
-        "organization_id": org_id,
-        "project_id": project_id,
-        "filename": filename,
-        "file_type": "pdf",
-        "storage_path": path,
-        "processed": True,
-    }).execute()
+        admin = get_supabase_admin()
+        admin.table("documents").insert({
+            "organization_id": org_id,
+            "project_id": project_id,
+            "filename": filename,
+            "file_type": "pdf",
+            "storage_path": path,
+            "processed": True,
+        }).execute()
+    except Exception as exc:
+        logger.warning(
+            "Simulation rapide : PDF/archivage indisponible (résultat renvoyé sans PDF) : %s",
+            exc,
+        )
 
     return {
         "result_url": signed_url,
