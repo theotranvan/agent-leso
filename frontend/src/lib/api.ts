@@ -854,6 +854,15 @@ export const api = {
         });
         return handle<any>(res);
       },
+      // Variante synchrone : renvoie directement le résultat (Qh, Ep, classe).
+      computeSync: async (body: any) => {
+        const res = await fetch(`${API_URL}/api/v4/simulation-rapide/sync`, {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return handle<any>(res);
+      },
       list: async (project_id?: string) => {
         const url = new URL(`${API_URL}/api/v4/simulation-rapide`);
         if (project_id) url.searchParams.set('project_id', project_id);
