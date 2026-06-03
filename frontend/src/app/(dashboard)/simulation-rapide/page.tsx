@@ -61,10 +61,13 @@ export default function SimulationRapidePage() {
     setError(null);
     setLoading(true);
     try {
-      const r = await api.v4.simulationRapide.create(form);
+      // Le backend attend les paramètres sous "programme" ; on utilise l'endpoint
+      // synchrone pour afficher Qh/Ep immédiatement.
+      const { project_name, author, ...programme } = form;
+      const r = await api.v4.simulationRapide.computeSync({ project_name, author, programme });
       setResult(r);
     } catch (e: any) {
-      setError(e.message);
+      setError(e?.userMessage || e.message);
     } finally {
       setLoading(false);
     }

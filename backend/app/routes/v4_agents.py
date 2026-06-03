@@ -324,6 +324,78 @@ async def list_metres(
     return {"metres": result.data or []}
 
 
+@router.post("/metres/extract")
+async def extract_metres_sync(
+    user: Annotated[AuthUser, Depends(get_current_user)],
+    ifc_file: UploadFile = File(...),
+    project_name: str = Form(""),
+    author: str = Form(""),
+    project_id: str | None = Form(None),
+):
+    """Upload IFC + extraction métrés en une requête, résultat immédiat.
+
+    La page Métrés envoie le fichier en multipart et attend le résultat (surfaces
+    SIA 416 + DPGF) directement, sans passer par la queue.
+    """
+    from app.config import settings
+    from app.agent.swiss import metres_agent
+
+    content = await ifc_file.read()
+    size_mb = len(content) / (1024 * 1024)
+    if size_mb > settings.MAX_UPLOAD_SIZE_MB:
+        raise HTTPException(413, f"Fichier trop volumineux : {size_mb:.1f} MB")
+    ext = (ifc_file.filename or "").split(".")[-1].lower() if ifc_file.filename else ""
+    if ext not in ("ifc", "ifczip"):
+        raise HTTPException(400, f"Un fichier IFC est attendu (.ifc/.ifczip), reçu : .{ext}")
+
+    # Upload + document
+    storage = get_storage()
+    filename = ifc_file.filename or f"modele_{datetime.now().timestamp()}.ifc"
+    path = f"{user.organization_id}/metres/{uuid.uuid4().hex[:8]}_{filename}"
+    storage.upload(path, content, content_type="application/octet-stream")
+
+    admin = get_supabase_admin()
+    doc_id = str(uuid.uuid4())
+    admin.table("documents").insert({
+        "id": doc_id,
+        "organization_id": user.organization_id,
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": ext,
+        "storage_path": path,
+        "size_bytes": len(content),
+        "processed": False,
+    }).execute()
+
+    task_dict: dict[str, Any] = {
+        "id": str(uuid.uuid4()),
+        "organization_id": user.organization_id,
+        "user_id": user.user_id,
+        "project_id": project_id,
+        "input_params": {
+            "project_name": project_name,
+            "ifc_document_id": doc_id,
+            "author": author,
+        },
+    }
+    try:
+        result = await metres_agent.execute(task_dict)
+        audit_log(user, "metres_extract_sync", {"document_id": doc_id})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.exception("Extraction métrés échec")
+        raise HTTPException(500, f"Erreur extraction métrés : {e}")
+
+    # La page lit result.metres / result.pdf_url : on expose le PDF généré.
+    return {
+        "metres": result.get("metres"),
+        "pdf_url": result.get("result_url"),
+        "preview": result.get("preview"),
+        "document_id": doc_id,
+    }
+
+
 # ============================================================
 # 5. Upload autocontrôlé (helper pour uploads rapides depuis les forms V4)
 # ============================================================
