@@ -57,8 +57,13 @@ async def execute_checklist(task: dict[str, Any]) -> dict[str, Any]:
                 })
         template = {"building_type": building_type, "items": base_items, "source": "knowledge_base_calibree"}
     else:
-        # Fallback ancien template
-        template = get_template_for_building(building_type, height_m=height_m, nb_occupants=nb_occupants)
+        # Fallback : build_checklist renvoie une list[dict] d'items, on
+        # l'enveloppe dans la même structure que la branche knowledge_base.
+        fallback_items = get_template_for_building(
+            building_type, height_m=height_m, nb_occupants=nb_occupants,
+        )
+        template = {"building_type": building_type, "items": fallback_items,
+                    "source": "template_generique"}
 
     base_items = template["items"]
 

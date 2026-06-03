@@ -358,6 +358,8 @@ Si tu n'as pas trouvé une valeur, mets null. Tes décimaux utilisent le point (
         )
         elapsed = time.monotonic() - start
 
+        if not response.content or not hasattr(response.content[0], "text"):
+            raise ValueError("Claude Vision a répondu sans contenu texte exploitable")
         text = response.content[0].text.strip()
         # Extraction JSON strict
         import json
