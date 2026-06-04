@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, ArrowRight, Loader2, FileText, Flame, Building, Building2, Shield, Bell,
   Layers, FileCheck2, MessageSquareWarning, Ruler, Zap, Users, Calculator, BookOpen,
-  PenTool, ScrollText,
+  PenTool, ScrollText, HelpCircle, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,12 @@ import { Dropzone } from '@/components/ui/dropzone';
 import { CANTONS_ROMANDS, AFFECTATIONS_SIA } from '@/lib/ch';
 import { useActiveProject } from '@/lib/active-project';
 
+type TaskHelp = {
+  what: string;        // à quoi sert le livrable
+  prereq: string;      // prérequis / ce qu'il faut sous la main
+  tips?: string;       // petites choses à savoir
+};
+
 type TaskCategory = {
   id: string;
   title: string;
@@ -26,6 +32,7 @@ type TaskCategory = {
   color: string;
   fields: string[];  // champs du form à afficher
   days_saved?: string;
+  help?: TaskHelp;
 };
 
 const TASK_CATEGORIES: TaskCategory[] = [
@@ -37,6 +44,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     icon: FileCheck2, color: 'bg-purple-50 text-purple-700',
     days_saved: '5-10 j économisés',
     fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'specificities', 'author'],
+    help: {
+      what: 'Rédige le mémoire justificatif de demande d\'autorisation (APA/APC) : descriptif de l\'ouvrage, tableau de surfaces SIA 416 et liste des pièces à joindre.',
+      prereq: 'Caractéristiques du projet : canton, adresse, affectation, type d\'opération et SRE (m²). Les métrés IFC fournissent ces chiffres.',
+      tips: 'Renseignez les « spécificités » (parking, toiture végétalisée…) pour enrichir le descriptif. À relire et signer avant dépôt.',
+    },
   },
   {
     id: 'metres_automatiques_ifc',
@@ -45,6 +57,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     icon: Ruler, color: 'bg-amber-50 text-amber-700',
     days_saved: '1-2 j économisés',
     fields: ['project_name', 'ifc_upload', 'author'],
+    help: {
+      what: 'Lit une maquette IFC et calcule automatiquement surfaces (SRE), volumes, enveloppe et quantités par CFC. Produit aussi un bordereau DPGF pré-rempli.',
+      prereq: 'Un fichier IFC de la maquette architecte (max 50 Mo).',
+      tips: 'Exportez l\'IFC AVEC les quantités : Revit « Export IFC quantities », ArchiCAD « Compute IFC quantities ». Sans cette case, tous les chiffres sortent à zéro.',
+    },
   },
   {
     id: 'coordination_inter_lots',
@@ -53,6 +70,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     icon: Layers, color: 'bg-indigo-50 text-indigo-700',
     days_saved: '2-4 j économisés',
     fields: ['project_name', 'ifc_multi_upload', 'author'],
+    help: {
+      what: 'Compare plusieurs maquettes IFC (un lot chacune) et détecte les collisions géométriques. Produit un rapport et un fichier BCF ouvrable dans vos outils BIM.',
+      prereq: 'Au moins 2 maquettes IFC, une par lot (structure, CVC, sanitaire…), avec le nom du lot indiqué.',
+      tips: 'Plus les maquettes sont géoréférencées au même point de base, plus la détection est fiable.',
+    },
   },
   {
     id: 'reponse_observations_autorite',
@@ -61,6 +83,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     icon: MessageSquareWarning, color: 'bg-red-50 text-red-700',
     days_saved: '1-3 j économisés',
     fields: ['project_name', 'canton', 'autorite_pdf_upload', 'author'],
+    help: {
+      what: 'Lit le courrier d\'observations d\'une autorité et rédige une réponse structurée, point par point, prête à renvoyer.',
+      prereq: 'Le PDF du courrier de l\'autorité (DALE, DGT, CAMAC…) + le canton.',
+      tips: 'Relisez chaque réponse : l\'argumentaire est un projet à valider par l\'ingénieur responsable.',
+    },
   },
   {
     id: 'simulation_energetique_rapide',
@@ -68,14 +95,23 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Estime Qh en 30 s depuis un programme — avant-projet ou concours, sans IFC',
     icon: Zap, color: 'bg-orange-50 text-orange-700',
     fields: ['project_name', 'canton', 'affectation', 'sre_m2', 'standard', 'heating_vector', 'facteur_forme'],
+    help: {
+      what: 'Estime le besoin de chaleur Qh d\'un bâtiment en 30 secondes à partir du programme, sans IFC ni saisie détaillée. Utile en concours ou pour comparer des variantes.',
+      prereq: 'Canton, affectation, SRE (m²), standard énergétique et vecteur de chauffage.',
+      tips: 'Résultat INDICATIF (avant-projet). Le justificatif officiel SIA 380/1 se fait dans le module Thermique avec Lesosai.',
+    },
   },
-  // Livrables courants
   {
     id: 'redaction_cctp',
     title: 'CCTP',
     description: 'Descriptif des prestations par lot — rédigé selon SIA 451',
     icon: ScrollText, color: 'bg-blue-50 text-blue-700',
     fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'contraintes'],
+    help: {
+      what: 'Rédige le cahier des charges techniques d\'un lot : prescriptions, description du matériel, exigences de performance, contrôles et réceptions.',
+      prereq: 'Le lot concerné, le type d\'ouvrage et le niveau de prestation visé.',
+      tips: 'Précisez les contraintes particulières pour un texte sur mesure. Le résultat est éditable (PDF + Word) avant diffusion.',
+    },
   },
   {
     id: 'chiffrage_dpgf',
@@ -83,6 +119,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Devis quantitatif structuré par lot à partir du programme',
     icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
     fields: ['project_name', 'lot', 'surface', 'notes'],
+    help: {
+      what: 'Génère un bordereau DPGF par lot avec postes, unités et prix unitaires indicatifs (indice 2025, ajusté au canton).',
+      prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
+      tips: 'Les prix sont indicatifs : à ajuster selon vos sous-traitants et le marché.',
+    },
   },
   {
     id: 'justificatif_sia_380_1',
@@ -90,6 +131,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Thermique — requiert un modèle ou un IFC (redirige vers le module)',
     icon: Flame, color: 'bg-orange-50 text-orange-700',
     fields: ['redirect_thermique'],
+    help: {
+      what: 'Justificatif thermique officiel SIA 380/1. Ouvre le module Thermique : saisie de la composition (zones, parois, ouvertures) puis export/import Lesosai.',
+      prereq: 'La composition de l\'enveloppe : surfaces et valeurs U des parois, fenêtres. Les métrés IFC fournissent les surfaces.',
+      tips: 'Pensez à « Enregistrer la composition » avant de lancer l\'export. Un calcul indicatif rapide est aussi disponible en avant-projet.',
+    },
   },
   {
     id: 'note_calcul_sia_260_267',
@@ -97,6 +143,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'SAF pour Scia/RFEM puis note de calcul (redirige vers le module)',
     icon: Building, color: 'bg-slate-50 text-slate-700',
     fields: ['redirect_structure'],
+    help: {
+      what: 'Génère un fichier SAF (géométrie + combinaisons SIA 260) pour Scia/RFEM, puis — après import de vos résultats — un double-check analytique et la note de calcul SIA 260-267.',
+      prereq: 'La trame du bâtiment (niveaux, entraxes, sections) saisie dans le module, ou un IFC structure.',
+      tips: 'La note finale n\'est générée qu\'après votre validation explicite d\'ingénieur. Le calcul de résistance reste fait dans votre logiciel.',
+    },
   },
   {
     id: 'idc_geneve_rapport',
@@ -104,6 +155,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Extraction factures, calcul, formulaire OCEN (redirige vers le module)',
     icon: Building2, color: 'bg-emerald-50 text-emerald-700',
     fields: ['redirect_idc'],
+    help: {
+      what: 'Calcule l\'indice de dépense de chaleur (IDC) genevois et produit le rapport annuel + le formulaire OCEN, à partir des consommations.',
+      prereq: 'EGID, SRE, énergie de chauffage et consommations des 3 dernières années (factures).',
+      tips: 'Obligatoire chaque année pour les bâtiments chauffés à Genève. Le module peut extraire les m³/kWh d\'une facture PDF.',
+    },
   },
   {
     id: 'aeai_checklist_generation',
@@ -111,6 +167,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Checklist incendie pour une typologie donnée',
     icon: Shield, color: 'bg-amber-50 text-amber-700',
     fields: ['project_name', 'building_type', 'height_m', 'nb_occupants_max', 'special_context'],
+    help: {
+      what: 'Génère la checklist de conformité incendie AEAI adaptée à la typologie du bâtiment, avec les références des directives.',
+      prereq: 'La typologie, la hauteur et l\'occupation maximale du bâtiment.',
+      tips: 'Décrivez le « contexte particulier » (parking, local déchets, vélos…) : LESO ajoute les points de vigilance correspondants et l\'autorité cantonale compétente.',
+    },
   },
   {
     id: 'controle_reglementaire_geneve',
@@ -118,6 +179,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Rapport pré-dépôt : zone, énergie, LDTR, AEAI, stationnement',
     icon: FileText, color: 'bg-blue-50 text-blue-700',
     fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'nb_logements'],
+    help: {
+      what: 'Vérification automatique avant dépôt : indices d\'utilisation du sol, énergie, LDTR, AEAI, stationnement. Produit un rapport vert/rouge par critère.',
+      prereq: 'Canton, adresse, affectation, type d\'opération, SRE et nombre de logements.',
+      tips: 'Filet de sécurité avant dépôt — ce n\'est pas un avis juridique. Idéal pour repérer un point bloquant tôt.',
+    },
   },
   {
     id: 'compte_rendu_reunion',
@@ -125,6 +191,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
     icon: Users, color: 'bg-slate-50 text-slate-700',
     fields: ['project_name', 'meeting_title', 'participants', 'notes'],
+    help: {
+      what: 'Transforme des notes brutes en compte-rendu structuré : décisions, actions, délais, présents.',
+      prereq: 'Vos notes de réunion (texte) et la liste des participants.',
+      tips: 'Séparez les participants par des virgules. Plus les notes sont précises, meilleur est le CR.',
+    },
   },
   {
     id: 'memoire_technique',
@@ -132,6 +203,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Note méthodologique convaincante pour une réponse à appel d\'offres',
     icon: BookOpen, color: 'bg-indigo-50 text-indigo-700',
     fields: ['project_name', 'brief', 'author'],
+    help: {
+      what: 'Rédige un mémoire technique argumenté pour une réponse à appel d\'offres : méthodologie, moyens, organisation.',
+      prereq: 'Le brief ou le CCTP du client (collé dans le champ prévu).',
+      tips: 'Plus le brief est complet, plus le mémoire est ciblé sur les critères de notation.',
+    },
   },
   {
     id: 'chiffrage_dqe',
@@ -139,6 +215,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Devis quantitatif estimatif structuré par lot, avec prix unitaires',
     icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
     fields: ['project_name', 'lot', 'surface', 'notes'],
+    help: {
+      what: 'Devis quantitatif estimatif détaillé par lot, avec quantités et prix unitaires indicatifs.',
+      prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
+      tips: 'Comme le DPGF, les prix sont indicatifs et à ajuster au marché.',
+    },
   },
   {
     id: 'calcul_acoustique',
@@ -146,6 +227,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Justificatif d\'isolement acoustique — avant-projet',
     icon: FileText, color: 'bg-purple-50 text-purple-700',
     fields: ['project_name', 'elements', 'hypotheses', 'author'],
+    help: {
+      what: 'Rédige une note d\'isolement acoustique selon SIA 181 : exigences, choix constructifs et performance estimée.',
+      prereq: 'Les éléments/locaux à justifier (séparations, façades…) et, si possible, vos hypothèses (valeurs visées, compositions).',
+      tips: 'Note d\'avant-projet : à confirmer par un calcul acoustique détaillé pour la phase d\'exécution.',
+    },
   },
   {
     id: 'rapport_chantier',
@@ -153,6 +239,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Compte-rendu de visite depuis des notes de terrain',
     icon: PenTool, color: 'bg-amber-50 text-amber-700',
     fields: ['project_name', 'notes', 'author'],
+    help: {
+      what: 'Met en forme un rapport de visite de chantier : constatations, réserves, suites à donner.',
+      prereq: 'Vos notes de terrain (texte). Le nom du projet.',
+      tips: 'Restez factuel dans les notes : le rapport reprend vos constats, à valider avant diffusion.',
+    },
   },
   {
     id: 'resume_document',
@@ -160,6 +251,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Synthèse des points clés d\'un rapport, d\'une norme ou d\'un PDF',
     icon: FileText, color: 'bg-slate-50 text-slate-700',
     fields: ['project_name', 'document_upload'],
+    help: {
+      what: 'Extrait et synthétise les points clés d\'un document long (rapport, norme, étude).',
+      prereq: 'Le PDF à résumer (max 50 Mo).',
+      tips: 'Idéal pour dégrossir une SIA, un rapport géotechnique ou un préavis volumineux.',
+    },
   },
 ];
 
@@ -196,6 +292,7 @@ function NewTaskInner() {
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [openHelp, setOpenHelp] = useState<string | null>(null);
 
   useEffect(() => {
     api.projects.list().then((r: any) => setProjects(r.projects || [])).catch(() => {});
@@ -270,35 +367,71 @@ function NewTaskInner() {
           </Link>
           <h1 className="text-2xl font-semibold mt-3">Nouvelle tâche</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Choisis le type de livrable à produire.
+            Choisis le type de livrable à produire. Clique sur <HelpCircle className="inline h-3.5 w-3.5 -mt-0.5" /> pour savoir à quoi sert chaque livrable.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {TASK_CATEGORIES.map((c) => (
-            <button
+            <div
               key={c.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setSelected(c)}
-              className="group relative p-4 rounded-lg border bg-card text-left hover:border-muted-foreground/40 hover:shadow-sm transition-all focus-ring"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(c); } }}
+              className="group relative p-4 rounded-lg border bg-card text-left hover:border-muted-foreground/40 hover:shadow-sm transition-all focus-ring cursor-pointer"
             >
+              {c.help && (
+                <button
+                  type="button"
+                  aria-label={`Aide : ${c.title}`}
+                  onClick={(e) => { e.stopPropagation(); setOpenHelp(openHelp === c.id ? null : c.id); }}
+                  className="absolute top-2.5 right-2.5 z-10 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  {openHelp === c.id ? <X className="h-4 w-4" /> : <HelpCircle className="h-4 w-4" />}
+                </button>
+              )}
               <div className={`inline-flex w-10 h-10 rounded-md ${c.color} items-center justify-center mb-3`}>
                 <c.icon className="h-5 w-5" strokeWidth={1.8} />
               </div>
-              <h3 className="font-medium text-sm mb-1.5">{c.title}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                {c.description}
-              </p>
-              <div className="flex items-center justify-between">
-                {c.days_saved ? (
-                  <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    {c.days_saved}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </button>
+              <h3 className="font-medium text-sm mb-1.5 pr-6">{c.title}</h3>
+
+              {openHelp === c.id && c.help ? (
+                <div
+                  className="text-xs leading-relaxed space-y-1.5 mb-1 rounded-md bg-muted/60 p-2.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p><span className="font-semibold">À quoi ça sert : </span>{c.help.what}</p>
+                  <p><span className="font-semibold">Prérequis : </span>{c.help.prereq}</p>
+                  {c.help.tips && (
+                    <p className="text-amber-700"><span className="font-semibold">Bon à savoir : </span>{c.help.tips}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSelected(c); }}
+                    className="mt-1 inline-flex items-center gap-1 text-primary font-medium hover:underline"
+                  >
+                    Choisir ce livrable <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                    {c.description}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    {c.days_saved ? (
+                      <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                        {c.days_saved}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </>
+              )}
+            </div>
           ))}
         </div>
       </div>
