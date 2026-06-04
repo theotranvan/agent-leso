@@ -245,8 +245,11 @@ def _extract_metres(ifc_bytes: bytes) -> dict[str, Any]:
                 "nb_spaces": nb_sp,
             })
 
-        # Fallback global si parcours par étage n'a rien donné
-        if total_sb == 0:
+        # Fallback global UNIQUEMENT si le parcours par étage n'a trouvé aucun
+        # espace (IFC sans hiérarchie IfcBuildingStorey → IfcSpace). Si des
+        # espaces ont déjà été comptés par étage, ne pas re-scanner : cela
+        # doublait le compteur nb_spaces quand le fichier n'a pas de quantités.
+        if total_sb == 0 and nb_spaces_total == 0:
             for sp in model.by_type("IfcSpace"):
                 nb_spaces_total += 1
                 qtos = util_el.get_psets(sp) or {}

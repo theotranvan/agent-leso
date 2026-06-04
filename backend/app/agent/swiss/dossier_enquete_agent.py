@@ -58,6 +58,35 @@ PIECES_DEPOT_APC_VD: list[dict[str, Any]] = [
 ]
 
 
+# Libellés lisibles des affectations (les valeurs internes utilisent des underscores)
+AFFECTATION_LABELS: dict[str, str] = {
+    "logement_individuel": "habitation individuelle",
+    "logement_collectif": "logement collectif",
+    "administration": "administration / bureau",
+    "ecole": "école",
+    "commerce": "commerce",
+    "restauration": "restauration",
+    "lieu_rassemblement": "lieu de rassemblement",
+    "hopital": "hôpital",
+    "industriel": "industrie",
+    "depot": "dépôt",
+    "sport": "installation sportive",
+}
+
+
+def _humanize_affectation(value: Any) -> str:
+    """Transforme la valeur interne d'affectation en libellé lisible."""
+    if not value:
+        return ""
+    return AFFECTATION_LABELS.get(str(value), str(value).replace("_", " "))
+
+
+def _cover_subtitle(canton: str, affectation: Any) -> str:
+    """Sous-titre de couverture, sans tiret orphelin si l'affectation est vide."""
+    affect = _humanize_affectation(affectation)
+    return f"Canton {canton} — {affect}" if affect else f"Canton {canton}"
+
+
 def _pieces_for_canton(canton: str) -> list[dict[str, Any]]:
     mapping = {
         "GE": PIECES_DEPOT_APA_GE,
@@ -206,7 +235,7 @@ Consignes :
         task_type="dossier_mise_enquete",
         system_prompt=system,
         user_content=user_content,
-        max_tokens=6000,
+        max_tokens=10000,
         temperature=0.15,
     )
 
@@ -256,7 +285,7 @@ engagent seuls leur responsabilité professionnelle sur la conformité du dossie
     pdf_bytes = render_pdf_from_html(
         body_html=markdown_to_html(full_md),
         title="Dossier de mise en enquête publique",
-        subtitle=f"Canton {canton} — {project_data.get('affectation', '')}",
+        subtitle=_cover_subtitle(canton, project_data.get("affectation")),
         project_name=project_name,
         project_address=project_data.get("address", ""),
         author=author,
@@ -338,6 +367,20 @@ def _match_docs_to_pieces(
     }
 
 
+def _fmt_val(v: Any) -> str:
+    """Affiche une valeur chiffrée, ou « À compléter » si la donnée manque (0/None).
+
+    Évite d'imprimer un « 0 » trompeur dans le tableau récapitulatif quand une
+    donnée n'a pas été renseignée (volume SIA, surface de terrain, etc.).
+    """
+    try:
+        if v is None or float(v) == 0:
+            return "À compléter"
+    except (TypeError, ValueError):
+        return str(v) if v else "À compléter"
+    return str(v)
+
+
 def _build_sia_451_table(project_data: dict[str, Any]) -> str:
     """Produit un tableau markdown SIA 416 (surfaces de référence)."""
     sre = project_data.get("sre_m2") or 0
@@ -345,19 +388,20 @@ def _build_sia_451_table(project_data: dict[str, Any]) -> str:
     terrain = project_data.get("terrain_m2") or 0
     surfaces = project_data.get("surfaces") or {}
 
-    su = surfaces.get("su_m2") or round(sre * 0.8, 1)
-    sb = surfaces.get("sb_m2") or round(sre * 1.05, 1)
-    sp = surfaces.get("sp_m2") or round(sre * 1.1, 1)
+    # SU/SB/SP : valeur fournie, sinon estimée depuis la SRE (uniquement si SRE connue)
+    su = surfaces.get("su_m2") or (round(sre * 0.8, 1) if sre else 0)
+    sb = surfaces.get("sb_m2") or (round(sre * 1.05, 1) if sre else 0)
+    sp = surfaces.get("sp_m2") or (round(sre * 1.1, 1) if sre else 0)
 
     lines = [
         "| Code | Grandeur | Unité | Valeur |",
         "|------|----------|-------|--------|",
-        f"| SP | Surface de plancher (SIA 416) | m² | {sp} |",
-        f"| SB | Surface brute de plancher | m² | {sb} |",
-        f"| SRE | Surface de référence énergétique (SIA 380/1) | m² | {sre} |",
-        f"| SU | Surface utile | m² | {su} |",
-        f"| V_SIA | Volume bâti selon SIA 416 | m³ | {volume} |",
-        f"| ST | Surface totale du terrain | m² | {terrain} |",
+        f"| SP | Surface de plancher (SIA 416) | m² | {_fmt_val(sp)} |",
+        f"| SB | Surface brute de plancher | m² | {_fmt_val(sb)} |",
+        f"| SRE | Surface de référence énergétique (SIA 380/1) | m² | {_fmt_val(sre)} |",
+        f"| SU | Surface utile | m² | {_fmt_val(su)} |",
+        f"| V_SIA | Volume bâti selon SIA 416 | m³ | {_fmt_val(volume)} |",
+        f"| ST | Surface totale du terrain | m² | {_fmt_val(terrain)} |",
     ]
 
     indices = project_data.get("indices") or {}

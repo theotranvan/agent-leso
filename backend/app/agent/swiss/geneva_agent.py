@@ -21,10 +21,13 @@ async def run_geneva_control(project_data: dict, project_name: str = "", author:
     canton = project_data.get("canton", "GE")
     checklist = checklist_for_canton(canton, project_data)
 
-    # V6 : contrôle urbanistique réel via knowledge_base si données dispo
+    # V6 : contrôle urbanistique réel via knowledge_base si données dispo.
+    # Le terrain peut arriver sous deux clés selon l'appelant (terrain_m2 côté
+    # formulaire dossier, surface_terrain_m2 historique) : on accepte les deux.
     urba_check = None
     zone_key = project_data.get("zone")
-    if zone_key and project_data.get("surface_terrain_m2"):
+    terrain_m2 = project_data.get("surface_terrain_m2") or project_data.get("terrain_m2")
+    if zone_key and terrain_m2:
         try:
             from app.knowledge_base.urbanisme.indices import (
                 check_conformite_urbanistique,
@@ -32,7 +35,7 @@ async def run_geneva_control(project_data: dict, project_name: str = "", author:
             urba_check = check_conformite_urbanistique(
                 canton=canton,
                 zone_key=zone_key,
-                surface_terrain_m2=float(project_data.get("surface_terrain_m2", 0)),
+                surface_terrain_m2=float(terrain_m2),
                 sbp_projetee_m2=float(project_data.get("sbp_projetee_m2", project_data.get("sre_m2", 0))),
                 emprise_sol_m2=float(project_data.get("emprise_sol_m2", 0)),
                 hauteur_corniche_m=float(project_data.get("hauteur_corniche_m", 0)),
@@ -86,7 +89,7 @@ Transformer cette checklist en RAPPORT PROFESSIONNEL en markdown :
         task_type="coordination_inter_lots",  # Sonnet pour raisonnement structuré
         system_prompt=system,
         user_content=user_content,
-        max_tokens=4096,
+        max_tokens=8000,
         temperature=0.1,
     )
 

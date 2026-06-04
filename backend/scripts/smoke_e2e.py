@@ -93,7 +93,6 @@ def main() -> int:
     # 2. /me
     status, me = _req("GET", f"{api}/api/auth/me", H)
     check("GET /api/auth/me (token accepté)", status == 200, f"HTTP {status} {me.get('detail','')}")
-    org_id = (me.get("organization") or {}).get("id") or me.get("organization_id")
 
     # 3. Crée un projet
     status, proj = _req("POST", f"{api}/api/projects", H, {
