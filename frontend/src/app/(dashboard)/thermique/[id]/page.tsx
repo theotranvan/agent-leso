@@ -24,6 +24,7 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
   const [engine, setEngine] = useState<'lesosai_stub' | 'lesosai_file'>('lesosai_file');
   const [authorName, setAuthorName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   const load = async () => {
     try {
@@ -111,7 +112,12 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
               <Input value={authorName} onChange={(e) => setAuthorName(e.target.value)} />
             </div>
           </div>
-          <Button onClick={handleRun} disabled={running}>
+          {editorDirty && (
+            <p className="text-xs text-amber-700 font-medium">
+              ⚠ La composition a des modifications non enregistrées — enregistrez d'abord ci-dessous.
+            </p>
+          )}
+          <Button onClick={handleRun} disabled={running || editorDirty}>
             {running ? 'Génération en cours...' : 'Lancer'}
           </Button>
 
@@ -242,7 +248,8 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
         key={model.updated_at || model.id}
         modelId={id}
         model={model}
-        onSaved={load}
+        onSaved={() => { setEditorDirty(false); load(); }}
+        onDirtyChange={setEditorDirty}
       />
     </div>
   );

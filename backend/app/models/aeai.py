@@ -31,6 +31,8 @@ class AEAIChecklistCreate(BaseModel):
     height_class: Optional[HeightClass] = None
     height_m: Optional[float] = None
     nb_occupants_max: Optional[int] = None
+    canton: Optional[str] = None
+    special_context: Optional[str] = None
 
 
 class AEAIChecklistUpdate(BaseModel):

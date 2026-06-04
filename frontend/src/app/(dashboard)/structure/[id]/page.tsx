@@ -1,12 +1,13 @@
 'use client';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download, Upload, Zap, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Download, Upload, Zap, ShieldCheck, Grid3x3 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
 
 export default function StructureDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +21,38 @@ export default function StructureDetailPage({ params }: { params: Promise<{ id: 
   const [generating, setGenerating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Saisie paramétrique de la trame (géométrie d'avant-projet)
+  const [geo, setGeo] = useState({
+    n_levels: '3', n_bays_x: '3', bay_x_m: '5.4', n_bays_y: '2', bay_y_m: '6.0',
+    story_height_m: '2.8', column_section: 'POT_30x30', beam_section: 'POU_30x50', material: 'C30/37',
+  });
+  const [geoBuilding, setGeoBuilding] = useState(false);
+  const [geoSummary, setGeoSummary] = useState<any>(null);
+
+  const handleGenerateGeometry = async () => {
+    setError(null);
+    setGeoBuilding(true);
+    try {
+      const r = await api.structure.generateGeometry(id, {
+        n_levels: Number(geo.n_levels),
+        n_bays_x: Number(geo.n_bays_x),
+        bay_x_m: Number(geo.bay_x_m),
+        n_bays_y: Number(geo.n_bays_y),
+        bay_y_m: Number(geo.bay_y_m),
+        story_height_m: Number(geo.story_height_m),
+        column_section: geo.column_section,
+        beam_section: geo.beam_section,
+        material: geo.material,
+      });
+      setGeoSummary(r.summary);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setGeoBuilding(false);
+    }
+  };
 
   const load = async () => {
     try {
@@ -79,6 +112,98 @@ export default function StructureDetailPage({ params }: { params: Promise<{ id: 
           {model.referentiel?.toUpperCase()} · Exposition {model.exposure_class} · Séisme {model.seismic_zone}
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Grid3x3 className="h-4 w-4" /> Étape 0 — Saisir la trame (géométrie d'avant-projet)
+          </CardTitle>
+          <CardDescription>
+            Décrivez la trame régulière du bâtiment : LESO génère nœuds, poteaux, poutres et appuis.
+            Optionnel — vous pouvez aussi partir d'un IFC (pré-BIM) ou bâtir la géométrie directement
+            dans votre logiciel. Le calcul de résistance reste fait dans Scia/RFEM.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Niveaux (étages)</Label>
+              <Input type="number" min="1" value={geo.n_levels}
+                onChange={(e) => setGeo({ ...geo, n_levels: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Hauteur d'étage (m)</Label>
+              <Input type="number" step="0.1" value={geo.story_height_m}
+                onChange={(e) => setGeo({ ...geo, story_height_m: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Matériau</Label>
+              <Select value={geo.material} onValueChange={(v) => setGeo({ ...geo, material: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['C25/30', 'C30/37', 'C35/45', 'S235', 'S355', 'GL24h'].map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Travées X (nb)</Label>
+              <Input type="number" min="1" value={geo.n_bays_x}
+                onChange={(e) => setGeo({ ...geo, n_bays_x: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Entraxe X (m)</Label>
+              <Input type="number" step="0.1" value={geo.bay_x_m}
+                onChange={(e) => setGeo({ ...geo, bay_x_m: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Section poteau</Label>
+              <Select value={geo.column_section} onValueChange={(v) => setGeo({ ...geo, column_section: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['POT_25x25', 'POT_30x30', 'HEB200'].map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Travées Y (nb)</Label>
+              <Input type="number" min="1" value={geo.n_bays_y}
+                onChange={(e) => setGeo({ ...geo, n_bays_y: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Entraxe Y (m)</Label>
+              <Input type="number" step="0.1" value={geo.bay_y_m}
+                onChange={(e) => setGeo({ ...geo, bay_y_m: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Section poutre</Label>
+              <Select value={geo.beam_section} onValueChange={(v) => setGeo({ ...geo, beam_section: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['POU_30x50', 'IPE200', 'HEB200'].map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button onClick={handleGenerateGeometry} disabled={geoBuilding} variant="outline">
+            <Grid3x3 className="h-4 w-4 mr-2" />
+            {geoBuilding ? 'Génération de la trame...' : 'Générer la géométrie'}
+          </Button>
+          {geoSummary && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div><strong>{geoSummary.nb_nodes}</strong> nœuds</div>
+              <div><strong>{geoSummary.nb_columns}</strong> poteaux</div>
+              <div><strong>{geoSummary.nb_beams}</strong> poutres</div>
+              <div><strong>{geoSummary.nb_supports}</strong> appuis</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -201,8 +326,9 @@ export default function StructureDetailPage({ params }: { params: Promise<{ id: 
             <div><p className="text-muted-foreground">Combinaisons</p><p className="font-medium">{(model.combinations || []).length}</p></div>
           </div>
           <p className="text-xs text-muted-foreground mt-4">
-            Édition graphique du modèle : à venir en V2.1. Pour l'instant, utilisez l'import BIM (pré-BIM)
-            ou la saisie directe dans votre logiciel de calcul après génération du SAF.
+            Utilisez la saisie paramétrique de la trame (étape 0 ci-dessus) pour générer une géométrie
+            d'avant-projet, l'import BIM (pré-BIM), ou la saisie directe dans votre logiciel après
+            génération du SAF. L'édition graphique nœud-par-nœud arrivera ultérieurement.
           </p>
         </CardContent>
       </Card>

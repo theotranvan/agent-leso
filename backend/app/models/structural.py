@@ -79,6 +79,19 @@ class StructuralModelInput(BaseModel):
     combinations: list[StructuralCombination] = Field(default_factory=list)
 
 
+class StructuralGeometryParams(BaseModel):
+    """Paramètres d'une trame régulière → génération de géométrie déterministe."""
+    n_levels: int = Field(3, ge=1, le=40)
+    n_bays_x: int = Field(3, ge=1, le=30)
+    bay_x_m: float = Field(5.4, gt=0, le=30)
+    n_bays_y: int = Field(2, ge=1, le=30)
+    bay_y_m: float = Field(6.0, gt=0, le=30)
+    story_height_m: float = Field(2.8, gt=0, le=12)
+    column_section: str = "POT_30x30"
+    beam_section: str = "POU_30x50"
+    material: str = "C30/37"
+
+
 class StructuralSafGenerateRequest(BaseModel):
     model_id: str
 

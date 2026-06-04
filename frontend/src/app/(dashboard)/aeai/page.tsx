@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AEAI_BUILDING_TYPES } from '@/lib/ch';
+import { AEAI_BUILDING_TYPES, CANTONS_ROMANDS } from '@/lib/ch';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
 import { PageHeader } from '@/components/ui/page-header';
 import { formatDate } from '@/lib/utils';
@@ -21,6 +21,8 @@ export default function AEAIPage() {
     building_type: 'habitation_faible',
     height_m: '',
     nb_occupants_max: '',
+    canton: 'GE',
+    special_context: '',
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +40,8 @@ export default function AEAIPage() {
         building_type: form.building_type,
         height_m: form.height_m ? Number(form.height_m) : null,
         nb_occupants_max: form.nb_occupants_max ? Number(form.nb_occupants_max) : null,
+        canton: form.canton || null,
+        special_context: form.special_context || null,
       };
       const r = await api.aeai.createChecklist(data);
       setActive(r);
@@ -121,6 +125,26 @@ export default function AEAIPage() {
                     onChange={(e) => setForm({ ...form, nb_occupants_max: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Canton</Label>
+                  <Select value={form.canton} onValueChange={(v) => setForm({ ...form, canton: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CANTONS_ROMANDS.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Contexte particulier (optionnel)</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="Ex : parking souterrain 2 niveaux, local poubelles, locaux vélos, toiture végétalisée"
+                  value={form.special_context}
+                  onChange={(e) => setForm({ ...form, special_context: e.target.value })}
+                />
               </div>
               {error && <div className="text-sm text-destructive">{error}</div>}
               <div className="flex gap-2">

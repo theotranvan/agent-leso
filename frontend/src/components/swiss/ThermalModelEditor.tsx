@@ -40,10 +40,12 @@ export function ThermalModelEditor({
   modelId,
   model,
   onSaved,
+  onDirtyChange,
 }: {
   modelId: string;
   model: any;
   onSaved: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [walls, setWalls] = useState<Row[]>(
     (model.walls || []).map((w: any) => ({
@@ -75,7 +77,7 @@ export function ThermalModelEditor({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const touch = () => { setDirty(true); setSaved(false); };
+  const touch = () => { setDirty(true); setSaved(false); onDirtyChange?.(true); };
 
   const num = (v: string): number | undefined => {
     if (v === '' || v === null || v === undefined) return undefined;
@@ -134,6 +136,7 @@ export function ThermalModelEditor({
       });
       setDirty(false);
       setSaved(true);
+      onDirtyChange?.(false);
       onSaved();
     } catch (e: any) {
       setError(e.message || 'Échec de l’enregistrement');
