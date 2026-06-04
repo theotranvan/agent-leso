@@ -267,8 +267,106 @@ def items_industriel() -> list[dict]:
     ]
 
 
-def build_checklist(building_type: str, height_m: float | None = None, nb_occupants: int | None = None) -> list[dict]:
-    """Factory principale : retourne la checklist AEAI appropriée."""
+# Autorité cantonale de protection incendie compétente (validation du dossier AEAI).
+_AUTORITE_CANTONALE = {
+    "GE": "OCAS / Police du feu de la Ville (Genève)",
+    "VD": "ECA Vaud (Établissement cantonal d'assurance)",
+    "NE": "ECAP Neuchâtel",
+    "FR": "ECAB Fribourg",
+    "VS": "Inspection cantonale du feu (Valais)",
+    "JU": "ECA Jura / Police du feu",
+    "BE": "GVB / AIB (Berne)",
+}
+
+# Mots-clés du contexte particulier → points de vigilance déterministes à ajouter.
+# Chaque entrée : (mots-clés, item). On n'invente rien : ce sont des rappels
+# standards AEAI, ajoutés seulement si le contexte les mentionne.
+_CONTEXT_RULES: list[tuple[tuple[str, ...], dict]] = [
+    (("parking", "souterrain", "garage", "véhicule", "vehicule"), {
+        "id": "aeai_ctx_parking",
+        "reference": "AEAI 15-15f / 18-15f",
+        "title": "Parking / sous-sol véhicules : compartimentage EI 90 et désenfumage",
+        "description": "Séparation coupe-feu avec les étages, ventilation de désenfumage dimensionnée, "
+                       "voies d'évacuation distinctes.",
+        "status": "A_VERIFIER",
+        "severity": "BLOQUANT",
+    }),
+    (("poubelle", "déchets", "dechets", "ordures"), {
+        "id": "aeai_ctx_dechets",
+        "reference": "AEAI 15-15f",
+        "title": "Local déchets : isolation coupe-feu et porte EI 30",
+        "description": "Local à charge calorifique élevée à compartimenter, porte résistante au feu.",
+        "status": "A_VERIFIER",
+        "severity": "IMPORTANT",
+    }),
+    (("vélo", "velo", "cave", "buanderie", "technique"), {
+        "id": "aeai_ctx_locaux_annexes",
+        "reference": "AEAI 15-15f",
+        "title": "Locaux annexes (vélos, caves, technique) compartimentés",
+        "description": "Locaux à risque séparés des voies d'évacuation par éléments coupe-feu adaptés.",
+        "status": "A_VERIFIER",
+        "severity": "IMPORTANT",
+    }),
+    (("toiture végétalisée", "toiture vegetalisee", "végétalisé", "vegetalise", "panneaux", "photovolt", "solaire"), {
+        "id": "aeai_ctx_toiture",
+        "reference": "AEAI 13-15f",
+        "title": "Toiture (végétalisée / panneaux) : matériaux et propagation en toiture",
+        "description": "Comportement au feu de la toiture et des installations en toiture, bandes coupe-feu.",
+        "status": "A_VERIFIER",
+        "severity": "IMPORTANT",
+    }),
+    (("commerce", "magasin", "restaurant", "rez commercial", "activité", "activite"), {
+        "id": "aeai_ctx_affectation_mixte",
+        "reference": "AEAI 16-15f",
+        "title": "Affectation mixte : séparation des affectations et évacuations propres",
+        "description": "Logement + activité : compartimentage entre affectations et issues indépendantes.",
+        "status": "A_VERIFIER",
+        "severity": "BLOQUANT",
+    }),
+]
+
+
+def _items_canton(canton: str | None) -> list[dict]:
+    if not canton:
+        return []
+    autorite = _AUTORITE_CANTONALE.get(canton.upper())
+    if not autorite:
+        return []
+    return [{
+        "id": "aeai_canton_validation",
+        "reference": "AEAI 11-15f",
+        "title": f"Validation par l'autorité cantonale : {autorite}",
+        "description": "Dossier de protection incendie à soumettre à l'autorité compétente du canton "
+                       f"{canton.upper()} selon la procédure locale (préavis / autorisation).",
+        "status": "A_VERIFIER",
+        "severity": "BLOQUANT",
+    }]
+
+
+def _items_context(special_context: str | None) -> list[dict]:
+    if not special_context:
+        return []
+    text = special_context.lower()
+    out: list[dict] = []
+    for keywords, item in _CONTEXT_RULES:
+        if any(kw in text for kw in keywords):
+            out.append(item)
+    return out
+
+
+def build_checklist(
+    building_type: str,
+    height_m: float | None = None,
+    nb_occupants: int | None = None,
+    canton: str | None = None,
+    special_context: str | None = None,
+) -> list[dict]:
+    """Factory principale : retourne la checklist AEAI appropriée.
+
+    `canton` et `special_context` enrichissent la liste de façon déterministe
+    (référence à l'autorité cantonale + points de vigilance selon le contexte).
+    Aucun appel LLM : les ajouts sont des rappels AEAI standards.
+    """
     dispatch = {
         "habitation_faible": items_habitation_faible,
         "habitation_moyenne": items_habitation_moyenne,
@@ -291,8 +389,18 @@ def build_checklist(building_type: str, height_m: float | None = None, nb_occupa
     import inspect
     sig = inspect.signature(fn)
     if "height_m" in sig.parameters:
-        return fn(height_m=height_m)
-    return fn()
+        items = fn(height_m=height_m)
+    else:
+        items = fn()
+
+    # Enrichissement déterministe (canton + contexte), sans doublon d'id.
+    extra = _items_canton(canton) + _items_context(special_context)
+    seen = {i["id"] for i in items}
+    for it in extra:
+        if it["id"] not in seen:
+            items = items + [it]
+            seen.add(it["id"])
+    return items
 
 
 # Alias rétro-compatible : l'agent AEAI importe `get_template_for_building`.

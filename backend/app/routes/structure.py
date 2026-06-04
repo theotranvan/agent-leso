@@ -11,7 +11,12 @@ from app.agent.swiss.structure_agent import (
 )
 from app.database import get_storage, get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user
-from app.models.structural import StructuralModelInput
+from app.models.structural import StructuralGeometryParams, StructuralModelInput
+from app.services.structure.geometry_builder import (
+    FrameParams,
+    build_frame_geometry,
+    geometry_summary,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/structure", tags=["structure"])
@@ -68,6 +73,49 @@ async def get_structural_model(
     if not m.data:
         raise HTTPException(status_code=404, detail="Modèle introuvable")
     return m.data
+
+
+@router.post("/models/{model_id}/geometry")
+async def generate_geometry(
+    model_id: str,
+    body: StructuralGeometryParams,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+):
+    """Génère une géométrie de portique régulier depuis une trame et l'enregistre.
+
+    Saisie d'avant-projet : produit nœuds/poteaux/poutres/appuis de façon
+    déterministe. Le calcul de résistance reste fait dans le logiciel de
+    l'ingénieur (Scia, RFEM…) après export SAF.
+    """
+    if user.role == "viewer":
+        raise HTTPException(status_code=403, detail="Droits insuffisants")
+
+    admin = get_supabase_admin()
+    m = admin.table("structural_models").select("id").eq("id", model_id).eq("organization_id", user.organization_id).maybe_single().execute()
+    if not m.data:
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+
+    try:
+        geometry = build_frame_geometry(FrameParams(**body.model_dump()))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    admin.table("structural_models").update({
+        "nodes": geometry["nodes"],
+        "members": geometry["members"],
+        "supports": geometry["supports"],
+        "status": "draft",
+    }).eq("id", model_id).eq("organization_id", user.organization_id).execute()
+
+    await audit_log(
+        action="structural_geometry_generated",
+        organization_id=user.organization_id,
+        user_id=user.id,
+        resource_type="structural_model",
+        resource_id=model_id,
+    )
+
+    return {"summary": geometry_summary(geometry), "params": body.model_dump()}
 
 
 @router.post("/models/{model_id}/generate-saf")

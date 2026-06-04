@@ -28,6 +28,8 @@ async def create_checklist(
         building_type=body.building_type,
         height_m=body.height_m,
         nb_occupants=body.nb_occupants_max,
+        canton=body.canton,
+        special_context=body.special_context,
     )
 
     admin = get_supabase_admin()

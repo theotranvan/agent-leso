@@ -546,6 +546,14 @@ export const api = {
       });
       return handle<any>(res);
     },
+    generateGeometry: async (id: string, params: any) => {
+      const res = await fetch(`${API_URL}/api/structure/models/${id}/geometry`, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      return handle<any>(res);
+    },
     generateSaf: async (id: string) => {
       const res = await fetch(`${API_URL}/api/structure/models/${id}/generate-saf`, {
         method: 'POST',
