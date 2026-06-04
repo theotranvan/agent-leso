@@ -140,10 +140,28 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
                 </Button>
               )}
               {result.results && (
-                <div className="grid grid-cols-3 gap-2 text-xs pt-2">
-                  <div><strong>Qh:</strong> {result.results.qh_mj_m2_an} MJ/m²/an</div>
-                  <div><strong>Qww:</strong> {result.results.qww_mj_m2_an} MJ/m²/an</div>
-                  <div><strong>E:</strong> {result.results.e_mj_m2_an} MJ/m²/an</div>
+                <div className="space-y-2 pt-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div><strong>Qh:</strong> {result.results.qh_mj_m2_an} MJ/m²/an</div>
+                    <div><strong>Qh limite:</strong> {result.results.qh_limite_mj_m2_an ?? '?'} MJ/m²/an</div>
+                    <div><strong>Qww:</strong> {result.results.qww_mj_m2_an} MJ/m²/an</div>
+                    <div><strong>E (chaleur):</strong> {result.results.e_mj_m2_an} MJ/m²/an</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {result.results.compliant !== null && result.results.compliant !== undefined && (
+                      <StatusBadge
+                        status={result.results.compliant ? 'CONFORME' : 'NON_CONFORME'}
+                        label={result.results.compliant ? 'Conforme (indicatif)' : 'Non conforme (indicatif)'}
+                      />
+                    )}
+                    {result.results.raw_results?.energy_class && (
+                      <span className="text-xs text-muted-foreground">Classe énergétique indicative&nbsp;: <strong>{result.results.raw_results.energy_class}</strong></span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Calcul indicatif d’avant-projet (bilan stationnaire degrés-jours). Le justificatif
+                    officiel SIA 380/1 se fait dans Lesosai (étape 2).
+                  </p>
                 </div>
               )}
               {result.warnings && result.warnings.length > 0 && (
