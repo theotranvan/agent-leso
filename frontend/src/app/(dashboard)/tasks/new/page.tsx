@@ -47,6 +47,14 @@ const TASK_CATEGORIES: TaskCategory[] = [
     fields: ['project_name', 'ifc_upload', 'author'],
   },
   {
+    id: 'coordination_inter_lots',
+    title: 'Coordination inter-lots',
+    description: 'Détecte les conflits géométriques entre maquettes IFC de différents lots (structure, CVC, sanitaire…). Rapport + BCF.',
+    icon: Layers, color: 'bg-indigo-50 text-indigo-700',
+    days_saved: '2-4 j économisés',
+    fields: ['project_name', 'ifc_multi_upload', 'author'],
+  },
+  {
     id: 'reponse_observations_autorite',
     title: 'Réponse aux observations',
     description: 'Lettre argumentée point par point depuis un courrier DALE, DGT ou CAMAC',
@@ -140,7 +148,7 @@ function NewTaskInner() {
   const { activeProject } = useActiveProject();
 
   const preselectedType = searchParams.get('type');
-  const preselectedProject = searchParams.get('project_id');
+  const preselectedProject = searchParams.get('project_id') || searchParams.get('project');
 
   const [selected, setSelected] = useState<TaskCategory | null>(
     preselectedType ? TASK_CATEGORIES.find((c) => c.id === preselectedType) || null : null
@@ -163,6 +171,16 @@ function NewTaskInner() {
     if (!projectId && activeProject?.id) setProjectId(activeProject.id);
   }, [activeProject, projectId]);
 
+  // Pré-remplit canton/affectation depuis le projet actif (adapte au canton)
+  useEffect(() => {
+    if (!activeProject) return;
+    setForm((f: any) => ({
+      ...f,
+      canton: f.canton ?? activeProject.canton ?? undefined,
+      affectation: f.affectation ?? activeProject.affectation ?? undefined,
+    }));
+  }, [activeProject]);
+
   // Redirect si l'utilisateur choisit un module
   useEffect(() => {
     if (!selected) return;
@@ -175,6 +193,10 @@ function NewTaskInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
+    if (selected.id === 'coordination_inter_lots' && (form.ifc_documents || []).length < 2) {
+      setError('La coordination nécessite au moins 2 maquettes IFC (une par lot).');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -303,6 +325,7 @@ function NewTaskInner() {
           onFileUpload={handleFileUpload}
           uploadedFileName={uploadedFileName}
           uploading={uploading}
+          projectId={projectId}
         />
 
         <div className="flex items-center gap-3 pt-2">
@@ -324,11 +347,11 @@ function NewTaskInner() {
 }
 
 function AdaptiveFields({
-  fields, form, setForm, onFileUpload, uploadedFileName, uploading,
+  fields, form, setForm, onFileUpload, uploadedFileName, uploading, projectId,
 }: {
   fields: string[]; form: any; setForm: (f: any) => void;
   onFileUpload: (files: File[]) => Promise<void>;
-  uploadedFileName: string; uploading: boolean;
+  uploadedFileName: string; uploading: boolean; projectId?: string;
 }) {
   const setField = (k: string, v: any) => setForm({ ...form, [k]: v });
 
@@ -634,7 +657,90 @@ function AdaptiveFields({
           />
         </div>
       )}
+
+      {fields.includes('ifc_multi_upload') && (
+        <MultiIfcUpload
+          projectId={projectId}
+          items={form.ifc_documents || []}
+          onChange={(items) => setField('ifc_documents', items)}
+        />
+      )}
     </>
+  );
+}
+
+type IfcLotEntry = { lot: string; document_id: string; filename: string };
+
+function MultiIfcUpload({
+  projectId, items, onChange,
+}: {
+  projectId?: string;
+  items: IfcLotEntry[];
+  onChange: (items: IfcLotEntry[]) => void;
+}) {
+  const [lot, setLot] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const addFile = async (files: File[]) => {
+    const f = files[0];
+    if (!f) return;
+    if (!lot.trim()) {
+      setErr('Indique le nom du lot avant d\'ajouter le fichier.');
+      return;
+    }
+    setErr(null);
+    setUploading(true);
+    try {
+      const r = await api.uploadDocument(f, projectId || undefined);
+      onChange([...items, { lot: lot.trim(), document_id: r.id || r.document_id, filename: f.name }]);
+      setLot('');
+    } catch (e: any) {
+      setErr(e?.message || 'Upload échoué');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="space-y-3">
+      <Label>Maquettes IFC par lot * (au moins 2)</Label>
+
+      {items.length > 0 && (
+        <ul className="space-y-1.5">
+          {items.map((it, i) => (
+            <li key={i} className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <span><strong>{it.lot}</strong> — {it.filename}</span>
+              <button type="button" onClick={() => remove(i)} className="text-xs text-red-600 hover:underline">
+                Retirer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="rounded-md border border-dashed p-3 space-y-2">
+        <Input
+          placeholder="Nom du lot (ex. Structure, CVC, Sanitaire)"
+          value={lot}
+          onChange={(e) => setLot(e.target.value)}
+        />
+        <Dropzone
+          accept=".ifc,.ifczip"
+          hint="Glisse l'IFC de ce lot (max 50 Mo)"
+          maxSizeMB={50}
+          uploading={uploading}
+          onFilesSelected={addFile}
+        />
+        {err && <p className="text-xs text-red-600">{err}</p>}
+      </div>
+
+      {items.length === 1 && (
+        <p className="text-xs text-amber-600">Ajoute au moins un 2e lot pour lancer la coordination.</p>
+      )}
+    </div>
   );
 }
 
@@ -668,18 +774,26 @@ function buildTaskPayload(
     p.specificities = form.specificities || '';
   } else if (taskType === 'metres_automatiques_ifc') {
     p.ifc_document_id = uploadedDocId;
+  } else if (taskType === 'coordination_inter_lots') {
+    p.ifc_documents = (form.ifc_documents || []).map((d: any) => ({
+      lot: d.lot, document_id: d.document_id,
+    }));
   } else if (taskType === 'reponse_observations_autorite') {
-    p.autorite_pdf_document_id = uploadedDocId;
-    p.project_data = { canton: form.canton, address: form.address };
-  } else if (taskType === 'simulation_energetique_rapide') {
-    p.programme = {
-      canton: form.canton || 'GE',
-      affectation: form.affectation,
+    // L'agent attend observations_document_id + project_context (pas project_data)
+    p.observations_document_id = uploadedDocId;
+    p.project_context = {
+      canton: form.canton,
       sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
-      standard: form.standard || 'sia_380_1_neuf',
-      heating_vector: form.heating_vector || 'chauffage_distance',
-      facteur_forme: form.facteur_forme || 'standard',
     };
+    p.project_address = form.address || '';
+  } else if (taskType === 'simulation_energetique_rapide') {
+    // L'agent lit ces champs à plat dans input_params (pas sous "programme")
+    p.canton = form.canton || 'GE';
+    p.affectation = form.affectation;
+    p.sre_m2 = form.sre_m2 ? Number(form.sre_m2) : undefined;
+    p.standard = form.standard || 'sia_380_1_neuf';
+    p.heating_vector = form.heating_vector || 'chauffage_distance';
+    p.facteur_forme = form.facteur_forme || 'standard';
   } else if (taskType === 'redaction_cctp') {
     Object.assign(p, {
       lot: form.lot, type_ouvrage: form.type_ouvrage,
@@ -687,7 +801,13 @@ function buildTaskPayload(
       contraintes: form.contraintes,
     });
   } else if (taskType === 'chiffrage_dpgf') {
-    Object.assign(p, { lot: form.lot, surface: form.surface, notes: form.notes });
+    // L'agent chiffre à partir de metre_text (ou metre_document_id), pas de
+    // champs surface/notes isolés : on compose un métré minimal lisible.
+    p.lot = form.lot;
+    const metreLines: string[] = [];
+    if (form.surface) metreLines.push(`Surface concernée : ${form.surface} m²`);
+    if (form.notes) metreLines.push(String(form.notes));
+    if (metreLines.length) p.metre_text = metreLines.join('\n');
   } else if (taskType === 'controle_reglementaire_geneve') {
     p.project_data = {
       canton: form.canton, address: form.address,
@@ -703,11 +823,13 @@ function buildTaskPayload(
       special_context: form.special_context || '',
     });
   } else if (taskType === 'compte_rendu_reunion') {
-    Object.assign(p, {
-      meeting_title: form.meeting_title,
-      participants: form.participants,
-      notes: form.notes,
-    });
+    // L'agent lit "objet" (pas meeting_title) et itère sur participants :
+    // il faut une LISTE, sinon une string serait parcourue caractère par caractère.
+    p.objet = form.meeting_title || 'Réunion de projet';
+    p.participants = form.participants
+      ? String(form.participants).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    p.notes = form.notes;
   }
 
   return base;

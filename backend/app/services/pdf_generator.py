@@ -30,7 +30,7 @@ BASE_CSS = """
         font-family: 'Helvetica', 'Arial', sans-serif;
     }
     @bottom-left {
-        content: "Document généré par BET Agent";
+        content: "Document généré par LESO";
         font-size: 8pt;
         color: #a3a3a3;
         font-family: 'Helvetica', 'Arial', sans-serif;
@@ -98,7 +98,7 @@ tr:nth-child(even) td { background: #fafafa; }
 COVER_TEMPLATE = """
 <div class="cover">
     {% if logo_html %}{{ logo_html|safe }}{% endif %}
-    <div style="font-size: 10pt; color: #737373; margin-bottom: 2cm;">{{ footer_org|default("BET Agent — Bureau d'Études Techniques") }}</div>
+    <div style="font-size: 10pt; color: #737373; margin-bottom: 2cm;">{{ footer_org|default("LESO — Bureau d'Études Techniques") }}</div>
     <h1>{{ title }}</h1>
     <div class="subtitle">{{ subtitle }}</div>
     <div class="meta">
@@ -136,7 +136,7 @@ def render_pdf_from_html(
     # Charte client : surcharge CSS des couleurs + logo
     branding_css = ""
     logo_html = ""
-    footer_org = "BET Agent — Bureau d'Études Techniques"
+    footer_org = "LESO — Bureau d'Études Techniques"
     if branding:
         primary = branding.get("primary_color", "#0a0a0a")
         accent = branding.get("accent_color", "#171717")

@@ -1,7 +1,21 @@
 """Modèles Pydantic pour le module thermique."""
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Plages physiques admissibles — garde-fous pour refuser une saisie aberrante
+# (valeur négative, nulle ou hors de toute réalité bâtie) plutôt que de produire
+# un calcul faux silencieusement.
+_U_VALUE_MAX = 10.0   # W/m²·K (un mur réel : ~0.1 à 3 ; mur passoire ancien < 6)
+
+
+def _validate_u_value(v: Optional[float]) -> Optional[float]:
+    if v is not None and not (0 < v <= _U_VALUE_MAX):
+        raise ValueError(
+            f"u_value doit être dans l'intervalle ]0 ; {_U_VALUE_MAX}] W/m²·K "
+            f"(reçu {v})"
+        )
+    return v
 
 
 class ThermalZone(BaseModel):
@@ -27,6 +41,8 @@ class Wall(BaseModel):
     u_value: Optional[float] = None
     layers: list[WallLayer] = Field(default_factory=list)
 
+    _v_u = field_validator("u_value")(_validate_u_value)
+
 
 class Opening(BaseModel):
     id: Optional[str] = None
@@ -35,6 +51,16 @@ class Opening(BaseModel):
     u_value: Optional[float] = None
     g_value: Optional[float] = None
     orientation: Optional[str] = None
+
+    _v_u = field_validator("u_value")(_validate_u_value)
+
+    @field_validator("g_value")
+    @classmethod
+    def _check_g(cls, v: Optional[float]) -> Optional[float]:
+        # Facteur solaire g : grandeur sans dimension entre 0 et 1.
+        if v is not None and not (0 <= v <= 1):
+            raise ValueError(f"g_value doit être dans [0 ; 1] (reçu {v})")
+        return v
 
 
 class ThermalBridge(BaseModel):
@@ -64,6 +90,21 @@ class ThermalModelInput(BaseModel):
     thermal_bridges: list[ThermalBridge] = Field(default_factory=list)
     systems: ThermalSystems = Field(default_factory=ThermalSystems)
     hypotheses: dict = Field(default_factory=dict)
+
+
+class ThermalModelPatch(BaseModel):
+    """Mise à jour partielle de la composition d'un modèle (éditeur V2.1).
+
+    Seuls les champs fournis (non None) sont écrits. Les listes vides sont
+    significatives : elles permettent de vider une section.
+    """
+    name: Optional[str] = None
+    zones: Optional[list[ThermalZone]] = None
+    walls: Optional[list[Wall]] = None
+    openings: Optional[list[Opening]] = None
+    thermal_bridges: Optional[list[ThermalBridge]] = None
+    systems: Optional[ThermalSystems] = None
+    hypotheses: Optional[dict] = None
 
 
 class ThermalRunRequest(BaseModel):

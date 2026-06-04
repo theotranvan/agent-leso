@@ -4,7 +4,7 @@ Source méthodologique : règlements communaux types, LATC (VD), LCI/LDTR (GE),
 guide CAMAC. Ces indices sont des références indicatives qui DOIVENT être
 validés au cas par cas avec le règlement communal applicable.
 
-Utilité dans BET Agent :
+Utilité dans LESO :
   - Dossier de mise en enquête : calcul automatique IUS/IBUS/CUS, contrôle conformité
   - Contrôle réglementaire : alerte si dépassement
   - Simulation rapide : choix de la typologie selon zone

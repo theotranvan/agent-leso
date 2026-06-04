@@ -1,4 +1,5 @@
 'use client';
+import { LogoMark } from '@/components/brand/logo';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, UserPlus } from 'lucide-react';
@@ -56,8 +57,8 @@ export default function AcceptInvitePage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <LogoMark className="h-8 w-8" />
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Rejoindre l'équipe</CardTitle>
           <CardDescription>

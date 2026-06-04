@@ -62,6 +62,10 @@ services:
         sync: false
       - key: BACKEND_URL
         sync: false
+      # CORS : laisser vide/non défini = "*" (permissif). Pour verrouiller en
+      # prod, mettre l'URL exacte du front, ex: https://agent-leso.vercel.app
+      - key: ALLOWED_ORIGINS
+        sync: false
 
   # Worker ARQ (tâches async + cron)
   - type: worker

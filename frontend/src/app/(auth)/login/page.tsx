@@ -1,4 +1,5 @@
 'use client';
+import { LogoMark } from '@/components/brand/logo';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -41,8 +42,8 @@ function LoginForm() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center font-bold">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <LogoMark className="h-8 w-8" />
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Connexion</CardTitle>
           <CardDescription>Accédez à votre espace bureau d'études</CardDescription>

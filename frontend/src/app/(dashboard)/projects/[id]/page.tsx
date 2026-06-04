@@ -9,12 +9,16 @@ import {
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskStatusBadge } from '@/components/ui/task-status';
 import { Skeleton, SkeletonListItem } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Banner } from '@/components/ui/banner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Dropzone } from '@/components/ui/dropzone';
+import { CANTONS_ROMANDS, AFFECTATIONS_SIA } from '@/lib/ch';
 import { TASK_TYPE_LABELS, formatDate, formatDateTime, formatBytes } from '@/lib/utils';
 import { useActiveProject } from '@/lib/active-project';
 import { ProjectJourney } from '@/components/project/project-journey';
@@ -33,6 +37,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('journey');
   const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const fetchAll = async () => {
     try {
@@ -124,12 +129,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {project.sre_m2 && <span>{project.sre_m2} m² SRE</span>}
           </div>
         </div>
-        <Link href={`/tasks/new?project_id=${project.id}`}>
-          <Button className="gap-2 shrink-0">
-            <Plus className="h-4 w-4" /> Nouvelle tâche
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
+            Modifier
           </Button>
-        </Link>
+          <Link href={`/tasks/new?project_id=${project.id}`}>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" /> Nouvelle tâche
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      {editing && (
+        <EditProjectForm
+          project={project}
+          onCancel={() => setEditing(false)}
+          onSaved={async () => { setEditing(false); await fetchAll(); }}
+        />
+      )}
 
       {/* Tabs */}
       <div className="border-b">
@@ -150,7 +168,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tab content */}
-      {tab === 'journey' && <ProjectJourney projectId={id} />}
+      {tab === 'journey' && (
+        <ProjectJourney projectId={id} onEditProject={() => setEditing(true)} />
+      )}
       {tab === 'tasks' && <TasksTab tasks={tasks} projectId={id} />}
       {tab === 'documents' && (
         <DocumentsTab
@@ -184,6 +204,94 @@ function TabButton({
       )}
       {active && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
     </button>
+  );
+}
+
+function EditProjectForm({
+  project, onCancel, onSaved,
+}: {
+  project: any;
+  onCancel: () => void;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [form, setForm] = useState({
+    name: project.name || '',
+    type_ouvrage: project.type_ouvrage || '',
+    address: project.address || '',
+    canton: project.canton || 'GE',
+    affectation: project.affectation || 'logement_collectif',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setErr(null);
+    try {
+      await api.updateProject(project.id, form);
+      await onSaved();
+    } catch (e: any) {
+      setErr(e?.userMessage || e?.message || 'Échec de l’enregistrement');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <h2 className="text-sm font-medium mb-3">Données du projet</h2>
+      <form onSubmit={save} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Nom du projet *</Label>
+            <Input required value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Type d&apos;ouvrage</Label>
+            <Input placeholder="Logement, bureau, ERP…" value={form.type_ouvrage}
+              onChange={(e) => setForm({ ...form, type_ouvrage: e.target.value })} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Adresse</Label>
+          <Input value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Canton</Label>
+            <Select value={form.canton} onValueChange={(v) => setForm({ ...form, canton: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CANTONS_ROMANDS.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Affectation</Label>
+            <Select value={form.affectation} onValueChange={(v) => setForm({ ...form, affectation: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {AFFECTATIONS_SIA.map((a) => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {err && <div className="text-sm text-destructive">{err}</div>}
+        <div className="flex gap-2">
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel}>Annuler</Button>
+        </div>
+      </form>
+    </div>
   );
 }
 

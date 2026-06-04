@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Check, ExternalLink } from 'lucide-react';
+import { Check, ExternalLink, Lock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,6 +64,8 @@ export default function BillingPage() {
   if (loading) return <div className="text-muted-foreground">Chargement...</div>;
 
   const quotaPct = status ? Math.round((status.tasks_used_this_month / Math.max(status.tasks_limit, 1)) * 100) : 0;
+  const betaMode = status?.beta_mode !== false; // par défaut bêta tant que non démenti
+  const contact = status?.billing_contact || 'theo.cours34@gmail.com';
 
   return (
     <div className="space-y-8">
@@ -71,6 +73,25 @@ export default function BillingPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Facturation</h1>
         <p className="text-sm text-muted-foreground mt-1">Gérez votre abonnement et consultez votre consommation</p>
       </div>
+
+      {betaMode && (
+        <Card className="border-amber-300 bg-amber-50/60">
+          <CardContent className="flex items-start gap-3 py-4 text-sm">
+            <Lock className="h-4 w-4 mt-0.5 shrink-0 text-amber-700" />
+            <div>
+              <p className="font-medium text-amber-900">Paiement en ligne en cours de déploiement</p>
+              <p className="text-amber-800 mt-0.5">
+                Pendant la bêta, le règlement et le changement de forfait se font directement avec nous —
+                écrivez à{' '}
+                <a href={`mailto:${contact}?subject=Forfait%20LESO`} className="font-medium underline">
+                  {contact}
+                </a>
+                . Les boutons de paiement seront activés à la sortie de bêta.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -83,7 +104,7 @@ export default function BillingPage() {
           <Progress value={quotaPct} />
           <div className="flex justify-between items-center">
             <p className="text-xs text-muted-foreground">{quotaPct}% du quota consommé</p>
-            {status?.stripe_subscription_id && (
+            {!betaMode && status?.stripe_subscription_id && (
               <Button variant="outline" size="sm" onClick={handlePortal}>
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Gérer l'abonnement (Stripe)
@@ -124,20 +145,27 @@ export default function BillingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button
-                    className="w-full"
-                    variant={isCurrent ? 'outline' : plan.highlight ? 'default' : 'outline'}
-                    disabled={isCurrent || upgrading !== null}
-                    onClick={() => handleUpgrade(plan.id as any)}
-                  >
-                    {isCurrent
-                      ? 'Plan actuel'
-                      : upgrading === plan.id
-                        ? 'Redirection...'
-                        : status?.stripe_subscription_id
-                          ? 'Changer pour ce plan'
-                          : 'Choisir ce plan'}
-                  </Button>
+                  {betaMode ? (
+                    <Button className="w-full" variant="outline" disabled>
+                      <Lock className="h-4 w-4 mr-2" />
+                      {isCurrent ? 'Plan actuel' : 'Bientôt disponible'}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      variant={isCurrent ? 'outline' : plan.highlight ? 'default' : 'outline'}
+                      disabled={isCurrent || upgrading !== null}
+                      onClick={() => handleUpgrade(plan.id as any)}
+                    >
+                      {isCurrent
+                        ? 'Plan actuel'
+                        : upgrading === plan.id
+                          ? 'Redirection...'
+                          : status?.stripe_subscription_id
+                            ? 'Changer pour ce plan'
+                            : 'Choisir ce plan'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

@@ -57,8 +57,13 @@ async def execute_checklist(task: dict[str, Any]) -> dict[str, Any]:
                 })
         template = {"building_type": building_type, "items": base_items, "source": "knowledge_base_calibree"}
     else:
-        # Fallback ancien template
-        template = get_template_for_building(building_type, height_m=height_m, nb_occupants=nb_occupants)
+        # Fallback : build_checklist renvoie une list[dict] d'items, on
+        # l'enveloppe dans la même structure que la branche knowledge_base.
+        fallback_items = get_template_for_building(
+            building_type, height_m=height_m, nb_occupants=nb_occupants,
+        )
+        template = {"building_type": building_type, "items": fallback_items,
+                    "source": "template_generique"}
 
     base_items = template["items"]
 
@@ -103,12 +108,27 @@ Maximum 8 items supplémentaires. Les codes doivent commencer par AEAI-X pour le
             logger.warning("Enrichissement LLM checklist AEAI échoué : %s", exc)
 
     # Création en DB
+    # Création en DB. La table stocke une classe de hauteur (height_class),
+    # pas une valeur en mètres : on convertit selon les seuils AEAI.
+    def _height_class(h):
+        if h is None:
+            return None
+        try:
+            h = float(h)
+        except (TypeError, ValueError):
+            return None
+        if h < 11:
+            return "faible_<11m"
+        if h <= 30:
+            return "moyenne_11-30m"
+        return "elevee_>30m"
+
     admin = get_supabase_admin()
     created = admin.table("aeai_checklists").insert({
         "organization_id": org_id,
         "project_id": project_id,
         "building_type": building_type,
-        "height_m": height_m,
+        "height_class": _height_class(height_m),
         "nb_occupants_max": nb_occupants,
         "items": base_items,
         "status": "draft",

@@ -53,7 +53,8 @@ class PreBIMGenerator:
         self.confidence: float = 1.0
         self.model = self._create_base_model()
         self.owner_history = self._create_owner_history()
-        self.context = self._create_geometric_context()
+        # Le contexte géométrique est créé dans build(), APRÈS l'IfcProject :
+        # context.add_context exige qu'un IfcProject existe déjà, sinon IndexError.
 
     def _create_base_model(self) -> ifcopenshell.file:
         return ifcopenshell.api.run("project.create_file", version="IFC4")
@@ -112,14 +113,14 @@ class PreBIMGenerator:
             "root.create_entity", self.model, ifc_class="IfcSite",
             name=spec.get("site_name", "Site"),
         )
-        ifcopenshell.api.run("aggregate.assign_object", self.model, relating_object=project, product=site)
+        ifcopenshell.api.run("aggregate.assign_object", self.model, relating_object=project, products=[site])
 
         # Bâtiment
         building = ifcopenshell.api.run(
             "root.create_entity", self.model, ifc_class="IfcBuilding",
             name=spec.get("building_name", "Bâtiment A"),
         )
-        ifcopenshell.api.run("aggregate.assign_object", self.model, relating_object=site, product=building)
+        ifcopenshell.api.run("aggregate.assign_object", self.model, relating_object=site, products=[building])
 
         # Étages
         storeys_created = []
@@ -140,7 +141,7 @@ class PreBIMGenerator:
                 logger.debug(f"Élévation non appliquée : {e}")
             ifcopenshell.api.run(
                 "aggregate.assign_object", self.model,
-                relating_object=building, product=storey,
+                relating_object=building, products=[storey],
             )
             storeys_created.append((storey, st_spec))
 
@@ -216,7 +217,7 @@ class PreBIMGenerator:
             )
             ifcopenshell.api.run(
                 "spatial.assign_container", self.model,
-                relating_structure=storey, product=wall,
+                relating_structure=storey, products=[wall],
             )
             wall_area = length_m * height_m
 
@@ -251,7 +252,7 @@ class PreBIMGenerator:
                 )
                 ifcopenshell.api.run(
                     "spatial.assign_container", self.model,
-                    relating_structure=storey, product=window,
+                    relating_structure=storey, products=[window],
                 )
                 pset_w = ifcopenshell.api.run(
                     "pset.add_pset", self.model, product=window, name="Pset_WindowCommon"
@@ -280,9 +281,11 @@ class PreBIMGenerator:
             "root.create_entity", self.model, ifc_class="IfcSpace",
             name=f"Espace {st_spec.get('name', '')}",
         )
+        # Un IfcSpace est un élément spatial : il s'AGRÈGE dans l'étage
+        # (IfcRelAggregates), il ne se "contient" pas comme un produit physique.
         ifcopenshell.api.run(
-            "spatial.assign_container", self.model,
-            relating_structure=storey, product=space,
+            "aggregate.assign_object", self.model,
+            relating_object=storey, products=[space],
         )
         # Pset surface
         pset_s = ifcopenshell.api.run(
@@ -315,7 +318,7 @@ class PreBIMGenerator:
         )
         ifcopenshell.api.run(
             "spatial.assign_container", self.model,
-            relating_structure=storey, product=slab,
+            relating_structure=storey, products=[slab],
         )
         slab_comp_key = (envelope.get("slab_ground_composition_key", "dalle_sur_terrain_neuf")
                          if st_spec.get("elevation_m", 0) == 0
@@ -340,7 +343,7 @@ class PreBIMGenerator:
         )
         ifcopenshell.api.run(
             "spatial.assign_container", self.model,
-            relating_structure=storey, product=roof,
+            relating_structure=storey, products=[roof],
         )
         comp_key = envelope.get("roof_composition_key", "toit_neuf_perform")
         comp = get_composition(comp_key) or {"u_value": 0.15}
@@ -390,7 +393,7 @@ class PreBIMGenerator:
                 "Géométrie orthogonale simple (rectangle de base)",
                 "Zones thermiques = 1 par étage (pas de zonage pièce à pièce)",
                 "Pas de décrochements, balcons, attiques automatiques",
-                "Compositions issues de bibliothèque standard BET Agent",
+                "Compositions issues de bibliothèque standard LESO",
                 "Fenêtres distribuées par ratio orientation (pas de positionnement réel)",
             ],
             "next_steps": [

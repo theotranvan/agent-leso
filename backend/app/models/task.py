@@ -15,15 +15,17 @@ TaskType = Literal[
     "redaction_cctp", "memoire_technique", "chiffrage_dpgf", "chiffrage_dqe",
     "coordination_inter_lots", "dossier_permis_construire",
     "analyse_ifc", "doe_compilation",
-    "controle_reglementaire_geneve", "aeai_checklist_generation",
+    "controle_reglementaire_geneve", "controle_reglementaire_vaud",
+    "controle_reglementaire_canton", "aeai_checklist_generation",
     "aeai_rapport", "descriptif_can_sia_451",
-    "note_calcul_sia_260_267", "justificatif_sia_380_1",
-    "idc_geneve_rapport", "prebim_generation",
+    "note_calcul_sia_260_267", "justificatif_sia_380_1", "calcul_cecb",
+    "idc_geneve_rapport", "prebim_generation", "prebim_extraction",
+    "rapport_chantier",
     # Haiku - léger
     "veille_reglementaire", "resume_document", "compte_rendu_reunion",
     "alerte_norme", "email_notification", "extraction_metadata",
     "simulation_energetique_rapide", "idc_extraction_facture",
-    "chiffrage_dqe", "veille_romande",
+    "veille_romande",
 ]
 
 

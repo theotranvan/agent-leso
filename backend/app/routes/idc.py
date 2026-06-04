@@ -258,7 +258,7 @@ def _build_idc_form_md(building: dict, declaration: dict, calc: dict) -> str:
 
 ## Notes
 
-Document préparatoire généré par BET Agent. À vérifier et signer par un responsable qualifié avant transmission à l'OCEN.
+Document préparatoire généré par LESO. À vérifier et signer par un responsable qualifié avant transmission à l'OCEN.
 
 Références : LEn-GE (L 2 30), REn-GE (L 2 30.01). Se référer toujours aux documents officiels OCEN en vigueur.
 """

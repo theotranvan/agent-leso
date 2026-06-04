@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   projectId: string;
+  onEditProject?: () => void;
 }
 
 const STATUS_META: Record<string, { color: string; bg: string }> = {
@@ -17,11 +18,48 @@ const STATUS_META: Record<string, { color: string; bg: string }> = {
   not_started: { color: '#9ca3af', bg: '#f3f4f6' },
 };
 
-export function ProjectJourney({ projectId }: Props) {
+// Chaque action mène à sa page dédiée quand elle existe (interface riche),
+// sinon au formulaire générique pré-sélectionné sur ce type.
+const TASK_TYPE_ROUTES: Record<string, string> = {
+  justificatif_sia_380_1: '/thermique',
+  note_calcul_sia_260_267: '/structure',
+  idc_geneve_rapport: '/idc',
+  idc_extraction_facture: '/idc',
+  aeai_checklist_generation: '/aeai',
+  aeai_rapport: '/aeai',
+  metres_automatiques_ifc: '/metres',
+  simulation_energetique_rapide: '/simulation-rapide',
+  prebim_generation: '/bim',
+  dossier_mise_enquete: '/dossier-enquete',
+  reponse_observations_autorite: '/observations',
+  veille_romande: '/veille',
+};
+
+export function ProjectJourney({ projectId, onEditProject }: Props) {
   const router = useRouter();
   const [state, setState] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportDossier = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await api.exportDossier(projectId, true);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dossier-${projectId}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportError(e?.userMessage || e?.message || 'Export impossible');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     api.getProjectJourney(projectId)
@@ -40,8 +78,21 @@ export function ProjectJourney({ projectId }: Props) {
   if (!state) return null;
 
   const startAction = (taskType: string) => {
-    if (taskType === 'project_setup') return;
-    router.push(`/tasks/new?type=${taskType}&project=${projectId}`);
+    if (taskType === 'project_setup') {
+      onEditProject?.();
+      return;
+    }
+    const dedicated = TASK_TYPE_ROUTES[taskType];
+    if (dedicated) {
+      router.push(`${dedicated}?project=${projectId}`);
+      return;
+    }
+    // Le formulaire générique ne connaît que controle_reglementaire_geneve
+    // (canton sélectionnable) : on y mappe toutes les variantes cantonales.
+    const formType = taskType.startsWith('controle_reglementaire_')
+      ? 'controle_reglementaire_geneve'
+      : taskType;
+    router.push(`/tasks/new?type=${formType}&project=${projectId}`);
   };
 
   return (
@@ -55,13 +106,18 @@ export function ProjectJourney({ projectId }: Props) {
               {state.global_progress}% des phases principales complétées
             </div>
           </div>
-          <a
-            href={api.exportDossierUrl(projectId, true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm hover:bg-secondary"
+          <button
+            type="button"
+            onClick={handleExportDossier}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm hover:bg-secondary disabled:opacity-60"
           >
-            <Download className="h-3.5 w-3.5" /> Dossier complet
-          </a>
+            <Download className="h-3.5 w-3.5" /> {exporting ? 'Préparation…' : 'Dossier complet'}
+          </button>
         </div>
+        {exportError && (
+          <p className="mt-2 text-xs text-destructive">{exportError}</p>
+        )}
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/60">
           <div className="h-full rounded-full bg-primary transition-all"
             style={{ width: `${state.global_progress}%` }} />
@@ -140,7 +196,14 @@ export function ProjectJourney({ projectId }: Props) {
                             <div className="text-xs text-amber-600">{action.advisory}</div>
                           )}
                         </div>
-                        {action.task_type !== 'project_setup' && !action.done && (
+                        {action.task_type === 'project_setup' ? (
+                          <button
+                            onClick={() => startAction(action.task_type)}
+                            className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-secondary"
+                          >
+                            {action.done ? 'Modifier' : 'Compléter'}
+                          </button>
+                        ) : !action.done && (
                           <button
                             onClick={() => startAction(action.task_type)}
                             className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-secondary"

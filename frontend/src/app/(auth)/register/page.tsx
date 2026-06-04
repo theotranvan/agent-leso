@@ -1,4 +1,5 @@
 'use client';
+import { LogoMark } from '@/components/brand/logo';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -87,8 +88,8 @@ export default function RegisterPage() {
       <Card className="w-full max-w-xl">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center font-bold">B</div>
-            <span className="font-semibold">BET Agent</span>
+            <LogoMark className="h-8 w-8" />
+            <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Créer un compte</CardTitle>
           <CardDescription>Plan Starter {planPrice} / mois · 500 tâches</CardDescription>

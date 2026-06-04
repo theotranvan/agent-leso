@@ -394,11 +394,11 @@ async def regenerate_task(
         "previous_output_preview": (task.data.get("result_preview") or "")[:2000],
         "upgrade_model": body.upgrade_model,
         "requested_at": _now_iso(),
-        "requested_by": user.user_id,
+        "requested_by": user.id,
     }
 
     admin.table("tasks").update({
-        "status": "queued",
+        "status": "pending",
         "error_message": None,
         "input_params": input_params,
         "regeneration_count": next_attempt,
@@ -411,7 +411,7 @@ async def regenerate_task(
     await audit_log(
         action="task_regenerated",
         organization_id=user.organization_id,
-        user_id=user.user_id,
+        user_id=user.id,
         resource_type="task",
         resource_id=task_id,
         metadata={

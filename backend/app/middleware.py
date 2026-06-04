@@ -28,10 +28,6 @@ class AuthUser(BaseModel):
     access_token: str
 
 
-# Cache des clés publiques JWKS de Supabase (nouveau format de signature ECC/RSA).
-# Depuis la migration "JWT Signing Keys", les access tokens peuvent être signés
-# en ES256/RS256 (asymétrique) au lieu de HS256 (secret partagé). On vérifie donc
-# selon l'algorithme du token : HS256 → secret legacy ; sinon → clés publiques JWKS.
 _jwks_cache: dict | None = None
 
 
@@ -54,14 +50,11 @@ def verify_supabase_jwt(token: str) -> dict:
                 algorithms=["HS256"], audience="authenticated",
             )
 
-        # Token signé avec une clé asymétrique (nouveau format Supabase) :
-        # vérification via les clés publiques JWKS du projet.
         try:
             return jwt.decode(
                 token, _get_jwks(), algorithms=[alg], audience="authenticated",
             )
         except JWTError:
-            # Clé peut-être tournée depuis la mise en cache : on rafraîchit une fois.
             return jwt.decode(
                 token, _get_jwks(force_refresh=True), algorithms=[alg],
                 audience="authenticated",
@@ -124,7 +117,13 @@ async def check_quota(user: AuthUser) -> None:
     if not org.data:
         raise HTTPException(status_code=403, detail="Organisation introuvable")
     if not org.data.get("active", True):
-        raise HTTPException(status_code=403, detail="Organisation désactivée")
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Compte en attente d'activation. Pendant la bêta, l'activation "
+                f"d'un forfait se fait sur demande : {settings.BETA_BILLING_CONTACT_EMAIL}"
+            ),
+        )
     used = org.data.get("tasks_used_this_month", 0)
     limit = org.data.get("tasks_limit", 0)
     if used >= limit:

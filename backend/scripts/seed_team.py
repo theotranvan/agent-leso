@@ -1,20 +1,23 @@
 """Crée une organisation + son équipe d'un coup, sans passer par les invitations email.
 
 Pour Conti : 1 organisation, 8 ingénieurs, tous avec accès au même espace
-(mêmes projets). Tous les membres ont le rôle 'member' (accès complet de travail).
+(mêmes projets). Le 1er user est admin (peut gérer l'équipe), les autres sont
+membres (peuvent créer projets/tâches — accès complet de travail).
 
 Usage :
+    # 1) Renseigner les emails (1 par ligne) dans un fichier, OU via --emails
     python -m scripts.seed_team --org "Conti" --emails "a@conti.ch,b@conti.ch,..."
     python -m scripts.seed_team --org "Conti" --emails-file scripts/team.txt
 
 Comportement :
-    - Idempotent : un email déjà existant est ignoré, pas recréé.
+    - Idempotent : un email déjà existant est ignoré (reporté), pas recréé.
     - Réutilise l'organisation existante si une porte déjà le même nom.
-    - Génère un mot de passe fort par user et AFFICHE le tableau récap à la fin.
+    - Génère un mot de passe fort par user et AFFICHE le tableau récap à la fin
+      (à distribuer aux ingénieurs ; aucun secret n'est stocké dans le repo).
     - email_confirm=True → connexion immédiate, sans email de confirmation.
 
-Nécessite : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (mêmes que l'API).
-À lancer depuis le dossier backend/.
+Nécessite les variables d'env standard (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+etc.) — les mêmes que l'API. À lancer depuis le dossier backend/.
 """
 from __future__ import annotations
 
@@ -28,13 +31,16 @@ from app.database import get_supabase_admin
 
 
 def _gen_password(length: int = 16) -> str:
+    """Mot de passe fort lisible (lettres + chiffres + 2 symboles sûrs)."""
     alphabet = string.ascii_letters + string.digits
     core = "".join(secrets.choice(alphabet) for _ in range(length - 2))
     return core + secrets.choice("!@#$%*") + secrets.choice(string.digits)
 
 
 def _get_or_create_org(admin, name: str, contact_email: str) -> str:
-    existing = admin.table("organizations").select("id, name").eq("name", name).execute()
+    existing = (
+        admin.table("organizations").select("id, name").eq("name", name).execute()
+    )
     if existing.data:
         org_id = existing.data[0]["id"]
         print(f"• Organisation « {name} » déjà existante → réutilisée ({org_id})")
@@ -55,14 +61,16 @@ def _get_or_create_org(admin, name: str, contact_email: str) -> str:
     return org_id
 
 
-def _create_user(admin, email: str, org_id: str, full_name: str) -> dict:
+def _create_user(admin, email: str, org_id: str, role: str, full_name: str) -> dict:
+    """Crée le user auth + la ligne users. Idempotent sur l'email."""
+    # Déjà présent dans la table users (via auth) ?
     try:
         existing = admin.auth.admin.list_users()
         for u in existing:
             if (getattr(u, "email", "") or "").lower() == email.lower():
-                return {"email": email, "status": "existe déjà", "password": None}
+                return {"email": email, "status": "exists", "password": None}
     except Exception:
-        pass
+        pass  # on tente la création, qui échouera proprement si doublon
 
     password = _gen_password()
     try:
@@ -80,13 +88,13 @@ def _create_user(admin, email: str, org_id: str, full_name: str) -> dict:
         admin.table("users").insert({
             "id": user_id,
             "organization_id": org_id,
-            "role": "member",
+            "role": role,
             "full_name": full_name,
         }).execute()
     except Exception as e:
         return {"email": email, "status": f"erreur users: {e}", "password": None}
 
-    return {"email": email, "status": "créé", "password": password, "role": "member"}
+    return {"email": email, "status": "créé", "password": password, "role": role}
 
 
 def main() -> int:
@@ -111,19 +119,22 @@ def main() -> int:
     org_id = _get_or_create_org(admin, args.org, emails[0])
 
     results = []
-    for email in emails:
+    for i, email in enumerate(emails):
+        role = "admin" if i == 0 else "member"
         full_name = email.split("@")[0].replace(".", " ").title()
-        results.append(_create_user(admin, email, org_id, full_name))
+        results.append(_create_user(admin, email, org_id, role, full_name))
 
-    print("\n" + "=" * 76)
+    # Récapitulatif
+    print("\n" + "=" * 72)
     print(f"ÉQUIPE « {args.org} » — {org_id}")
-    print("=" * 76)
-    print(f"{'EMAIL':<38}{'MOT DE PASSE':<22}STATUT")
-    print("-" * 76)
+    print("=" * 72)
+    print(f"{'EMAIL':<34}{'RÔLE':<10}{'MOT DE PASSE':<20}STATUT")
+    print("-" * 72)
     for r in results:
         pwd = r.get("password") or "—"
-        print(f"{r['email']:<38}{pwd:<22}{r['status']}")
-    print("=" * 76)
+        role = r.get("role") or ""
+        print(f"{r['email']:<34}{role:<10}{pwd:<20}{r['status']}")
+    print("=" * 72)
     print("⚠️  Distribuez ces mots de passe de façon sécurisée puis effacez cette sortie.")
     print("    Chaque ingénieur peut se connecter immédiatement et changer son mot de passe.")
     return 0

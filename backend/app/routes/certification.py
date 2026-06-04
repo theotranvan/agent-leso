@@ -44,16 +44,16 @@ async def verify_badge_public(badge_token: str):
         )
         html = f"""
         <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Bureau certifié BET Agent</title></head>
+        <title>Bureau certifié LESO</title></head>
         <body style="font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f7f6f2;">
         <div style="text-align:center;padding:48px;background:#fff;border-radius:16px;box-shadow:0 2px 24px rgba(0,0,0,0.06);max-width:420px;">
         <div style="font-size:42px;color:{level_color};">✓</div>
         <h1 style="font-size:22px;color:#0a0a0a;margin:12px 0 4px;">{result['organization_name']}</h1>
         <div style="display:inline-block;padding:6px 16px;border-radius:99px;background:{level_color}1a;color:{level_color};font-weight:600;font-size:14px;margin:8px 0;">
-          Bureau certifié BET Agent — {result['level']}
+          Bureau certifié LESO — {result['level']}
         </div>
         <p style="color:#525252;font-size:14px;margin:12px 0 0;">
-          Ce bureau produit et valide ses dossiers techniques avec BET Agent.
+          Ce bureau produit et valide ses dossiers techniques avec LESO.
           {result['approved_docs']} documents validés.
         </p>
         <p style="color:#a3a3a3;font-size:12px;margin:16px 0 0;">

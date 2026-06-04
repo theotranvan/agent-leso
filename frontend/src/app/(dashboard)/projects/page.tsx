@@ -6,9 +6,11 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CANTONS_ROMANDS, AFFECTATIONS_SIA } from '@/lib/ch';
 import { formatDate, LOT_LABELS } from '@/lib/utils';
 
 export default function ProjectsPage() {
@@ -21,6 +23,8 @@ export default function ProjectsPage() {
     name: '',
     type_ouvrage: '',
     address: '',
+    canton: 'GE',
+    affectation: 'logement_collectif',
     lots: [] as string[],
   });
 
@@ -45,7 +49,7 @@ export default function ProjectsPage() {
     try {
       await api.createProject(form);
       setShowForm(false);
-      setForm({ name: '', type_ouvrage: '', address: '', lots: [] });
+      setForm({ name: '', type_ouvrage: '', address: '', canton: 'GE', affectation: 'logement_collectif', lots: [] });
       await fetchProjects();
     } catch (e: any) {
       setError(e.message);
@@ -63,16 +67,16 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projets</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gérez vos opérations et leurs documents techniques</p>
-        </div>
+      <PageHeader
+        title="Mes projets"
+        description="Chaque projet regroupe ses documents et livrables. C'est le point de départ : crée-en un, puis génère tes livrables à l'intérieur."
+        icon={FolderKanban}
+      >
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouveau projet
         </Button>
-      </div>
+      </PageHeader>
 
       {showForm && (
         <Card>
@@ -105,6 +109,30 @@ export default function ProjectsPage() {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Canton</Label>
+                  <Select value={form.canton} onValueChange={(v) => setForm({ ...form, canton: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CANTONS_ROMANDS.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Affectation</Label>
+                  <Select value={form.affectation} onValueChange={(v) => setForm({ ...form, affectation: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {AFFECTATIONS_SIA.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Lots concernés</Label>

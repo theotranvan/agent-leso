@@ -175,7 +175,7 @@ async def send_monthly_digests() -> dict[str, Any]:
                 f"({digest['nb_alerts']} point(s)).</p>"
                 f"<div>{digest['summary_md']}</div>"
             )
-            send_email(emails, "[BET Agent] Votre veille réglementaire du mois", html)
+            send_email(emails, "[LESO] Votre veille réglementaire du mois", html)
             sent += 1
         except Exception as e:
             logger.error("Digest org=%s échoué : %s", org["id"], e)

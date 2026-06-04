@@ -302,6 +302,23 @@ export const api = {
   },
   exportDossierUrl: (projectId: string, onlyApproved = true) =>
     `${API_URL}/api/projects/${projectId}/export-dossier?only_approved=${onlyApproved}`,
+  // Téléchargement authentifié du dossier ZIP (le endpoint exige le Bearer token,
+  // donc on ne peut pas utiliser un simple <a href>).
+  exportDossier: async (projectId: string, onlyApproved = true): Promise<Blob> => {
+    const res = await fetch(
+      `${API_URL}/api/projects/${projectId}/export-dossier?only_approved=${onlyApproved}`,
+      { headers: await authHeaders() },
+    );
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === 'string') detail = body.detail;
+      } catch {}
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
+  },
 
   // Dashboard ingénieur + analytics + notifications
   engineerDashboard: async () => {
@@ -476,6 +493,14 @@ export const api = {
     createModel: async (data: any) => {
       const res = await fetch(`${API_URL}/api/thermique/models`, {
         method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handle<any>(res);
+    },
+    updateModel: async (id: string, data: any) => {
+      const res = await fetch(`${API_URL}/api/thermique/models/${id}`, {
+        method: 'PATCH',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
@@ -831,6 +856,15 @@ export const api = {
     simulationRapide: {
       create: async (body: any) => {
         const res = await fetch(`${API_URL}/api/v4/simulation-rapide`, {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return handle<any>(res);
+      },
+      // Variante synchrone : renvoie directement le résultat (Qh, Ep, classe).
+      computeSync: async (body: any) => {
+        const res = await fetch(`${API_URL}/api/v4/simulation-rapide/sync`, {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify(body),

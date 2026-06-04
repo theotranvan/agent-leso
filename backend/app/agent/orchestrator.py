@@ -279,12 +279,17 @@ async def execute_task(task_id: str) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("Email approbation échec (non-bloquant) task=%s : %s", task_id, exc)
 
-        # Incrémente compteur tâches de l'organisation
-        org = admin.table("organizations").select("tasks_used_this_month").eq("id", task["organization_id"]).maybe_single().execute()
-        if org.data:
-            admin.table("organizations").update({
-                "tasks_used_this_month": (org.data.get("tasks_used_this_month") or 0) + 1,
-            }).eq("id", task["organization_id"]).execute()
+        # Incrémente compteur tâches de l'organisation — ATOMIQUE (sûr en
+        # concurrence : plusieurs ingénieurs de la même org en parallèle).
+        # Fallback non-atomique si la fonction SQL n'est pas encore déployée.
+        try:
+            admin.rpc("increment_tasks_used", {"p_org_id": task["organization_id"]}).execute()
+        except Exception:
+            org = admin.table("organizations").select("tasks_used_this_month").eq("id", task["organization_id"]).maybe_single().execute()
+            if org.data:
+                admin.table("organizations").update({
+                    "tasks_used_this_month": (org.data.get("tasks_used_this_month") or 0) + 1,
+                }).eq("id", task["organization_id"]).execute()
 
         # Audit log
         admin.table("audit_logs").insert({

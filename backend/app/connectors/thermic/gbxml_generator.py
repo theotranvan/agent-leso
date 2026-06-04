@@ -458,8 +458,8 @@ class GbxmlGenerator(ThermicConnector):
         # DocumentHistory
         doc = ET.SubElement(root, f"{{{GBXML_NAMESPACE}}}DocumentHistory")
         pr = ET.SubElement(doc, f"{{{GBXML_NAMESPACE}}}ProgramInfo", id="prog-betagent")
-        self._sub_text(pr, "CompanyName", "BET Agent")
-        self._sub_text(pr, "ProductName", "BET Agent V3")
+        self._sub_text(pr, "CompanyName", "LESO")
+        self._sub_text(pr, "ProductName", "LESO V3")
         self._sub_text(pr, "Version", "3.0")
 
         tree = ET.ElementTree(root)

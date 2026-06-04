@@ -122,7 +122,7 @@ export default function OnboardingPage() {
         {step === 0 && (
           <div className="space-y-5">
             <div>
-              <h1 className="text-xl font-semibold">Bienvenue dans BET Agent</h1>
+              <h1 className="text-xl font-semibold">Bienvenue dans LESO</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Configurons votre bureau en quelques étapes pour démarrer.
               </p>

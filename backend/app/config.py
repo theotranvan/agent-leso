@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
 
     # Security
-    ENCRYPTION_KEY: str
+    # Optionnelle : requise par le Blueprint mais non utilisée pour chiffrer des
+    # données partagées. La rendre optionnelle évite que le worker (où la clé est
+    # en sync:false) crashe au boot si elle n'a pas été saisie manuellement.
+    ENCRYPTION_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
 
     # Monitoring
@@ -51,7 +54,24 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "production"
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
+    # Origines CORS autorisées. "*" = tout (défaut, pour ne rien casser). Sinon
+    # liste séparée par des virgules, ex: "https://app.exemple.ch,https://exemple.ch"
+    ALLOWED_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
+
+    # Bêta — pendant la phase pilote, le paiement en ligne (Stripe self-service)
+    # n'est pas encore ouvert. Les nouveaux comptes sont créés "inactifs" et un
+    # forfait doit être activé manuellement. Le contact paiement/activation est
+    # affiché dans l'UI à la place des boutons Stripe.
+    BETA_MODE: bool = True
+    BETA_BILLING_CONTACT_EMAIL: str = "theo.cours34@gmail.com"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = (self.ALLOWED_ORIGINS or "*").strip()
+        if raw == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
     PLAN_LIMITS: dict = Field(default_factory=lambda: {
         "starter": {"tasks": 500, "price_eur": 690, "price_chf": 690},

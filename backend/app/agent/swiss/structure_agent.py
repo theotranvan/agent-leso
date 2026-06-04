@@ -41,7 +41,7 @@ def _build_engineer_notice(model: dict) -> str:
         "3. **Valider ou corriger** toute incohérence avant de lancer le calcul.",
         "4. Lancer le calcul dans votre logiciel.",
         "5. Exporter les résultats en SAF enrichi (Export → SAF avec résultats).",
-        "6. Réimporter ce SAF enrichi dans BET Agent pour obtenir :",
+        "6. Réimporter ce SAF enrichi dans LESO pour obtenir :",
         "   - Double-check analytique automatique (détection d'écart > 15%)",
         "   - Note de calcul SIA 260-267 pré-rédigée",
         "   - Bloc visa pour signature",

@@ -150,6 +150,12 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
       - project_name, author
     """
     params = task.get("input_params") or {}
+    # Tolère les deux structures d'appel : champs à plat (form générique) OU
+    # nichés sous "programme" (endpoints /api/v4/simulation-rapide). Les clés de
+    # plus haut niveau l'emportent en cas de doublon.
+    if isinstance(params.get("programme"), dict):
+        params = {**params["programme"], **params}
+
     org_id = task["organization_id"]
     project_id = task.get("project_id")
 
@@ -301,10 +307,6 @@ def _simulate(
     # Pertes de transmission en kWh/an : UA · HDD · 24 / 1000
     pertes_transmission = ua * hdd * 24 / 1000
 
-    # Apports gratuits (soleil + internes) - facteur indicatif
-    apports_gratuits_factor = 0.25 if affectation.startswith("logement") else 0.30
-    pertes_nettes = pertes_transmission * (1 - apports_gratuits_factor)
-
     # Ventilation simplifiée : 0.5 vol/h (logement) ou 1.0 (administration)
     n_vol_h = 1.0 if not affectation.startswith("logement") else 0.5
     # Volume = SRE × 2.8m (hypothèse hauteur moyenne)
@@ -315,8 +317,14 @@ def _simulate(
     recovery = VENTILATION_HEAT_RECOVERY.get(standard, 0.0)
     pertes_ventilation = pertes_ventilation_brutes * (1 - recovery)
 
-    # Qh total
-    qh_total_kwh = pertes_nettes + pertes_ventilation
+    # Apports gratuits (soleil + internes). Conformément au bilan SIA 380/1
+    # (Qh = Qt + Qv − ηg·Qg), les apports compensent l'ENSEMBLE des pertes —
+    # transmission ET ventilation —, pas la seule transmission. Le facteur ci-
+    # dessous est un taux d'utilisation indicatif (pré-étude). À caler contre un
+    # calcul Lesosai officiel pour un usage réglementaire.
+    apports_gratuits_factor = 0.25 if affectation.startswith("logement") else 0.30
+    pertes_brutes = pertes_transmission + pertes_ventilation
+    qh_total_kwh = pertes_brutes * (1 - apports_gratuits_factor)
     qh_kwh_m2_an = qh_total_kwh / sre_m2
 
     # ECS forfait
@@ -442,7 +450,7 @@ def _build_report_md(
         "",
         "## Responsabilité",
         "",
-        f"Résultat produit par BET Agent. Le thermicien signataire ({author or 'à désigner'}) ",
+        f"Résultat produit par LESO. Le thermicien signataire ({author or 'à désigner'}) ",
         "engage seul sa responsabilité sur la conformité du calcul officiel qui sera produit.",
     ])
 

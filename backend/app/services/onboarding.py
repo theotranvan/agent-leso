@@ -101,7 +101,7 @@ async def run_first_payment_onboarding(stripe_customer_id: str) -> dict[str, Any
                 "organization_id": org_id,
                 "project_id": demo_project_id,
                 "task_type": "simulation_energetique_rapide",
-                "status": "queued",
+                "status": "pending",
                 "input_params": {
                     "project_name": "Mon premier projet - Immeuble Démo",
                     "programme": {
@@ -114,7 +114,7 @@ async def run_first_payment_onboarding(stripe_customer_id: str) -> dict[str, Any
                         "nb_etages": 4,
                         "nb_logements": 18,
                     },
-                    "author": "BET Agent - Onboarding",
+                    "author": "LESO - Onboarding",
                 },
                 "attempts": 0,
                 "created_at": datetime.utcnow().isoformat(),

@@ -153,6 +153,13 @@ async def get_project_journey(project_id: str, user: Annotated[AuthUser, Depends
     completed = [t["task_type"] for t in rows if t.get("status") == "completed"]
     approved = [t["task_type"] for t in rows if t.get("review_status") == "approved"]
 
+    # "Création de l'affaire" (project_setup) n'est pas une tâche agent : on la
+    # considère faite dès que les données de base du projet sont renseignées.
+    pdata = project.data
+    if pdata.get("canton") and pdata.get("affectation"):
+        completed.append("project_setup")
+        approved.append("project_setup")
+
     # Phases désactivées au niveau organisation (modularité)
     org = (
         admin.table("organizations").select("disabled_journey_phases")
@@ -165,6 +172,7 @@ async def get_project_journey(project_id: str, user: Annotated[AuthUser, Depends
         approved_task_types=approved,
         current_phase=project.data.get("current_phase"),
         disabled_phases=disabled,
+        canton=project.data.get("canton"),
     )
     return state
 
