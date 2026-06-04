@@ -57,3 +57,6 @@ coverage/
 htmlcov/
 guide-demarrage-leso.html
 guide-demarrage-leso.pdf
+
+# Artefacts de démo locaux (non destinés à la prod)
+demo/
