@@ -92,6 +92,21 @@ class ThermalModelInput(BaseModel):
     hypotheses: dict = Field(default_factory=dict)
 
 
+class ThermalModelPatch(BaseModel):
+    """Mise à jour partielle de la composition d'un modèle (éditeur V2.1).
+
+    Seuls les champs fournis (non None) sont écrits. Les listes vides sont
+    significatives : elles permettent de vider une section.
+    """
+    name: Optional[str] = None
+    zones: Optional[list[ThermalZone]] = None
+    walls: Optional[list[Wall]] = None
+    openings: Optional[list[Opening]] = None
+    thermal_bridges: Optional[list[ThermalBridge]] = None
+    systems: Optional[ThermalSystems] = None
+    hypotheses: Optional[dict] = None
+
+
 class ThermalRunRequest(BaseModel):
     model_id: str
     engine: Literal["lesosai_stub", "lesosai_file", "gbxml", "stub"] = "lesosai_stub"

@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.agent.swiss.thermique_agent import run_thermal_pipeline
 from app.database import get_storage, get_supabase_admin
 from app.middleware import AuthUser, audit_log, get_current_user
-from app.models.thermal import ThermalModelInput, ThermalRunRequest
+from app.models.thermal import (
+    ThermalModelInput,
+    ThermalModelPatch,
+    ThermalRunRequest,
+)
 from app.services.thermique.lesosai_file import (
     build_operator_sheet_markdown,
     parse_lesosai_results_pdf,
@@ -81,6 +85,48 @@ async def get_thermal_model(
     if not m.data:
         raise HTTPException(status_code=404, detail="Modèle introuvable")
     return m.data
+
+
+@router.patch("/models/{model_id}")
+async def update_thermal_model(
+    model_id: str,
+    body: ThermalModelPatch,
+    user: Annotated[AuthUser, Depends(get_current_user)],
+):
+    """Met à jour la composition d'un modèle (parois, ouvertures, zones, ponts).
+
+    Mise à jour partielle : seuls les champs fournis sont écrits. Une liste vide
+    vide la section correspondante.
+    """
+    if user.role == "viewer":
+        raise HTTPException(status_code=403, detail="Droits insuffisants")
+
+    admin = get_supabase_admin()
+    m = admin.table("thermal_models").select("id").eq("id", model_id).eq("organization_id", user.organization_id).maybe_single().execute()
+    if not m.data:
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+
+    # by_alias=True pour réécrire WallLayer.lambda_ en "lambda" dans le JSONB ;
+    # exclude_none au niveau racine pour ne toucher que les sections fournies.
+    data = body.model_dump(by_alias=True, exclude_unset=True)
+    updates = {
+        k: v for k, v in data.items()
+        if k in {"name", "zones", "walls", "openings", "thermal_bridges", "systems", "hypotheses"}
+    }
+    if not updates:
+        full = admin.table("thermal_models").select("*").eq("id", model_id).eq("organization_id", user.organization_id).maybe_single().execute()
+        return full.data or {}
+
+    result = admin.table("thermal_models").update(updates).eq("id", model_id).eq("organization_id", user.organization_id).execute()
+
+    await audit_log(
+        action="thermal_model_updated",
+        organization_id=user.organization_id,
+        user_id=user.id,
+        resource_type="thermal_model",
+        resource_id=model_id,
+    )
+    return result.data[0] if result.data else {}
 
 
 @router.post("/models/{model_id}/run")
