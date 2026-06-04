@@ -126,6 +126,41 @@ const TASK_CATEGORIES: TaskCategory[] = [
     icon: Users, color: 'bg-slate-50 text-slate-700',
     fields: ['project_name', 'meeting_title', 'participants', 'notes'],
   },
+  {
+    id: 'memoire_technique',
+    title: 'Mémoire technique',
+    description: 'Note méthodologique convaincante pour une réponse à appel d\'offres',
+    icon: BookOpen, color: 'bg-indigo-50 text-indigo-700',
+    fields: ['project_name', 'brief', 'author'],
+  },
+  {
+    id: 'chiffrage_dqe',
+    title: 'DQE',
+    description: 'Devis quantitatif estimatif structuré par lot, avec prix unitaires',
+    icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
+    fields: ['project_name', 'lot', 'surface', 'notes'],
+  },
+  {
+    id: 'calcul_acoustique',
+    title: 'Note acoustique SIA 181',
+    description: 'Justificatif d\'isolement acoustique — avant-projet',
+    icon: FileText, color: 'bg-purple-50 text-purple-700',
+    fields: ['project_name', 'elements', 'hypotheses', 'author'],
+  },
+  {
+    id: 'rapport_chantier',
+    title: 'Rapport de chantier',
+    description: 'Compte-rendu de visite depuis des notes de terrain',
+    icon: PenTool, color: 'bg-amber-50 text-amber-700',
+    fields: ['project_name', 'notes', 'author'],
+  },
+  {
+    id: 'resume_document',
+    title: 'Résumé de document',
+    description: 'Synthèse des points clés d\'un rapport, d\'une norme ou d\'un PDF',
+    icon: FileText, color: 'bg-slate-50 text-slate-700',
+    fields: ['project_name', 'document_upload'],
+  },
 ];
 
 const MODULE_REDIRECTS: Record<string, string> = {
@@ -581,6 +616,47 @@ function AdaptiveFields({
         </div>
       )}
 
+      {fields.includes('brief') && (
+        <div>
+          <Label>Brief / CCTP client *</Label>
+          <Textarea rows={5} value={form.brief || ''}
+            placeholder="Collez le cahier des charges ou décrivez la demande : objet, attentes, contraintes, critères de notation…"
+            onChange={(e) => setField('brief', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('elements') && (
+        <div>
+          <Label>Éléments / locaux à justifier</Label>
+          <Textarea rows={3} value={form.elements || ''}
+            placeholder="Ex : séparation logement/logement, façade sur rue, dalle entre commerce et logement…"
+            onChange={(e) => setField('elements', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('hypotheses') && (
+        <div>
+          <Label>Hypothèses (optionnel)</Label>
+          <Textarea rows={2} value={form.hypotheses || ''}
+            placeholder="Ex : DnT,w visé 52 dB, L'nT,w ≤ 53 dB, dalle BA 22 cm + chape flottante…"
+            onChange={(e) => setField('hypotheses', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('document_upload') && (
+        <div>
+          <Label>Document à résumer (PDF) *</Label>
+          <Dropzone
+            accept=".pdf"
+            hint="Rapport, norme, étude… (max 50 Mo)"
+            maxSizeMB={50}
+            uploading={uploading}
+            currentFileName={uploadedFileName}
+            onFilesSelected={onFileUpload}
+          />
+        </div>
+      )}
+
       {fields.includes('specificities') && (
         <div>
           <Label>Spécificités du projet</Label>
@@ -800,7 +876,7 @@ function buildTaskPayload(
       niveau_prestation: form.niveau_prestation, surface: form.surface,
       contraintes: form.contraintes,
     });
-  } else if (taskType === 'chiffrage_dpgf') {
+  } else if (taskType === 'chiffrage_dpgf' || taskType === 'chiffrage_dqe') {
     // L'agent chiffre à partir de metre_text (ou metre_document_id), pas de
     // champs surface/notes isolés : on compose un métré minimal lisible.
     p.lot = form.lot;
@@ -808,6 +884,18 @@ function buildTaskPayload(
     if (form.surface) metreLines.push(`Surface concernée : ${form.surface} m²`);
     if (form.notes) metreLines.push(String(form.notes));
     if (metreLines.length) p.metre_text = metreLines.join('\n');
+  } else if (taskType === 'memoire_technique') {
+    p.brief = form.brief || '';
+  } else if (taskType === 'calcul_acoustique') {
+    // L'agent note_calcul lit elements/hypotheses ; localisation pilote SIA vs EC.
+    p.elements = form.elements || '';
+    p.hypotheses = form.hypotheses || '';
+    p.localisation = 'Suisse';
+  } else if (taskType === 'rapport_chantier') {
+    // L'agent accepte des notes seules (sans photo) ; project_name déjà posé.
+    p.notes = form.notes || '';
+  } else if (taskType === 'resume_document') {
+    p.document_id = uploadedDocId;
   } else if (taskType === 'controle_reglementaire_geneve') {
     p.project_data = {
       canton: form.canton, address: form.address,
