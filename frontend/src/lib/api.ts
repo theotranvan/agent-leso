@@ -498,6 +498,14 @@ export const api = {
       });
       return handle<any>(res);
     },
+    updateModel: async (id: string, data: any) => {
+      const res = await fetch(`${API_URL}/api/thermique/models/${id}`, {
+        method: 'PATCH',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handle<any>(res);
+    },
     run: async (id: string, body: { engine: 'lesosai_stub' | 'lesosai_file'; author_name?: string; generate_justificatif?: boolean }) => {
       const res = await fetch(`${API_URL}/api/thermique/models/${id}/run`, {
         method: 'POST',

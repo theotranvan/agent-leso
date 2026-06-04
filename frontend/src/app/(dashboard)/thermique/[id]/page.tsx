@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/swiss/StatusBadge';
+import { ThermalModelEditor } from '@/components/swiss/ThermalModelEditor';
 import { formatDateTime } from '@/lib/utils';
 
 export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -216,12 +217,15 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
             <div><p className="text-muted-foreground">Ouvertures</p><p className="font-medium">{(model.openings || []).length}</p></div>
             <div><p className="text-muted-foreground">Ponts thermiques</p><p className="font-medium">{(model.thermal_bridges || []).length}</p></div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Édition détaillée du modèle (zones, compositions, systèmes) : à venir en V2.1. En attendant,
-            la saisie complète se fait directement dans Lesosai via la fiche de saisie générée.
-          </p>
         </CardContent>
       </Card>
+
+      <ThermalModelEditor
+        key={model.updated_at || model.id}
+        modelId={id}
+        model={model}
+        onSaved={load}
+      />
     </div>
   );
 }
