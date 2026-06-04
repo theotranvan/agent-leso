@@ -168,7 +168,7 @@ async def run_thermal(
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         xml_path = f"{user.organization_id}/thermique/{model_id}/lesosai_{ts}.xml"
         sheet_path = f"{user.organization_id}/thermique/{model_id}/fiche_saisie_{ts}.md"
-        storage.upload(xml_path, xml_bytes, content_type="application/xml")
+        storage.upload(xml_path, xml_bytes, content_type="application/xml; charset=utf-8")
         storage.upload(sheet_path, sheet_md.encode("utf-8"), content_type="text/markdown")
 
         # Log exchange
