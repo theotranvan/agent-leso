@@ -136,7 +136,7 @@ class TestIDCReference:
 # ---------------------------------------------------------------------------
 # 2. THERMIQUE SIA 380/1 (simplifié) — arithmétique exacte + invariants
 # ---------------------------------------------------------------------------
-from app.agent.swiss.simulation_rapide_agent import _simulate
+from app.agent.swiss.simulation_rapide_agent import _simulate  # noqa: E402
 
 
 def _sim(**kw):
@@ -238,7 +238,7 @@ class TestThermiqueReference:
 # ---------------------------------------------------------------------------
 # 3. STRUCTURE SIA 260 — facteurs de combinaison + propriétés matériaux
 # ---------------------------------------------------------------------------
-from app.connectors.structural.saf_generator import (
+from app.connectors.structural.saf_generator import (  # noqa: E402
     MATERIAL_PROPERTIES,
     SIA_260_COMBINATIONS,
 )
@@ -284,7 +284,7 @@ class TestStructureReference:
 # ---------------------------------------------------------------------------
 # 4. MÉTRÉS SIA 416 — ratios et table de correspondance IFC→CFC
 # ---------------------------------------------------------------------------
-from app.agent.swiss.metres_agent import IFC_TO_CFC
+from app.agent.swiss.metres_agent import IFC_TO_CFC  # noqa: E402
 
 
 class TestMetresReference:
@@ -304,11 +304,11 @@ class TestMetresReference:
 # ---------------------------------------------------------------------------
 # 5. STRUCTURE — MOTEUR RÉEL (double-check M = qL²/8 via parse_csv)
 # ---------------------------------------------------------------------------
-import csv as _csv
-import tempfile
-from pathlib import Path
+import csv as _csv  # noqa: E402
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-from app.connectors.structural.results_parser import SafResultsParser
+from app.connectors.structural.results_parser import SafResultsParser  # noqa: E402
 
 
 def _model_poutre_6m():
@@ -378,15 +378,15 @@ class TestStructureEngineReference:
         I = 3692e-8 m⁴ (HEA200)
         f = 5·10e3·6⁴ / (384·210e9·3692e-8) = 6.48e7 / 2.977e9 ≈ 0.0218 m (21.8 mm)
         """
-        q, L, E, I = 10e3, 6.0, 210e9, 3692e-8
-        f = 5 * q * L**4 / (384 * E * I)
+        q, L, E, inertia = 10e3, 6.0, 210e9, 3692e-8
+        f = 5 * q * L**4 / (384 * E * inertia)
         assert f == pytest.approx(0.0218, abs=0.001)
 
 
 # ---------------------------------------------------------------------------
 # 6. MÉTRÉS — MOTEUR RÉEL sur un IFC synthétique à surfaces CONNUES
 # ---------------------------------------------------------------------------
-from app.agent.swiss.metres_agent import _extract_metres
+from app.agent.swiss.metres_agent import _extract_metres  # noqa: E402
 
 
 def _build_ifc_with_spaces(spaces):
@@ -440,9 +440,9 @@ class TestMetresEngineReference:
 # ---------------------------------------------------------------------------
 # 7. GARDE-FOUS — l'outil REFUSE une entrée aberrante au lieu de calculer faux
 # ---------------------------------------------------------------------------
-from pydantic import ValidationError
+from pydantic import ValidationError  # noqa: E402
 
-from app.models.thermal import Opening, Wall
+from app.models.thermal import Opening, Wall  # noqa: E402
 
 
 class TestGuardRails:

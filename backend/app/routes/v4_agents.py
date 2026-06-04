@@ -341,8 +341,8 @@ async def extract_metres_sync(
     La page Métrés envoie le fichier en multipart et attend le résultat (surfaces
     SIA 416 + DPGF) directement, sans passer par la queue.
     """
-    from app.config import settings
     from app.agent.swiss import metres_agent
+    from app.config import settings
 
     content = await ifc_file.read()
     size_mb = len(content) / (1024 * 1024)
