@@ -1,4 +1,5 @@
 'use client';
+import { LogoMark } from '@/components/brand/logo';
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, MailCheck } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">B</div>
+            <LogoMark className="h-8 w-8" />
             <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Mot de passe oublié</CardTitle>
