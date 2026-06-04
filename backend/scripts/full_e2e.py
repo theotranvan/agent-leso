@@ -216,7 +216,7 @@ def main() -> int:
         rq = (run.get("results") or {}).get("qh_kwh_m2_an") or (run.get("results") or {}).get("qh")
         check("POST thermique/models/{id}/run (justificatif + Qh)",
               status == 200 and bool(run.get("pdf_url")),
-              f"HTTP {status} {run.get('detail','')}")
+              f"HTTP {status} Qh={rq} {run.get('detail','')}")
 
     # ---------------------------------------------------------- STRUCTURE SIA
     print("\n[ Structure SIA 260 ]")
