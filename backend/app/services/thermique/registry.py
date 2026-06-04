@@ -55,6 +55,7 @@ class _ConnectorAdapter(ThermalEngine):
 
     async def prepare_model(self, thermal_model: dict) -> dict:
         ifc_path = thermal_model.get("ifc_path")
+        has_manual = bool(thermal_model.get("walls") or thermal_model.get("zones"))
         warnings: list[str] = []
         if ifc_path and Path(str(ifc_path)).exists():
             inputs = ThermicInputs(
@@ -69,8 +70,11 @@ class _ConnectorAdapter(ThermalEngine):
                 warnings = self._connector.validate_inputs(inputs)
             except Exception as exc:
                 warnings = [f"Validation échouée : {exc}"]
+        elif has_manual:
+            # Saisie manuelle : chemin nominal, pas d'IFC requis → aucun avertissement.
+            warnings = []
         else:
-            warnings = ["Pas de fichier IFC fourni : le modèle est construit depuis JSON"]
+            warnings = ["Ajoutez des parois et une zone (ou un IFC) pour calculer le modèle."]
 
         zones = thermal_model.get("zones") or []
         total_area = sum(float(z.get("area", 0) or 0) for z in zones)
@@ -91,8 +95,29 @@ class _ConnectorAdapter(ThermalEngine):
         return self.name in ("lesosai_stub", "gbxml")
 
     async def compute(self, thermal_model: dict) -> ThermalEngineResult:
-        """Compat V2 : le stub expose compute() directement."""
+        """Compat V2 : le stub expose compute() directement.
+
+        Pour le moteur indicatif (`lesosai_stub`) sans IFC mais avec une saisie
+        manuelle (parois/zones), on exécute un vrai bilan stationnaire SIA 380/1
+        qui réagit aux valeurs U/surfaces saisies, plutôt que des valeurs factices.
+        """
         ifc_path = thermal_model.get("ifc_path")
+        has_ifc = bool(ifc_path and Path(str(ifc_path)).exists())
+        has_manual = bool(thermal_model.get("walls") or thermal_model.get("zones"))
+        if self.name == "lesosai_stub" and has_manual and not has_ifc:
+            from app.connectors.thermic.sia380_simplified import (
+                compute_indicative_result,
+            )
+            try:
+                return compute_indicative_result(thermal_model)
+            except ValueError as exc:
+                # SRE indéterminée, etc. → message clair plutôt qu'un crash.
+                return ThermalEngineResult(
+                    qh_mj_m2_an=0.0, qww_mj_m2_an=0.0, e_mj_m2_an=0.0,
+                    compliant=None, engine_used="sia380_indicatif",
+                    warnings=[str(exc)],
+                )
+
         systems = thermal_model.get("systems") or {}
         heating = systems.get("heating") if isinstance(systems, dict) else None
         vector = "gaz"

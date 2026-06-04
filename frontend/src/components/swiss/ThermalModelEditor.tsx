@@ -176,6 +176,15 @@ export function ThermalModelEditor({
             }}><Plus className="h-3 w-3 mr-1" /> Ajouter</Button>
           </div>
           {walls.length === 0 && <p className="text-xs text-muted-foreground">Aucune paroi.</p>}
+          {walls.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 text-[11px] font-medium text-muted-foreground px-1">
+              <span className="col-span-4">Type de paroi</span>
+              <span className="col-span-3">Orientation</span>
+              <span className="col-span-2">Surface (m²)</span>
+              <span className="col-span-2">U (W/m²·K)</span>
+              <span className="col-span-1" />
+            </div>
+          )}
           {walls.map((w, i) => (
             <div key={w.id} className="grid grid-cols-12 gap-2 items-center">
               <div className="col-span-4">
@@ -217,6 +226,16 @@ export function ThermalModelEditor({
             }}><Plus className="h-3 w-3 mr-1" /> Ajouter</Button>
           </div>
           {openings.length === 0 && <p className="text-xs text-muted-foreground">Aucune ouverture.</p>}
+          {openings.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 text-[11px] font-medium text-muted-foreground px-1">
+              <span className="col-span-3">Type</span>
+              <span className="col-span-3">Orientation</span>
+              <span className="col-span-2">Surface (m²)</span>
+              <span className="col-span-2">U (W/m²·K)</span>
+              <span className="col-span-1">g</span>
+              <span className="col-span-1" />
+            </div>
+          )}
           {openings.map((o, i) => (
             <div key={o.id} className="grid grid-cols-12 gap-2 items-center">
               <div className="col-span-3">
@@ -260,6 +279,15 @@ export function ThermalModelEditor({
             }}><Plus className="h-3 w-3 mr-1" /> Ajouter</Button>
           </div>
           {zones.length === 0 && <p className="text-xs text-muted-foreground">Aucune zone.</p>}
+          {zones.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 text-[11px] font-medium text-muted-foreground px-1">
+              <span className="col-span-4">Nom de la zone</span>
+              <span className="col-span-3">Affectation</span>
+              <span className="col-span-2">Surface (m²)</span>
+              <span className="col-span-2">Volume (m³)</span>
+              <span className="col-span-1" />
+            </div>
+          )}
           {zones.map((z, i) => (
             <div key={z.id} className="grid grid-cols-12 gap-2 items-center">
               <Input className="col-span-4" placeholder="Nom" value={z.name}
@@ -288,6 +316,14 @@ export function ThermalModelEditor({
             }}><Plus className="h-3 w-3 mr-1" /> Ajouter</Button>
           </div>
           {bridges.length === 0 && <p className="text-xs text-muted-foreground">Aucun pont thermique.</p>}
+          {bridges.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 text-[11px] font-medium text-muted-foreground px-1">
+              <span className="col-span-6">Type de liaison</span>
+              <span className="col-span-2">Longueur (ml)</span>
+              <span className="col-span-3">ψ (W/m·K)</span>
+              <span className="col-span-1" />
+            </div>
+          )}
           {bridges.map((b, i) => (
             <div key={b.key} className="grid grid-cols-12 gap-2 items-center">
               <Input className="col-span-6" placeholder="Type (ex. liaison balcon)" value={b.type}
