@@ -117,7 +117,13 @@ async def check_quota(user: AuthUser) -> None:
     if not org.data:
         raise HTTPException(status_code=403, detail="Organisation introuvable")
     if not org.data.get("active", True):
-        raise HTTPException(status_code=403, detail="Organisation désactivée")
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Compte en attente d'activation. Pendant la bêta, l'activation "
+                f"d'un forfait se fait sur demande : {settings.BETA_BILLING_CONTACT_EMAIL}"
+            ),
+        )
     used = org.data.get("tasks_used_this_month", 0)
     limit = org.data.get("tasks_limit", 0)
     if used >= limit:

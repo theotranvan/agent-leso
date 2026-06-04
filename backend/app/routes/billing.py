@@ -93,6 +93,10 @@ async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
         **org.data,
         "plan_details": settings.PLAN_LIMITS.get(org.data["plan"], {}),
         "quota_pct": round(100 * (org.data["tasks_used_this_month"] / max(org.data["tasks_limit"], 1)), 1),
+        # Bêta : le front masque/verrouille les boutons de paiement Stripe et
+        # affiche le contact d'activation tant que BETA_MODE est actif.
+        "beta_mode": settings.BETA_MODE,
+        "billing_contact": settings.BETA_BILLING_CONTACT_EMAIL,
     }
 
 
@@ -149,7 +153,11 @@ async def get_usage(
     """Consommation tokens du mois courant + quotas + packs + coût CHF."""
     from app.services.token_quota import get_monthly_usage
     try:
-        return await get_monthly_usage(user.organization_id)
+        usage = await get_monthly_usage(user.organization_id)
+        if isinstance(usage, dict):
+            usage["beta_mode"] = settings.BETA_MODE
+            usage["billing_contact"] = settings.BETA_BILLING_CONTACT_EMAIL
+        return usage
     except ValueError as e:
         raise HTTPException(404, str(e))
     except Exception as e:

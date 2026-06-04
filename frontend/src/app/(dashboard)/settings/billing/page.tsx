@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Gauge, Zap, CreditCard, TrendingUp, Loader2, AlertCircle, Check,
-  Package, Sparkles, ArrowLeft,
+  Package, Sparkles, ArrowLeft, Lock,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ type Usage = {
   by_model: Record<string, { tokens: number; cost_chf: number; calls: number }>;
   credit_packs: any[];
   pack_info: { tokens_per_pack: number; price_chf_per_pack: number };
+  beta_mode?: boolean;
+  billing_contact?: string;
 };
 
 const MODEL_LABELS: Record<string, { name: string; color: string }> = {
@@ -119,6 +121,8 @@ export default function BillingUsagePage() {
     usage.used_pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
 
   const totalPackTokens = (usage.credit_packs || []).reduce((sum, p) => sum + (p.tokens_granted || 0), 0);
+  const betaMode = usage.beta_mode !== false; // bêta par défaut tant que non démenti
+  const contact = usage.billing_contact || 'theo.cours34@gmail.com';
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -206,31 +210,47 @@ export default function BillingUsagePage() {
             <p className="text-lg font-semibold">{usage.pack_info.price_chf_per_pack} CHF</p>
           </div>
 
-          <div className="flex items-center gap-2 mb-3">
-            <label className="text-xs text-muted-foreground">Quantité :</label>
-            <div className="inline-flex items-center border rounded-md">
-              <button
-                onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
-                className="px-2 py-0.5 hover:bg-muted transition-colors"
-                disabled={packQuantity <= 1}
-              >−</button>
-              <span className="w-8 text-center text-sm font-medium">{packQuantity}</span>
-              <button
-                onClick={() => setPackQuantity(Math.min(20, packQuantity + 1))}
-                className="px-2 py-0.5 hover:bg-muted transition-colors"
-                disabled={packQuantity >= 20}
-              >+</button>
+          {betaMode ? (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-800">
+              <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-700" />
+              <span>
+                Paiement en ligne en cours de déploiement. Pendant la bêta, l'achat de
+                tokens additionnels se fait avec nous —{' '}
+                <a href={`mailto:${contact}?subject=Pack%20tokens%20LESO`} className="font-medium underline">
+                  {contact}
+                </a>
+                .
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground ml-2">
-              = {formatTokens(usage.pack_info.tokens_per_pack * packQuantity)} tokens pour {usage.pack_info.price_chf_per_pack * packQuantity} CHF
-            </span>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-xs text-muted-foreground">Quantité :</label>
+                <div className="inline-flex items-center border rounded-md">
+                  <button
+                    onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                    className="px-2 py-0.5 hover:bg-muted transition-colors"
+                    disabled={packQuantity <= 1}
+                  >−</button>
+                  <span className="w-8 text-center text-sm font-medium">{packQuantity}</span>
+                  <button
+                    onClick={() => setPackQuantity(Math.min(20, packQuantity + 1))}
+                    className="px-2 py-0.5 hover:bg-muted transition-colors"
+                    disabled={packQuantity >= 20}
+                  >+</button>
+                </div>
+                <span className="text-xs text-muted-foreground ml-2">
+                  = {formatTokens(usage.pack_info.tokens_per_pack * packQuantity)} tokens pour {usage.pack_info.price_chf_per_pack * packQuantity} CHF
+                </span>
+              </div>
 
-          <Button onClick={handlePurchase} disabled={purchasing} className="gap-2 w-full sm:w-auto">
-            {purchasing && <Loader2 className="h-4 w-4 animate-spin" />}
-            <CreditCard className="h-4 w-4" />
-            {purchasing ? 'Ouverture du paiement…' : `Acheter ${packQuantity > 1 ? `${packQuantity} packs` : 'un pack'}`}
-          </Button>
+              <Button onClick={handlePurchase} disabled={purchasing} className="gap-2 w-full sm:w-auto">
+                {purchasing && <Loader2 className="h-4 w-4 animate-spin" />}
+                <CreditCard className="h-4 w-4" />
+                {purchasing ? 'Ouverture du paiement…' : `Acheter ${packQuantity > 1 ? `${packQuantity} packs` : 'un pack'}`}
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Historique des packs */}

@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
 
+    # Bêta — pendant la phase pilote, le paiement en ligne (Stripe self-service)
+    # n'est pas encore ouvert. Les nouveaux comptes sont créés "inactifs" et un
+    # forfait doit être activé manuellement. Le contact paiement/activation est
+    # affiché dans l'UI à la place des boutons Stripe.
+    BETA_MODE: bool = True
+    BETA_BILLING_CONTACT_EMAIL: str = "theo.cours34@gmail.com"
+
     @property
     def cors_origins(self) -> list[str]:
         raw = (self.ALLOWED_ORIGINS or "*").strip()
