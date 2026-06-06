@@ -447,7 +447,7 @@ export const api = {
     const res = await fetch(`${API_URL}/api/billing/status`, { headers: await authHeaders() });
     return handle<any>(res);
   },
-  checkout: async (plan: 'starter' | 'pro' | 'enterprise') => {
+  checkout: async (plan: 'solo' | 'bureau' | 'enterprise') => {
     const res = await fetch(`${API_URL}/api/billing/checkout`, {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },

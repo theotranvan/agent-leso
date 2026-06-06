@@ -38,17 +38,17 @@ export default async function LandingPage() {
 
   const plans = [
     {
-      name: 'Starter', price: '690', tagline: 'Bureau indépendant', tasks: '500 documents / mois',
+      name: 'Solo', price: '690', tagline: 'Ingénieur indépendant', tasks: '~200 livrables / mois',
       features: ['Tous les modules suisses', '1 utilisateur', 'Documents à votre charte', 'Support par email'],
     },
     {
-      name: 'Pro', price: '1 900', tagline: 'Bureau de 5 à 20 personnes', tasks: '2 000 documents / mois',
-      features: ['Tout Starter, plus :', 'Utilisateurs illimités', 'Veille personnalisée', 'Validation déléguée', 'Vue multi-affaires', 'Support prioritaire'],
+      name: 'Bureau', price: '2 400', tagline: 'Bureau de 5 à 20 personnes', tasks: '~500 livrables / mois',
+      features: ['Tout Solo, plus :', 'Utilisateurs illimités', 'Veille personnalisée', 'Validation déléguée', 'Vue multi-affaires', 'Support prioritaire'],
       highlight: true,
     },
     {
-      name: 'Enterprise', price: '5 000', tagline: 'Grand bureau', tasks: 'Documents illimités',
-      features: ['Tout Pro, plus :', 'SLA 99.9 %', 'Account manager dédié', 'Intégrations sur mesure'],
+      name: 'Enterprise', price: 'dès 4 900', tagline: 'Grand bureau', tasks: 'Volume sur mesure',
+      features: ['Tout Bureau, plus :', 'SLA 99.9 %', 'Account manager dédié', 'Intégrations sur mesure'],
     },
   ];
 
@@ -223,6 +223,9 @@ export default async function LandingPage() {
           <p className="text-muted-foreground">
             Tous les modules dans chaque plan. Vous ne payez que le volume.
           </p>
+          <p className="text-sm text-muted-foreground mt-3">
+            Prix HT (TVA 8.1 % en sus) · <span className="text-foreground font-medium">−17 % en annuel</span> (2 mois offerts) · Essai 1 mois sans engagement
+          </p>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-6 items-start">
           {plans.map((plan, i) => (
@@ -239,7 +242,7 @@ export default async function LandingPage() {
                 <div className="text-sm text-muted-foreground mb-4">{plan.tagline}</div>
                 <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-4xl font-semibold tracking-tight">{plan.price}</span>
-                  <span className="text-muted-foreground">CHF / mois</span>
+                  <span className="text-muted-foreground">CHF / mois HT</span>
                 </div>
                 <div className="text-sm text-muted-foreground mb-6">{plan.tasks}</div>
                 <Link href="/register">

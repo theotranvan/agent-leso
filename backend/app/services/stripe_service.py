@@ -10,9 +10,12 @@ logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+# Vocabulaire unique solo/bureau/enterprise. Les noms des variables d'env Stripe
+# (STRIPE_PRICE_STARTER/PRO/ENTERPRISE) restent inchangés : ce ne sont que des
+# identifiants pointant vers les objets Price du dashboard Stripe.
 PLAN_TO_PRICE_ID = {
-    "starter": settings.STRIPE_PRICE_STARTER,
-    "pro": settings.STRIPE_PRICE_PRO,
+    "solo": settings.STRIPE_PRICE_STARTER,
+    "bureau": settings.STRIPE_PRICE_PRO,
     "enterprise": settings.STRIPE_PRICE_ENTERPRISE,
 }
 
@@ -133,13 +136,13 @@ def _handle_checkout_completed(session: dict) -> None:
         return
 
     # Subscription classique
-    plan = session.get("metadata", {}).get("plan", "pilot")
+    from app.services.token_quota import DEFAULT_PLAN, QUOTA_PLANS
+    plan = session.get("metadata", {}).get("plan", DEFAULT_PLAN)
     subscription_id = session.get("subscription")
 
     admin = get_supabase_admin()
     # V5 : on utilise les quotas tokens au lieu des tasks_limit
-    from app.services.token_quota import QUOTA_PLANS
-    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS["pilot"])
+    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN])
 
     admin.table("organizations").update({
         "plan": plan,
@@ -165,14 +168,14 @@ def _handle_subscription_updated(subscription: dict) -> None:
     items = subscription.get("items", {}).get("data", [])
     if not items:
         return
+    from app.services.token_quota import DEFAULT_PLAN, QUOTA_PLANS
     price_id = items[0].get("price", {}).get("id")
-    plan = PRICE_ID_TO_PLAN.get(price_id, "starter")
+    plan = PRICE_ID_TO_PLAN.get(price_id, DEFAULT_PLAN)
 
     status = subscription.get("status")
     active = status in ("active", "trialing")
 
-    from app.services.token_quota import QUOTA_PLANS
-    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS.get("pilot", 8_000_000))
+    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN])
 
     admin = get_supabase_admin()
     admin.table("organizations").update({

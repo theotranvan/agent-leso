@@ -46,13 +46,14 @@ async def register(request: Request, body: UserCreate):
         org = admin.table("organizations").insert({
             "name": org_name,
             "email": body.email,
-            "plan": "starter",
+            "plan": "solo",
             # Bêta : un nouveau compte démarre INACTIF. Tant qu'un forfait n'a pas
             # été activé (manuellement pendant la phase pilote), check_quota renvoie
             # 403 et l'utilisateur ne peut générer aucun livrable. Les organisations
             # existantes (ex. pilote Conti) ne sont PAS affectées par ce défaut.
             "active": not settings.BETA_MODE,
-            "tasks_limit": settings.PLAN_LIMITS["starter"]["tasks"],
+            "tasks_limit": settings.PLAN_LIMITS["solo"]["tasks"],
+            "tokens_limit_monthly": settings.PLAN_LIMITS["solo"]["tokens"],
             "country": country,
             "canton": body.canton,
             "language": body.language or "fr",

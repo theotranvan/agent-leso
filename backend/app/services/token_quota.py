@@ -3,7 +3,7 @@
 Architecture
 ============
 Chaque organisation a :
-  - `tokens_limit_monthly` : quota du plan actuel (pilot/pro/scale)
+  - `tokens_limit_monthly` : quota du plan actuel (solo/bureau/enterprise)
   - `tokens_used_current_month` : consommation du mois (reset le 1er)
   - `tokens_pack_remaining` : tokens additionnels achetés via credit packs
 
@@ -43,13 +43,28 @@ logger = logging.getLogger(__name__)
 # ==========================================================================
 
 QUOTA_PLANS: dict[str, int] = {
-    "pilot": 8_000_000,
-    "pro": 20_000_000,
-    "scale": 60_000_000,
+    "solo": 8_000_000,
+    "bureau": 20_000_000,
+    "enterprise": 60_000_000,
 }
+
+# Plan par défaut quand l'organisation n'a pas (encore) de plan défini.
+DEFAULT_PLAN = "solo"
 
 CREDIT_PACK_TOKENS = 5_000_000
 CREDIT_PACK_PRICE_CHF = 200
+
+# Conversion tokens → « livrables » affichés au client. Un livrable (CCTP, note,
+# rapport…) consomme ~40 000 tokens en moyenne. On reste volontairement prudent
+# (on sous-promet plutôt que l'inverse). Le token reste la limite technique dure.
+TOKENS_PER_DELIVERABLE = 40_000
+# Pack additionnel : 5M tokens ≈ 125 livrables → on annonce 100 (sous-promesse).
+CREDIT_PACK_LIVRABLES = 100
+
+
+def tokens_to_livrables(tokens: int) -> int:
+    """Convertit un budget tokens en nombre de livrables (estimation prudente)."""
+    return int(max(0, tokens) // TOKENS_PER_DELIVERABLE)
 
 # Seuils d'alerte (en % du quota mensuel)
 ALERT_THRESHOLDS_PCT = (80, 100)
@@ -153,7 +168,7 @@ async def check_quota_available(
             org.data["tokens_used_current_month"] = 0
 
     tokens_used = int(org.data.get("tokens_used_current_month") or 0)
-    tokens_limit = int(org.data.get("tokens_limit_monthly") or QUOTA_PLANS["pilot"])
+    tokens_limit = int(org.data.get("tokens_limit_monthly") or QUOTA_PLANS[DEFAULT_PLAN])
     tokens_pack = int(org.data.get("tokens_pack_remaining") or 0)
     remaining_monthly = max(0, tokens_limit - tokens_used)
     total_available = remaining_monthly + tokens_pack
@@ -178,7 +193,7 @@ async def check_quota_available(
         "tokens_pack_remaining": tokens_pack,
         "tokens_total_available": total_available,
         "used_pct": used_pct,
-        "plan": org.data.get("plan") or "pilot",
+        "plan": org.data.get("plan") or DEFAULT_PLAN,
     }
 
 
@@ -236,7 +251,7 @@ async def log_token_usage(
             return
 
         used = int(org.data.get("tokens_used_current_month") or 0)
-        limit = int(org.data.get("tokens_limit_monthly") or QUOTA_PLANS["pilot"])
+        limit = int(org.data.get("tokens_limit_monthly") or QUOTA_PLANS[DEFAULT_PLAN])
         pack = int(org.data.get("tokens_pack_remaining") or 0)
         last_alert_pct = int(org.data.get("last_quota_alert_pct") or 0)
 
@@ -321,7 +336,7 @@ async def _send_quota_alert(
         ).maybe_single().execute()
         org_name = org.data.get("name", organization_id) if org.data else organization_id
         org_email = org.data.get("email", "?") if org.data else "?"
-        plan = org.data.get("plan", "pilot") if org.data else "pilot"
+        plan = org.data.get("plan", DEFAULT_PLAN) if org.data else DEFAULT_PLAN
 
         emoji = "🚨" if threshold_pct >= 100 else "⚠️"
         status = "DÉPASSÉ" if threshold_pct >= 100 else f"{threshold_pct}% atteint"
@@ -380,12 +395,12 @@ async def get_monthly_usage(organization_id: str) -> dict[str, Any]:
     if not org_row:
         raise ValueError("Organisation introuvable")
 
-    plan = org_row.get("plan") or "pilot"
+    plan = org_row.get("plan") or DEFAULT_PLAN
     # tolère les deux conventions de nommage présentes dans la base
     limit = int(
         org_row.get("tokens_limit_monthly")
         or org_row.get("token_quota_monthly")
-        or QUOTA_PLANS.get(plan, QUOTA_PLANS["pilot"])
+        or QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN])
     )
     used = int(
         org_row.get("tokens_used_current_month")
@@ -437,12 +452,18 @@ async def get_monthly_usage(organization_id: str) -> dict[str, Any]:
         "tokens_pack_remaining": pack,
         "tokens_total_available": remaining_monthly + pack,
         "used_pct": used_pct,
+        # Vue « livrables » (affichage principal client) — conversion prudente.
+        "livrables_used": tokens_to_livrables(used),
+        "livrables_limit": tokens_to_livrables(limit),
+        "livrables_pack_remaining": tokens_to_livrables(pack),
+        "livrables_total_available": tokens_to_livrables(remaining_monthly + pack),
         "cost_chf_estimated": round(cost_chf_month, 2),
         "by_model": by_model,
         "credit_packs": credit_packs,
         "pack_info": {
             "tokens_per_pack": CREDIT_PACK_TOKENS,
             "price_chf_per_pack": CREDIT_PACK_PRICE_CHF,
+            "livrables_per_pack": CREDIT_PACK_LIVRABLES,
         },
     }
 
