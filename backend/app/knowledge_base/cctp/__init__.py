@@ -15,12 +15,14 @@ from __future__ import annotations
 
 from typing import Literal
 
+from app.knowledge_base.cctp.lot_ascenseur import LOT_ASCENSEUR
 from app.knowledge_base.cctp.lot_chauffage import LOT_CHAUFFAGE
 from app.knowledge_base.cctp.lot_electricite import LOT_ELECTRICITE
 from app.knowledge_base.cctp.lot_facade import LOT_FACADE
 from app.knowledge_base.cctp.lot_gros_oeuvre import LOT_GROS_OEUVRE
 from app.knowledge_base.cctp.lot_mcr import LOT_MCR
 from app.knowledge_base.cctp.lot_sanitaire import LOT_SANITAIRE
+from app.knowledge_base.cctp.lot_second_oeuvre import LOT_SECOND_OEUVRE
 from app.knowledge_base.cctp.lot_ventilation import LOT_VENTILATION
 
 # Registre principal : tous les lots disponibles
@@ -52,6 +54,19 @@ LOTS_REGISTRY = {
     "enveloppe": LOT_FACADE,
     "fenetres": LOT_FACADE,
     "toiture": LOT_FACADE,
+
+    "second_oeuvre": LOT_SECOND_OEUVRE,
+    "270": LOT_SECOND_OEUVRE,
+    "platrerie": LOT_SECOND_OEUVRE,
+    "cloisons": LOT_SECOND_OEUVRE,
+    "menuiserie_interieure": LOT_SECOND_OEUVRE,
+    "sols": LOT_SECOND_OEUVRE,
+    "peinture": LOT_SECOND_OEUVRE,
+    "amenagements": LOT_SECOND_OEUVRE,
+
+    "ascenseur": LOT_ASCENSEUR,
+    "ascenseurs": LOT_ASCENSEUR,
+    "261": LOT_ASCENSEUR,
 }
 
 
