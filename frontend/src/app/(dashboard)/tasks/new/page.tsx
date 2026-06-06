@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, ArrowRight, Loader2, FileText, Flame, Building, Building2, Shield, Bell,
   Layers, FileCheck2, MessageSquareWarning, Ruler, Zap, Users, Calculator, BookOpen,
-  PenTool, ScrollText, HelpCircle, X,
+  PenTool, ScrollText, HelpCircle, X, Library, Bookmark, Trash2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -44,11 +44,11 @@ const TASK_CATEGORIES: TaskCategory[] = [
     title: 'CCTP',
     description: 'Descriptif des prestations par lot — rédigé selon SIA 451',
     icon: ScrollText, color: 'bg-blue-50 text-blue-700',
-    fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'contraintes'],
+    fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'articles_libres', 'contraintes'],
     help: {
       what: 'Rédige le cahier des charges techniques d\'un lot : prescriptions, description du matériel, exigences de performance, contrôles et réceptions.',
       prereq: 'Le lot concerné, le type d\'ouvrage et le niveau de prestation visé.',
-      tips: 'Précisez les contraintes particulières pour un texte sur mesure. Le résultat est éditable (PDF + Word) avant diffusion.',
+      tips: 'Lot absent de la liste ? Choisissez « Autre lot » et décrivez-le. Le champ « Articles sur mesure » accepte n\'importe quelle prescription : LESO l\'intègre telle quelle. Le résultat est éditable (PDF + Word) avant diffusion.',
     },
   },
   {
@@ -227,12 +227,12 @@ const TASK_CATEGORIES: TaskCategory[] = [
   {
     id: 'coordination_inter_lots',
     title: 'Coordination inter-lots',
-    description: 'Détecte les conflits géométriques entre maquettes IFC de différents lots (structure, CVC, sanitaire…). Rapport + BCF.',
+    description: 'Pré-détection des conflits entre maquettes IFC (par enveloppe / bounding box) sur différents lots. Rapport + BCF à confirmer en géométrie fine.',
     icon: Layers, color: 'bg-indigo-50 text-indigo-700',
     days_saved: '2-4 j économisés',
     fields: ['project_name', 'ifc_multi_upload', 'author'],
     help: {
-      what: 'Compare plusieurs maquettes IFC (un lot chacune) et détecte les collisions géométriques. Produit un rapport et un fichier BCF ouvrable dans vos outils BIM.',
+      what: 'Compare plusieurs maquettes IFC (un lot chacune) et pré-détecte les collisions par recouvrement d\'enveloppes (bounding box). Produit un rapport et un fichier BCF ouvrable dans vos outils BIM, à confirmer en géométrie fine.',
       prereq: 'Au moins 2 maquettes IFC, une par lot (structure, CVC, sanitaire…), avec le nom du lot indiqué.',
       tips: 'Plus les maquettes sont géoréférencées au même point de base, plus la détection est fiable.',
     },
@@ -587,15 +587,33 @@ function AdaptiveFields({
           <Select value={form.lot || 'cvs'} onValueChange={(v) => setField('lot', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="cvs">CVS / Chauffage</SelectItem>
-              <SelectItem value="electricite">Électricité</SelectItem>
+              <SelectItem value="cvs">Chauffage / CVS</SelectItem>
+              <SelectItem value="ventilation">Ventilation</SelectItem>
               <SelectItem value="sanitaire">Sanitaire</SelectItem>
-              <SelectItem value="mcr">MCR</SelectItem>
-              <SelectItem value="structure">Structure</SelectItem>
-              <SelectItem value="enveloppe">Enveloppe</SelectItem>
-              <SelectItem value="second_oeuvre">Second œuvre</SelectItem>
+              <SelectItem value="electricite">Électricité</SelectItem>
+              <SelectItem value="mcr">MCR / GTB</SelectItem>
+              <SelectItem value="gros_oeuvre">Gros œuvre (béton, maçonnerie)</SelectItem>
+              <SelectItem value="facade">Façade / enveloppe</SelectItem>
+              <SelectItem value="second_oeuvre">Second œuvre (générique)</SelectItem>
+              <SelectItem value="custom">Autre lot (à décrire) …</SelectItem>
             </SelectContent>
           </Select>
+          {form.lot === 'custom' ? (
+            <div className="mt-2">
+              <Input
+                value={form.lot_custom || ''}
+                placeholder="Nom du lot (ex. Cloisonnement / doublages, Serrurerie, Ascenseurs…)"
+                onChange={(e) => setField('lot_custom', e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Lot libre : LESO construit le CCTP à partir des « Articles sur mesure » ci-dessous. Pensez à les renseigner.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Bibliothèque de prescriptions détaillée disponible pour tous les lots sauf « Second œuvre » (structure générique).
+            </p>
+          )}
         </div>
       )}
 
@@ -779,6 +797,13 @@ function AdaptiveFields({
         </div>
       )}
 
+      {fields.includes('articles_libres') && (
+        <CctpCustomArticles
+          value={form.articles_libres || ''}
+          onChange={(v) => setField('articles_libres', v)}
+        />
+      )}
+
       {fields.includes('contraintes') && (
         <div>
           <Label>Contraintes</Label>
@@ -933,6 +958,129 @@ function MultiIfcUpload({
   );
 }
 
+// Catalogue d'articles CCTP réutilisables — mémorisé sur le navigateur,
+// même logique que le catalogue de compositions thermiques.
+const CCTP_CATALOG_KEY = 'leso_cctp_articles_v1';
+type CctpSnippet = { name: string; content: string };
+
+function loadCctpCatalog(): CctpSnippet[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CCTP_CATALOG_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCctpCatalog(items: CctpSnippet[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CCTP_CATALOG_KEY, JSON.stringify(items));
+  } catch {
+    /* quota / mode privé : on ignore */
+  }
+}
+
+function CctpCustomArticles({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [catalog, setCatalog] = useState<CctpSnippet[]>(loadCctpCatalog);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [snippetName, setSnippetName] = useState('');
+
+  const saveSnippet = () => {
+    const name = snippetName.trim();
+    if (!name || !value.trim()) return;
+    const next = [{ name, content: value }, ...catalog.filter((s) => s.name !== name)].slice(0, 50);
+    setCatalog(next);
+    saveCctpCatalog(next);
+    setSnippetName('');
+  };
+  const insertSnippet = (s: CctpSnippet) => {
+    onChange(value.trim() ? `${value.trim()}\n\n${s.content}` : s.content);
+  };
+  const removeSnippet = (name: string) => {
+    const next = catalog.filter((s) => s.name !== name);
+    setCatalog(next);
+    saveCctpCatalog(next);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <Label>Articles & prescriptions sur mesure (optionnel)</Label>
+        <button
+          type="button"
+          onClick={() => setShowCatalog((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          <Library className="h-3.5 w-3.5" /> Mes modèles ({catalog.length})
+        </button>
+      </div>
+      <Textarea
+        rows={5}
+        value={value}
+        placeholder={'Saisissez librement vos exigences — LESO les intègre telles quelles au CCTP.\n\nEx :\n- Robinetterie : mitigeurs thermostatiques, corps laiton chromé\n- Garantie décennale exigée sur l’étanchéité de toiture\n- Compteur d’énergie thermique communicant M-Bus par logement'}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="text-[11px] text-muted-foreground mt-1">
+        Tout ce que vous écrivez ici fait foi : LESO le structure en CCTP sans altérer vos valeurs. Idéal pour un lot absent de la liste ou une exigence client spécifique.
+      </p>
+
+      {showCatalog && (
+        <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              className="h-8"
+              placeholder="Nom du modèle (ex. Sanitaire haut de gamme)"
+              value={snippetName}
+              onChange={(e) => setSnippetName(e.target.value)}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1 shrink-0"
+              onClick={saveSnippet}
+              disabled={!snippetName.trim() || !value.trim()}
+            >
+              <Bookmark className="h-3.5 w-3.5" /> Mémoriser
+            </Button>
+          </div>
+          {catalog.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Aucun modèle enregistré. Saisissez vos articles puis mémorisez-les pour les réutiliser sur vos prochains projets.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {catalog.map((s) => (
+                <li key={s.name} className="flex items-center justify-between gap-2 text-sm">
+                  <button
+                    type="button"
+                    className="flex-1 text-left hover:underline truncate"
+                    onClick={() => insertSnippet(s)}
+                    title="Insérer dans le champ"
+                  >
+                    {s.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSnippet(s.name)}
+                    className="text-muted-foreground hover:text-red-600"
+                    title="Supprimer ce modèle"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function buildTaskPayload(
   taskType: string,
   form: any,
@@ -988,6 +1136,8 @@ function buildTaskPayload(
       lot: form.lot, type_ouvrage: form.type_ouvrage,
       niveau_prestation: form.niveau_prestation, surface: form.surface,
       contraintes: form.contraintes,
+      articles_libres: form.articles_libres || '',
+      lot_custom: form.lot === 'custom' ? (form.lot_custom || '') : '',
     });
   } else if (taskType === 'chiffrage_dpgf' || taskType === 'chiffrage_dqe') {
     // L'agent chiffre à partir de metre_text (ou metre_document_id), pas de

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   CheckCircle2, AlertTriangle, XCircle, ShieldCheck, ChevronRight,
-  ThumbsUp, RotateCcw, Clock, Sparkles,
+  ThumbsUp, RotateCcw, Clock, Sparkles, ExternalLink, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { PageHeader } from '@/components/ui/page-header';
 import { formatDate } from '@/lib/utils';
+import { RegenerateDialog } from '@/components/dashboard/regenerate-dialog';
 
 const TASK_LABELS: Record<string, string> = {
   redaction_cctp: 'CCTP',
@@ -44,6 +45,13 @@ export default function ValidationPage() {
   const [review, setReview] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [acting, setActing] = useState(false);
+  const [showRegen, setShowRegen] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; variant: 'success' | 'info' } | null>(null);
+
+  const showToast = useCallback((msg: string, variant: 'success' | 'info' = 'success') => {
+    setToast({ msg, variant });
+    window.setTimeout(() => setToast(null), 5000);
+  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -73,6 +81,7 @@ export default function ValidationPage() {
     try {
       await api.approveTask(selected.id);
       setDrawerOpen(false);
+      showToast('Document validé — disponible dans le projet › Documents.');
       load();
     } catch (e: any) {
       alert(e?.message || 'Erreur lors de l\'approbation');
@@ -81,18 +90,18 @@ export default function ValidationPage() {
     }
   };
 
-  const doReject = async () => {
+  // « Renvoyer » = repart réellement en correction : on ouvre le dialogue de
+  // régénération (motifs + commentaire) qui relance l'agent sur ce feedback.
+  const openReject = () => {
     if (!selected) return;
-    setActing(true);
-    try {
-      await api.rejectTask(selected.id);
-      setDrawerOpen(false);
-      load();
-    } catch (e: any) {
-      alert(e?.message || 'Erreur lors du rejet');
-    } finally {
-      setActing(false);
-    }
+    setShowRegen(true);
+  };
+
+  const onRegenSuccess = () => {
+    setShowRegen(false);
+    setDrawerOpen(false);
+    showToast('Renvoyé en correction — l\'agent régénère le document, il réapparaîtra ici.', 'info');
+    load();
   };
 
   return (
@@ -235,6 +244,18 @@ export default function ValidationPage() {
               </div>
             )}
 
+            {/* Lire le document avant de trancher */}
+            {review.result_url && (
+              <a
+                href={review.result_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-secondary/40"
+              >
+                <ExternalLink className="h-4 w-4" /> Ouvrir le PDF à relire
+              </a>
+            )}
+
             {/* Permission */}
             {!review.can_approve && (
               <Banner variant="warning">{review.approval_reason}</Banner>
@@ -250,8 +271,8 @@ export default function ValidationPage() {
                 <ThumbsUp className="mr-2 h-4 w-4" /> Approuver
               </Button>
               <Button
-                onClick={doReject}
-                disabled={!review.can_approve || acting}
+                onClick={openReject}
+                disabled={acting}
                 variant="outline"
                 className="flex-1"
               >
@@ -259,12 +280,56 @@ export default function ValidationPage() {
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              En approuvant, vous engagez votre validation professionnelle sur ce document.
-            </p>
+            <div className="space-y-1.5 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              <p className="flex items-start gap-1.5">
+                <ThumbsUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
+                <span><strong>Approuver</strong> : engage votre validation professionnelle. Le PDF reste dans le projet › Documents, marqué validé.</span>
+              </p>
+              <p className="flex items-start gap-1.5">
+                <RotateCcw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span><strong>Renvoyer</strong> : indiquez ce qui ne va pas, l'agent régénère le document. Il revient ensuite dans cette file.</span>
+              </p>
+            </div>
           </div>
         )}
       </Drawer>
+
+      {/* « Renvoyer » → régénération réelle avec feedback */}
+      {selected && (
+        <RegenerateDialog
+          taskId={selected.id}
+          open={showRegen}
+          onClose={() => setShowRegen(false)}
+          onSuccess={onRegenSuccess}
+          currentPreview={review?.result_preview || selected.result_preview}
+          regenerationCount={review?.regeneration_count ?? 0}
+        />
+      )}
+
+      {/* Notification transitoire (validation / renvoi) */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[60] flex max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg animate-in fade-in slide-in-from-bottom-2 ${
+            toast.variant === 'success'
+              ? 'border-green-200 bg-green-50 text-green-900'
+              : 'border-amber-200 bg-amber-50 text-amber-900'
+          }`}
+        >
+          {toast.variant === 'success' ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+          ) : (
+            <RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          )}
+          <p className="text-sm leading-snug">{toast.msg}</p>
+          <button
+            onClick={() => setToast(null)}
+            className="ml-1 shrink-0 rounded p-0.5 hover:bg-black/5"
+            aria-label="Fermer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

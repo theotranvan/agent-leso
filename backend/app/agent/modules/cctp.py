@@ -47,7 +47,15 @@ Règles impératives :
 - Ton factuel, prescriptif, professionnel. Pas de marketing.
 - Structure en sections claires avec numéros d'articles CFC.
 - Produis du HTML sémantique (h2 pour les sections CFC, h3 pour les articles, ul pour les prescriptions, \
-  table pour les essais de réception)."""
+  table pour les essais de réception).
+
+ARTICLES PERSONNALISÉS DE L'INGÉNIEUR :
+Si l'ingénieur fournit des articles, prescriptions ou exigences sur mesure, traite-les comme des données \
+AUTORITAIRES (au même titre que la bibliothèque, voire prioritaires en cas de chevauchement). Intègre-les \
+pleinement dans le document : rattache-les à la bonne section CFC si possible (ou crée une section dédiée), \
+rédige-les dans le même style normatif, ajoute les essais de réception et normes SIA pertinents quand c'est \
+cohérent. Ne dénature jamais une valeur technique saisie par l'ingénieur ; conserve-la telle quelle. \
+Tu peux structurer et compléter, mais ce que l'ingénieur a écrit fait foi."""
 
 
 async def execute(task: dict[str, Any]) -> dict[str, Any]:
@@ -61,12 +69,21 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     niveau = params.get("niveau_prestation", "standard")
     surface = params.get("surface", "")
     contraintes = params.get("contraintes", "")
+    # Flexibilité maximale : lot libre + articles/prescriptions sur mesure
+    lot_custom = (params.get("lot_custom") or "").strip()
+    articles_libres = (params.get("articles_libres") or "").strip()
 
     # 1. Charge la structure CCTP réelle depuis la knowledge_base
-    lot_data = get_lot_cctp(lot)
+    # Si l'ingénieur a saisi un lot personnalisé, il prime sur le code lot fourni.
+    lot_label = lot_custom or lot
+    lot_data = None if lot_custom else get_lot_cctp(lot)
     if not lot_data:
-        # Lot non couvert par la KB : on signale clairement plutôt que d'improviser
-        logger.warning("Lot %s non couvert par la knowledge_base CCTP", lot)
+        # Lot non couvert par la KB (ou lot personnalisé) : on s'appuie sur les
+        # articles libres de l'ingénieur plutôt que d'improviser des valeurs.
+        if lot_custom:
+            logger.info("CCTP lot personnalisé demandé : %s", lot_custom)
+        else:
+            logger.warning("Lot %s non couvert par la knowledge_base CCTP", lot)
         cctp_structure = None
     else:
         cctp_structure = build_cctp_structure_for_lot(lot, niveau)
@@ -82,12 +99,27 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     # 2. Construit le prompt avec les prescriptions RÉELLES injectées
     if cctp_structure:
         kb_block = _format_kb_for_prompt(cctp_structure)
+    elif articles_libres:
+        # Pas de bibliothèque mais l'ingénieur a fourni ses propres articles :
+        # on bâtit le document autour de sa saisie.
+        kb_block = (
+            f"Aucune bibliothèque de clauses prédéfinie pour le lot « {lot_label} ». "
+            f"Le document doit être construit À PARTIR DES ARTICLES PERSONNALISÉS fournis par "
+            f"l'ingénieur ci-dessous, organisés et complétés en CCTP professionnel (structure CFC, "
+            f"essais de réception, normes SIA pertinentes lorsqu'elles s'appliquent)."
+        )
     else:
         kb_block = (
-            f"Aucune bibliothèque de clauses n'est disponible pour le lot '{lot}'. "
+            f"Aucune bibliothèque de clauses n'est disponible pour le lot « {lot_label} ». "
             f"Indique clairement dans le document les sections qui nécessitent une rédaction manuelle "
             f"par l'ingénieur, et ne produis que la structure attendue."
         )
+
+    articles_block = (
+        articles_libres
+        if articles_libres
+        else "Aucun article personnalisé fourni — utilise uniquement la bibliothèque et les contraintes."
+    )
 
     user_content = f"""Rédiger le CCTP du lot pour le projet suivant.
 
@@ -95,12 +127,16 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 - Projet : {project_name}
 - Adresse : {project_address}
 - Canton : {canton}
+- Lot : {lot_label}
 - Type d'ouvrage : {type_ouvrage or "non précisé"}
 - Niveau de prestation demandé : {niveau}
 - Surface concernée : {surface or "non précisée"} m²
 
 ## Contraintes particulières du projet
 {contraintes or "Aucune contrainte particulière signalée."}
+
+## ARTICLES & PRESCRIPTIONS PERSONNALISÉS DE L'INGÉNIEUR (autoritaires, à intégrer en priorité)
+{articles_block}
 
 ## PRESCRIPTIONS TECHNIQUES NORMALISÉES À INTÉGRER (issues de la bibliothèque métier)
 {kb_block}
@@ -109,8 +145,9 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 {rag_context or "Aucun document de référence."}
 
 ## Ta tâche
-Produis le CCTP complet en HTML sémantique. Contextualise chaque prescription au projet, \
-complète avec les contraintes, rédige l'introduction et les clauses générales. \
+Produis le CCTP complet en HTML sémantique. Intègre EN PRIORITÉ les articles personnalisés de \
+l'ingénieur (en conservant ses valeurs telles quelles), puis contextualise les prescriptions de la \
+bibliothèque au projet, complète avec les contraintes, rédige l'introduction et les clauses générales. \
 Conserve toutes les valeurs techniques et normes fournies."""
 
     # Régénération
@@ -140,11 +177,18 @@ Conserve toutes les valeurs techniques et normes fournies."""
     # Nettoyage si le LLM a wrappé dans des balises markdown de code
     body_html = body_html.replace("```html", "").replace("```", "").strip()
 
-    reference = f"CCTP-{lot.upper()[:4]}-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6]}"
+    import re as _re
+    lot_slug = _re.sub(r"[^a-z0-9]+", "_", lot_label.lower()).strip("_") or "lot"
+    reference = f"CCTP-{lot_slug.upper()[:6]}-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6]}"
 
     # 3. Génère le PDF à la charte client
     branding = await get_org_branding(org_id)
-    lot_intitule = lot_data["lot_intitule"] if lot_data else lot.upper()
+    if lot_data:
+        lot_intitule = lot_data["lot_intitule"]
+    elif lot_custom:
+        lot_intitule = lot_custom
+    else:
+        lot_intitule = lot.upper()
 
     full_html = render_document(
         doc_type="cctp",
@@ -154,7 +198,7 @@ Conserve toutes les valeurs techniques et normes fournies."""
             "Projet": project_name,
             "Adresse": project_address,
             "Canton": canton,
-            "Lot": f"{lot_data['lot_code'] if lot_data else ''} — {lot_intitule}",
+            "Lot": f"{lot_data['lot_code'] if lot_data else ''} — {lot_intitule}".lstrip(" —"),
             "Niveau": niveau,
         },
         body_html=body_html,
@@ -165,7 +209,7 @@ Conserve toutes les valeurs techniques et normes fournies."""
     pdf_bytes = _html_to_pdf(full_html)
 
     storage = get_storage()
-    filename = f"CCTP_{lot}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"CCTP_{lot_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     path = f"{org_id}/cctp/{task['id']}/{filename}"
     storage.upload(path, pdf_bytes, content_type="application/pdf")
     signed_url = storage.get_signed_url(path, expires_in=604800)
@@ -194,6 +238,8 @@ Conserve toutes les valeurs techniques et normes fournies."""
         "email_bytes": pdf_bytes,
         "email_filename": filename,
         "kb_used": bool(cctp_structure),
+        "custom_articles_used": bool(articles_libres),
+        "lot_label": lot_label,
         "articles_count": sum(len(s["articles"]) for s in cctp_structure["sections"]) if cctp_structure else 0,
     }
 
