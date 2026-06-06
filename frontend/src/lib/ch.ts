@@ -87,6 +87,15 @@ export const VENTILATION_TYPES = [
   { value: 'double_flux_geo', label: 'Double flux + puits canadien' },
 ];
 
+// Affectations reconnues par le calculateur IDC (seuils OCEN par type)
+export const AFFECTATIONS_IDC = [
+  { value: 'logement_collectif', label: 'Logement collectif' },
+  { value: 'logement_individuel', label: 'Logement individuel' },
+  { value: 'administration', label: 'Administration / bureau' },
+  { value: 'commerce', label: 'Commerce' },
+  { value: 'industriel', label: 'Industrie' },
+];
+
 export const AEAI_BUILDING_TYPES = [
   { value: 'habitation_faible', label: 'Habitation < 11 m' },
   { value: 'habitation_moyenne', label: 'Habitation 11-30 m' },

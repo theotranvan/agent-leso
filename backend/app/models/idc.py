@@ -40,4 +40,6 @@ class IDCDeclarationCreate(BaseModel):
     year: int = Field(ge=2015, le=2050)
     invoices: list[IDCInvoiceItem] = Field(default_factory=list)
     degree_days_period: Optional[float] = None
+    dju_year: Optional[float] = None  # DJU réels de l'année mesurée (correction climatique)
+    affectation: Optional[str] = None  # logement_collectif | logement_individuel | administration | commerce | industriel
     notes: Optional[str] = None
