@@ -159,6 +159,10 @@ async def get_task_review(task_id: str, user: Annotated[AuthUser, Depends(get_cu
     review["can_approve"] = allowed
     review["approval_reason"] = reason
     review["review_status"] = task.data.get("review_status")
+    # Permet d'ouvrir le PDF et de relier le bouton "Renvoyer" au flux de régénération
+    review["result_url"] = task.data.get("result_url")
+    review["result_preview"] = task.data.get("result_preview")
+    review["regeneration_count"] = int(task.data.get("regeneration_count") or 0)
     return review
 
 
