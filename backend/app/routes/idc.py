@@ -137,25 +137,45 @@ async def create_declaration(
         }
         for inv in body.invoices
     ]
-    affectation = "logement_collectif" if (building.get("nb_logements") or 0) > 1 else "logement_individuel"
+    # Affectation : choix explicite de la déclaration, sinon déduite du nb de logements.
+    affectation = body.affectation or (
+        "logement_collectif" if (building.get("nb_logements") or 0) > 1 else "logement_individuel"
+    )
     raw_calc = compute_annual_from_invoices(
         invoices_data,
         sre_m2=float(building["sre_m2"]),
         vector=building["heating_energy_vector"],
         affectation=affectation,
+        year=body.year,
+        dju_year=body.dju_year,  # correction climatique réelle si fourni
     )
 
     # Normalisation des clés : le service renvoie idc_*_an / total_energy_kwh /
     # status (str) ; le reste de la route (insert + formulaire PDF) attend des
     # noms stables (consumption_kwh, idc_*_mj_m2, status:dict).
     energy_kwh = raw_calc.get("total_energy_kwh") or 0
+    # Seuils applicables (MJ/m²·an) pour l'affectation retenue.
+    from app.connectors.idc.idc_calculator import (
+        IDC_THRESHOLDS_KWH_M2_AN,
+        MJ_PER_KWH,
+        IDCStatus,
+    )
+    thr = IDC_THRESHOLDS_KWH_M2_AN.get(affectation) or IDC_THRESHOLDS_KWH_M2_AN["logement_collectif"]
+    seuil_ok_mj = round(thr[IDCStatus.OK] * MJ_PER_KWH, 1)
+    seuil_assain_mj = round(thr[IDCStatus.ASSAINISSEMENT_OBLIGATOIRE] * MJ_PER_KWH, 1)
     calc = {
         **raw_calc,
         "consumption_kwh": energy_kwh,
         "energy_mj": energy_kwh * 3.6,
-        "idc_brut_mj_m2": raw_calc.get("idc_raw_kwh_m2_an", 0) * 3.6,
+        "idc_brut_mj_m2": round(raw_calc.get("idc_raw_kwh_m2_an", 0) * 3.6, 1),
         "idc_normalise_mj_m2": raw_calc.get("idc_mj_m2_an", 0),
         "nb_invoices": raw_calc.get("nb_factures", len(invoices_data)),
+        "affectation": affectation,
+        "dju_year": body.dju_year,
+        "dju_normal": raw_calc.get("dju_normal", 3050),
+        "correction_factor": raw_calc.get("correction_factor", 1.0),
+        "seuil_ok_mj_m2": seuil_ok_mj,
+        "seuil_assainissement_mj_m2": seuil_assain_mj,
         "status": {
             "label": raw_calc.get("classification_label", "—"),
             "level": raw_calc.get("status", "—"),
@@ -170,6 +190,8 @@ async def create_declaration(
         "year": body.year,
         "consumption_kwh": calc["consumption_kwh"],
         "idc_mj_m2": calc["idc_normalise_mj_m2"],
+        "idc_threshold_mj_m2": seuil_assain_mj,
+        "degree_days": body.dju_year,
         "source_documents": [inv.source_document_id for inv in body.invoices if inv.source_document_id],
         "status": "draft",
         "notes": body.notes,
@@ -222,6 +244,12 @@ async def create_declaration(
 def _build_idc_form_md(building: dict, declaration: dict, calc: dict) -> str:
     """Formulaire IDC genevois en markdown."""
     status = calc.get("status", {})
+    dju_year = calc.get("dju_year")
+    correction = calc.get("correction_factor", 1.0)
+    dju_line = (
+        f"{dju_year:g} DJU (correction ×{correction:g})"
+        if dju_year else f"non renseigné — IDC non corrigé du climat (correction ×{correction:g})"
+    )
     md = f"""# Déclaration IDC annuelle - Canton de Genève
 
 **Année de déclaration** : {declaration.get('year')}
@@ -235,6 +263,7 @@ def _build_idc_form_md(building: dict, declaration: dict, calc: dict) -> str:
 | Code postal | {building.get('postal_code', '')} |
 | Année de construction | {building.get('building_year', '—')} |
 | Nombre de logements | {building.get('nb_logements', '—')} |
+| Affectation | {calc.get('affectation', '—')} |
 | SRE (Surface de Référence Énergétique) | {building.get('sre_m2')} m² |
 | Régie / gestionnaire | {building.get('regie_name', '—')} |
 
@@ -247,12 +276,21 @@ def _build_idc_form_md(building: dict, declaration: dict, calc: dict) -> str:
 | Énergie totale (MJ) | {calc.get('energy_mj'):,.0f} |
 | Nombre de factures | {calc.get('nb_invoices', 0)} |
 
+## Correction climatique
+
+| Champ | Valeur |
+|---|---|
+| DJU normaux Genève-Cointrin (base 20/12) | {calc.get('dju_normal', 3050):g} |
+| DJU de l'année mesurée | {dju_line} |
+
 ## Calcul IDC
 
 | Champ | Valeur |
 |---|---|
 | **IDC brut** | **{calc.get('idc_brut_mj_m2')} MJ/m²/an** |
 | **IDC normalisé** | **{calc.get('idc_normalise_mj_m2')} MJ/m²/an** |
+| Seuil « dans la cible » | {calc.get('seuil_ok_mj_m2', '—')} MJ/m²/an |
+| Seuil assainissement | {calc.get('seuil_assainissement_mj_m2', '—')} MJ/m²/an |
 | Statut | **{status.get('label', '—')}** ({status.get('level', '—')}) |
 | Action recommandée | {status.get('action', '—')} |
 
