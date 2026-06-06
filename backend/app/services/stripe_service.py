@@ -155,7 +155,6 @@ def _handle_checkout_completed(session: dict) -> None:
 def _handle_subscription_updated(subscription: dict) -> None:
     organization_id = subscription.get("metadata", {}).get("organization_id")
     if not organization_id:
-        # Fallback: on cherche via customer_id
         customer_id = subscription.get("customer")
         admin = get_supabase_admin()
         result = admin.table("organizations").select("id").eq("stripe_customer_id", customer_id).maybe_single().execute()
@@ -163,7 +162,6 @@ def _handle_subscription_updated(subscription: dict) -> None:
             return
         organization_id = result.data["id"]
 
-    # Récupère le price_id et en déduit le plan
     items = subscription.get("items", {}).get("data", [])
     if not items:
         return
@@ -173,14 +171,17 @@ def _handle_subscription_updated(subscription: dict) -> None:
     status = subscription.get("status")
     active = status in ("active", "trialing")
 
+    from app.services.token_quota import QUOTA_PLANS
+    tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS.get("pilot", 8_000_000))
+
     admin = get_supabase_admin()
-    limits = settings.PLAN_LIMITS.get(plan, {"tasks": 500})
     admin.table("organizations").update({
         "plan": plan,
-        "tasks_limit": limits["tasks"],
+        "tokens_limit_monthly": tokens_limit,
         "stripe_subscription_id": subscription["id"],
         "active": active,
     }).eq("id", organization_id).execute()
+    logger.info("Subscription updated: org=%s plan=%s active=%s", organization_id, plan, active)
 
 
 def _handle_subscription_deleted(subscription: dict) -> None:
@@ -194,17 +195,29 @@ def _handle_subscription_deleted(subscription: dict) -> None:
 
 def _handle_payment_failed(invoice: dict) -> None:
     customer_id = invoice.get("customer")
+    attempt_count = invoice.get("attempt_count", 1)
     admin = get_supabase_admin()
     result = admin.table("organizations").select("id, email, name").eq("stripe_customer_id", customer_id).maybe_single().execute()
 
-    if result.data:
-        # Envoi d'un email d'alerte
+    if not result.data:
+        return
+
+    try:
         from app.services.email_service import send_alert_email
         send_alert_email(
             to=[result.data["email"]],
             subject="Paiement échoué — action requise",
             body_html="<p>Le paiement de votre abonnement LESO a échoué.</p><p>Merci de mettre à jour votre moyen de paiement dans votre espace client.</p>",
         )
+    except Exception as e:
+        logger.warning("Email paiement échoué : %s", e)
+
+    # Suspend after 2nd failed attempt (Stripe retries 3–4 times before deleting subscription)
+    if attempt_count >= 2:
+        admin.table("organizations").update({"active": False}).eq(
+            "id", result.data["id"],
+        ).execute()
+        logger.warning("Organisation %s suspendue après %d échecs de paiement", result.data["id"], attempt_count)
 
 
 def create_credit_pack_session(
