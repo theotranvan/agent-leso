@@ -54,9 +54,12 @@ async def get_project(project_id: str, user: Annotated[AuthUser, Depends(get_cur
     if not project.data:
         raise HTTPException(status_code=404, detail="Projet introuvable")
 
-    # Compteurs associés
-    docs = admin.table("documents").select("id", count="exact").eq("project_id", project_id).execute()
-    tasks = admin.table("tasks").select("id", count="exact").eq("project_id", project_id).execute()
+    # Compteurs associés — filtre org_id en défense en profondeur (le projet est
+    # déjà garanti appartenir à l'org ci-dessus, mais on ne compte jamais hors org).
+    docs = admin.table("documents").select("id", count="exact").eq(
+        "project_id", project_id).eq("organization_id", user.organization_id).execute()
+    tasks = admin.table("tasks").select("id", count="exact").eq(
+        "project_id", project_id).eq("organization_id", user.organization_id).execute()
 
     return {
         **project.data,

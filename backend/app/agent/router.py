@@ -143,7 +143,6 @@ ROUTING_TABLE: dict[str, str] = {
 
     # Coordination multi-lots : raisonnement transversal requis
     "coordination_inter_lots": MODEL_SONNET,
-    "dossier_permis_construire": MODEL_SONNET,
 
     # DOE : compilation argumentée avec synthèse des fiches techniques
     "doe_compilation": MODEL_SONNET,
@@ -152,9 +151,6 @@ ROUTING_TABLE: dict[str, str] = {
     # une bonne compréhension d'un programme architectural en langage naturel.
     "prebim_generation": MODEL_SONNET,
     "prebim_extraction": MODEL_SONNET,
-
-    # Analyse IFC détaillée
-    "analyse_ifc": MODEL_SONNET,
 
     # Vérification eurocode (France) : raisonnement technique structuré
     "verification_eurocode": MODEL_SONNET,  # rétrogradé d'Opus : le calcul
@@ -171,7 +167,6 @@ ROUTING_TABLE: dict[str, str] = {
 
     # Résumés, notifications — Haiku est littéralement fait pour ça
     "resume_document": MODEL_HAIKU,
-    "email_notification": MODEL_HAIKU,
     "extraction_metadata": MODEL_HAIKU,
 
     # Extraction factures IDC : structure fixe (valeur/unité/période),

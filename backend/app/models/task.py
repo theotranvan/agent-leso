@@ -13,8 +13,8 @@ TaskType = Literal[
     "metres_automatiques_ifc",
     # Sonnet - standard
     "redaction_cctp", "memoire_technique", "chiffrage_dpgf", "chiffrage_dqe",
-    "coordination_inter_lots", "dossier_permis_construire",
-    "analyse_ifc", "doe_compilation",
+    "coordination_inter_lots",
+    "doe_compilation",
     "controle_reglementaire_geneve", "controle_reglementaire_vaud",
     "controle_reglementaire_canton", "aeai_checklist_generation",
     "aeai_rapport", "descriptif_can_sia_451",
@@ -23,7 +23,7 @@ TaskType = Literal[
     "rapport_chantier",
     # Haiku - léger
     "veille_reglementaire", "resume_document", "compte_rendu_reunion",
-    "alerte_norme", "email_notification", "extraction_metadata",
+    "alerte_norme", "extraction_metadata",
     "simulation_energetique_rapide", "idc_extraction_facture",
     "veille_romande",
 ]
