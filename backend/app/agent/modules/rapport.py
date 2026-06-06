@@ -235,6 +235,11 @@ async def _resume_document(task: dict[str, Any]) -> dict[str, Any]:
     if not doc_text:
         raise ValueError("Aucun contenu à résumer")
 
+    org_id = task["organization_id"]
+    project_id = task.get("project_id")
+    project_info = await get_project_summary(org_id, project_id) if project_id else {}
+    project_name = project_info.get("name") or params.get("project_name", "")
+
     llm_result = await call_llm(
         task_type="resume_document",
         system_prompt=get_system_prompt("resume_document"),
@@ -243,10 +248,36 @@ async def _resume_document(task: dict[str, Any]) -> dict[str, Any]:
         temperature=0.2,
     )
 
+    md = llm_result["text"]
+    pdf_bytes = render_pdf_from_html(
+        body_html=markdown_to_html(md),
+        title="Résumé de document",
+        project_name=project_name,
+        author=params.get("author", ""),
+        reference=f"RES-{datetime.now().strftime('%Y%m%d-%H%M')}",
+    )
+
+    storage = get_storage()
+    filename = f"Resume_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    path = f"{org_id}/resumes/{task['id']}/{filename}"
+    storage.upload(path, pdf_bytes, content_type="application/pdf")
+    signed_url = storage.get_signed_url(path, expires_in=604800)
+
+    get_supabase_admin().table("documents").insert({
+        "organization_id": org_id,
+        "project_id": project_id,
+        "filename": filename,
+        "file_type": "pdf",
+        "storage_path": path,
+        "processed": True,
+    }).execute()
+
     return {
-        "result_url": None,
-        "preview": llm_result["text"],
+        "result_url": signed_url,
+        "preview": md[:1000],
         "model": llm_result["model"],
         "tokens_used": llm_result["tokens_used"],
         "cost_eur": llm_result["cost_eur"],
+        "email_bytes": pdf_bytes,
+        "email_filename": filename,
     }

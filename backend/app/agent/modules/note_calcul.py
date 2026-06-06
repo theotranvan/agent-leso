@@ -102,10 +102,21 @@ Produire la note de calcul complète en markdown. Toutes les formules doivent ê
 
     reference = f"NC-{task_type[:8].upper()}-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6]}"
 
+    # Référentiel normatif selon le domaine ET la localisation (Suisse → SIA).
+    is_suisse = "suisse" in str(localisation).lower()
+    if "structure" in task_type or "eurocode" in task_type:
+        referentiel = "SIA 260/267" if is_suisse else "Eurocodes"
+    elif "thermique" in task_type:
+        referentiel = "SIA 380/1" if is_suisse else "RE2020"
+    elif "acoustique" in task_type:
+        referentiel = "SIA 181" if is_suisse else "NRA"
+    else:
+        referentiel = ""
+
     pdf_bytes = render_pdf_from_html(
         body_html=body_html,
         title=doc_title,
-        subtitle=f"Conforme aux {'Eurocodes' if 'structure' in task_type or 'eurocode' in task_type else 'RE2020' if 'thermique' in task_type else 'NRA'}",
+        subtitle=f"Conforme aux {referentiel}" if referentiel else "",
         project_name=project_name,
         project_address=project_address,
         author=params.get("author", ""),
