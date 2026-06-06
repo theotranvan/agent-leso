@@ -52,23 +52,40 @@ def serialize_to_lesosai_xml(thermal_model: dict) -> bytes:
         ET.SubElement(zone, "VolumeM3").text = str(z.get("volume", 0))
         ET.SubElement(zone, "TempSetpointC").text = str(z.get("temp_setpoint", 20))
 
+    # Surface de référence énergétique (SRE) — saisie explicite ou somme des zones
+    sre = (thermal_model.get("hypotheses") or {}).get("sre_m2")
+    if not sre:
+        sre = sum(float(z.get("area", 0) or 0) for z in (thermal_model.get("zones") or []))
+    ET.SubElement(project, "SreM2").text = str(sre or "")
+
     # Parois
     walls_el = ET.SubElement(root, "Walls")
     for w in thermal_model.get("walls") or []:
         wall = ET.SubElement(walls_el, "Wall", id=str(w.get("id", "")))
         ET.SubElement(wall, "Type").text = str(w.get("type", "mur_exterieur"))
-        ET.SubElement(wall, "Orientation").text = str(w.get("orientation", ""))
+        ET.SubElement(wall, "Designation").text = str(w.get("name", "") or "")
+        ET.SubElement(wall, "Orientation").text = str(w.get("orientation", "") or "")
         ET.SubElement(wall, "AreaM2").text = str(w.get("area", 0))
-        ET.SubElement(wall, "UValueWm2K").text = str(w.get("u_value", ""))
+        ET.SubElement(wall, "UValueWm2K").text = str(w.get("u_value", "") or "")
 
     # Ouvertures
     openings_el = ET.SubElement(root, "Openings")
     for o in thermal_model.get("openings") or []:
         op = ET.SubElement(openings_el, "Opening", id=str(o.get("id", "")))
         ET.SubElement(op, "Type").text = str(o.get("type", "fenetre"))
+        ET.SubElement(op, "Designation").text = str(o.get("name", "") or "")
+        ET.SubElement(op, "Orientation").text = str(o.get("orientation", "") or "")
         ET.SubElement(op, "AreaM2").text = str(o.get("area", 0))
-        ET.SubElement(op, "UValueWm2K").text = str(o.get("u_value", ""))
-        ET.SubElement(op, "GValue").text = str(o.get("g_value", ""))
+        ET.SubElement(op, "UValueWm2K").text = str(o.get("u_value", "") or "")
+        ET.SubElement(op, "GValue").text = str(o.get("g_value", "") or "")
+
+    # Ponts thermiques
+    bridges_el = ET.SubElement(root, "ThermalBridges")
+    for b in thermal_model.get("thermal_bridges") or []:
+        br = ET.SubElement(bridges_el, "ThermalBridge")
+        ET.SubElement(br, "Type").text = str(b.get("type", "") or "")
+        ET.SubElement(br, "LengthM").text = str(b.get("length", 0))
+        ET.SubElement(br, "PsiWmK").text = str(b.get("psi", "") or "")
 
     # Systèmes
     systems = thermal_model.get("systems") or {}
@@ -85,15 +102,83 @@ def serialize_to_lesosai_xml(thermal_model: dict) -> bytes:
     return buf.getvalue()
 
 
+_WALL_TYPE_LABELS = {
+    "mur_exterieur": "Mur extérieur",
+    "toiture": "Toiture",
+    "dalle_sur_terrain": "Dalle sur terrain",
+    "dalle_sur_exterieur": "Dalle sur extérieur",
+    "dalle_sur_local_non_chauffe": "Dalle sur local non chauffé",
+    "mur_contre_terre": "Mur contre terre",
+    "mur_local_non_chauffe": "Mur contre local non chauffé",
+    "plancher": "Plancher",
+}
+_OPENING_TYPE_LABELS = {
+    "fenetre": "Fenêtre",
+    "porte_vitree": "Porte vitrée",
+    "porte_opaque": "Porte opaque",
+}
+
+
+def _wall_label(t: str) -> str:
+    return _WALL_TYPE_LABELS.get(t, t or "—")
+
+
+def _opening_label(t: str) -> str:
+    return _OPENING_TYPE_LABELS.get(t, t or "—")
+
+
+def _systems_lines(systems: dict) -> list[str]:
+    """Bloc « installations techniques » de la fiche (chauffage / ventilation / ECS)."""
+    if not isinstance(systems, dict) or not systems:
+        return []
+    lines: list[str] = ["## 5. Installations techniques"]
+    heating = systems.get("heating") if isinstance(systems.get("heating"), dict) else None
+    if heating:
+        parts = []
+        if heating.get("vector"):
+            parts.append(f"vecteur **{heating['vector']}**")
+        if heating.get("generator"):
+            parts.append(f"générateur **{heating['generator']}**")
+        if heating.get("efficiency"):
+            parts.append(f"rendement {heating['efficiency']}")
+        lines.append(f"- **Chauffage** : {', '.join(parts) if parts else 'à préciser'}")
+    vent = systems.get("ventilation") if isinstance(systems.get("ventilation"), dict) else None
+    if vent:
+        parts = []
+        if vent.get("type"):
+            parts.append(f"type **{vent['type']}**")
+        if vent.get("heat_recovery_pct") not in (None, ""):
+            parts.append(f"récupération de chaleur {vent['heat_recovery_pct']} %")
+        lines.append(f"- **Ventilation** : {', '.join(parts) if parts else 'à préciser'}")
+    ecs = systems.get("ecs") if isinstance(systems.get("ecs"), dict) else None
+    if ecs:
+        parts = []
+        if ecs.get("vector"):
+            parts.append(f"vecteur **{ecs['vector']}**")
+        if ecs.get("storage_liters") not in (None, ""):
+            parts.append(f"stockage {ecs['storage_liters']} L")
+        lines.append(f"- **Eau chaude sanitaire (ECS)** : {', '.join(parts) if parts else 'à préciser'}")
+    lines.append("")
+    return lines
+
+
 def build_operator_sheet_markdown(thermal_model: dict, prepared: dict) -> str:
-    """Fiche opérateur à ouvrir en parallèle de Lesosai."""
+    """Fiche de saisie à ouvrir en parallèle de Lesosai pour reporter les données."""
+    # SRE : valeur saisie explicitement, sinon estimée par la préparation du modèle.
+    sre = (thermal_model.get("hypotheses") or {}).get("sre_m2") or prepared.get("sre_total_m2", 0)
+
     lines = ["# Fiche de saisie Lesosai", ""]
+    lines.append(
+        "> Document d'aide à la saisie. Reportez ces données dans Lesosai, lancez le "
+        "calcul SIA 380/1, exportez le PDF de résultats puis réimportez-le dans LESO."
+    )
+    lines.append("")
     lines.append(f"**Projet** : {thermal_model.get('name', '?')}")
     lines.append(f"**Canton** : {thermal_model.get('canton', '?')}")
     lines.append(f"**Affectation** : {thermal_model.get('affectation', '?')}")
     lines.append(f"**Opération** : {thermal_model.get('operation_type', '?')}")
     lines.append(f"**Standard visé** : {thermal_model.get('standard', 'sia_380_1')}")
-    lines.append(f"**SRE totale** : {prepared.get('sre_total_m2', 0)} m²")
+    lines.append(f"**SRE (surface de référence énergétique)** : {sre} m²")
     lines.append("")
 
     if prepared.get("warnings"):
@@ -123,37 +208,54 @@ def build_operator_sheet_markdown(thermal_model: dict, prepared: dict) -> str:
 
     walls = thermal_model.get("walls") or []
     if walls:
-        lines.append("## 3. Parois")
-        lines.append("| Type | Orientation | Surface | U |")
-        lines.append("|---|---|---|---|")
+        lines.append("## 3. Parois opaques")
+        lines.append("| Désignation | Type | Orientation | Surface | U (W/m²·K) |")
+        lines.append("|---|---|---|---|---|")
         for w in walls:
             lines.append(
-                f"| {w.get('type', '')} | {w.get('orientation', '')} | "
-                f"{w.get('area', 0)} m² | {w.get('u_value', '?')} W/m²K |"
+                f"| {w.get('name', '') or '—'} | {_wall_label(w.get('type', ''))} | "
+                f"{w.get('orientation', '') or '—'} | {w.get('area', 0)} m² | "
+                f"{w.get('u_value', '?')} |"
             )
         lines.append("")
 
     openings = thermal_model.get("openings") or []
     if openings:
         lines.append("## 4. Ouvertures")
-        lines.append("| Type | Orientation | Surface | U | g |")
-        lines.append("|---|---|---|---|---|")
+        lines.append("| Désignation | Type | Orientation | Surface | U | g |")
+        lines.append("|---|---|---|---|---|---|")
         for o in openings:
             lines.append(
-                f"| {o.get('type', '')} | {o.get('orientation', '')} | "
-                f"{o.get('area', 0)} m² | {o.get('u_value', '?')} | {o.get('g_value', '?')} |"
+                f"| {o.get('name', '') or '—'} | {_opening_label(o.get('type', ''))} | "
+                f"{o.get('orientation', '') or '—'} | {o.get('area', 0)} m² | "
+                f"{o.get('u_value', '?')} | {o.get('g_value', '?')} |"
+            )
+        lines.append("")
+
+    lines.extend(_systems_lines(thermal_model.get("systems") or {}))
+
+    bridges = thermal_model.get("thermal_bridges") or []
+    if bridges:
+        lines.append("## 6. Ponts thermiques")
+        lines.append("| Type de liaison | Longueur (ml) | ψ (W/m·K) |")
+        lines.append("|---|---|---|")
+        for b in bridges:
+            lines.append(
+                f"| {b.get('type', '') or '—'} | {b.get('length', 0)} | {b.get('psi', '?')} |"
             )
         lines.append("")
 
     lines.append("---\n")
     lines.append("## Procédure Lesosai")
-    lines.append("1. Ouvrir Lesosai, nouveau projet avec les paramètres du projet ci-dessus")
+    lines.append("1. Ouvrir Lesosai, nouveau projet avec les paramètres ci-dessus (canton, affectation, standard)")
     lines.append("2. Sélectionner la station climatique (section 1)")
-    lines.append("3. Saisir les zones thermiques (section 2)")
-    lines.append("4. Créer les compositions selon les U-values (section 3)")
-    lines.append("5. Reporter les ouvertures (section 4)")
-    lines.append("6. Lancer le calcul, exporter le PDF")
-    lines.append("7. Revenir dans LESO → Thermique → Importer les résultats")
+    lines.append("3. Saisir les zones thermiques et la SRE (section 2)")
+    lines.append("4. Créer les compositions de parois selon les désignations et U (section 3)")
+    lines.append("5. Reporter les ouvertures avec U et facteur solaire g (section 4)")
+    lines.append("6. Renseigner les installations techniques (section 5)")
+    lines.append("7. Saisir les ponts thermiques (section 6)")
+    lines.append("8. Lancer le calcul, exporter le PDF de résultats")
+    lines.append("9. Revenir dans LESO → Thermique → Importer les résultats")
     return "\n".join(lines)
 
 

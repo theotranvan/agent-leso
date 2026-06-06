@@ -158,18 +158,31 @@ async def run_thermal(
 
     storage = get_storage()
 
-    # Pour engine 'lesosai_file' : générer XML + fiche saisie
+    # Pour engine 'lesosai_file' : générer XML (données) + fiche de saisie (md + PDF)
     if engine_name == "lesosai_file":
         xml_bytes = serialize_to_lesosai_xml(model)
         engine = get_engine("lesosai_file")
         prep = await engine.prepare_model(model)
         sheet_md = build_operator_sheet_markdown(model, prep)
 
+        # Fiche de saisie en PDF — livrable principal, prêt à imprimer/poser à côté de Lesosai
+        from app.services.pdf_generator import markdown_to_html, render_pdf_from_html
+        sheet_pdf = render_pdf_from_html(
+            body_html=markdown_to_html(sheet_md),
+            title="Fiche de saisie Lesosai",
+            subtitle="SIA 380/1 — aide à la saisie",
+            project_name=project_name or model.get("name", ""),
+            project_address=project_address,
+            reference=f"FICHE-LESOSAI-{datetime.utcnow().strftime('%Y%m%d-%H%M')}",
+        )
+
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         xml_path = f"{user.organization_id}/thermique/{model_id}/lesosai_{ts}.xml"
         sheet_path = f"{user.organization_id}/thermique/{model_id}/fiche_saisie_{ts}.md"
+        sheet_pdf_path = f"{user.organization_id}/thermique/{model_id}/fiche_saisie_{ts}.pdf"
         storage.upload(xml_path, xml_bytes, content_type="application/xml; charset=utf-8")
         storage.upload(sheet_path, sheet_md.encode("utf-8"), content_type="text/markdown")
+        storage.upload(sheet_pdf_path, sheet_pdf, content_type="application/pdf")
 
         # Log exchange
         admin.table("lesosai_exchanges").insert({
@@ -196,10 +209,11 @@ async def run_thermal(
 
         return {
             "engine": engine_name,
-            "lesosai_xml_url": storage.get_signed_url(xml_path, expires_in=604800),
+            "operator_sheet_pdf_url": storage.get_signed_url(sheet_pdf_path, expires_in=604800),
             "operator_sheet_url": storage.get_signed_url(sheet_path, expires_in=604800),
+            "lesosai_xml_url": storage.get_signed_url(xml_path, expires_in=604800),
             "warnings": prep.get("warnings", []),
-            "next_step": "Saisir dans Lesosai (aidé par la fiche), exporter résultats PDF, puis utiliser POST /thermique/models/{id}/import-results",
+            "next_step": "Imprimer la fiche de saisie, reporter dans Lesosai, exporter le PDF de résultats, puis l'importer ci-dessous (étape 2).",
         }
 
     # Engine stub : calcul immédiat + justificatif

@@ -88,11 +88,12 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
-            Étape 1 — Générer le dossier Lesosai
+            Étape 1 — Générer la fiche de saisie Lesosai
           </CardTitle>
           <CardDescription>
-            Le moteur file produit un XML pré-rempli + une fiche de saisie pour accélérer votre travail dans Lesosai.
-            Le moteur stub donne un calcul indicatif rapide (avant-projet uniquement).
+            Le moteur « Export Lesosai » produit une <strong>fiche de saisie PDF</strong> (toutes vos données
+            structurées prêtes à reporter dans Lesosai) + les données en XML. Le moteur indicatif donne un
+            calcul rapide d'avant-projet, non officiel.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -124,18 +125,29 @@ export default function ThermiqueDetailPage({ params }: { params: Promise<{ id: 
           {result && (
             <div className="mt-4 p-4 bg-muted rounded-md space-y-2">
               <p className="text-sm font-medium">Dossier généré</p>
-              {result.lesosai_xml_url && (
-                <div className="flex gap-2">
-                  <Button variant="outline" asChild size="sm">
-                    <a href={result.lesosai_xml_url} target="_blank" rel="noopener noreferrer" download>
-                      <Download className="h-3 w-3 mr-2" /> XML Lesosai
-                    </a>
-                  </Button>
-                  <Button variant="outline" asChild size="sm">
-                    <a href={result.operator_sheet_url} target="_blank" rel="noopener noreferrer" download>
-                      <Download className="h-3 w-3 mr-2" /> Fiche de saisie
-                    </a>
-                  </Button>
+              {(result.operator_sheet_pdf_url || result.lesosai_xml_url) && (
+                <div className="flex flex-wrap gap-2">
+                  {result.operator_sheet_pdf_url && (
+                    <Button asChild size="sm">
+                      <a href={result.operator_sheet_pdf_url} target="_blank" rel="noopener noreferrer" download>
+                        <FileText className="h-3 w-3 mr-2" /> Fiche de saisie (PDF)
+                      </a>
+                    </Button>
+                  )}
+                  {result.lesosai_xml_url && (
+                    <Button variant="outline" asChild size="sm">
+                      <a href={result.lesosai_xml_url} target="_blank" rel="noopener noreferrer" download>
+                        <Download className="h-3 w-3 mr-2" /> Données (XML)
+                      </a>
+                    </Button>
+                  )}
+                  {result.operator_sheet_url && (
+                    <Button variant="outline" asChild size="sm">
+                      <a href={result.operator_sheet_url} target="_blank" rel="noopener noreferrer" download>
+                        <Download className="h-3 w-3 mr-2" /> Fiche (Markdown)
+                      </a>
+                    </Button>
+                  )}
                 </div>
               )}
               {result.pdf_url && (
