@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { BetaAccessGate } from '@/components/dashboard/beta-access-gate';
+import { WhatsNewModal } from '@/components/dashboard/whats-new-modal';
 import { ActiveProjectProvider } from '@/lib/active-project';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
+      <WhatsNewModal />
     </ActiveProjectProvider>
   );
 }
