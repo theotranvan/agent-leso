@@ -2,7 +2,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, Download, Zap, RefreshCw, Loader2, AlertCircle, Sparkles, History,
+  ArrowLeft, Download, Zap, RefreshCw, Loader2, AlertCircle, Sparkles, History, FileText,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState<string | null>(null);
   const [showRegenDialog, setShowRegenDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [docxLoading, setDocxLoading] = useState(false);
+
+  const handleDocx = async () => {
+    setDocxLoading(true);
+    try {
+      await api.exportTaskDocx(id);
+    } catch (e: any) {
+      setError(e?.userMessage || e?.message || 'Export Word échoué');
+    } finally {
+      setDocxLoading(false);
+    }
+  };
 
   const fetchTask = async () => {
     try {
@@ -100,9 +112,15 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 rel="noopener noreferrer"
               >
                 <Button variant="default" className="gap-2">
-                  <Download className="h-4 w-4" /> Télécharger
+                  <Download className="h-4 w-4" /> PDF
                 </Button>
               </a>
+            )}
+            {isDone && (
+              <Button variant="outline" onClick={handleDocx} disabled={docxLoading} className="gap-2">
+                {docxLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                Word
+              </Button>
             )}
             {canRegenerate && (
               <Button

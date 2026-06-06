@@ -321,6 +321,7 @@ engagent seuls leur responsabilité professionnelle sur la conformité du dossie
         "cost_eur": llm["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(full_md),
         "nb_pieces_attendues": len(pieces_attendues),
         "nb_pieces_manquantes": len(doc_coverage["missing_codes"]),
         "coverage_pct": round(doc_coverage["present"] / len(pieces_attendues) * 100, 1),

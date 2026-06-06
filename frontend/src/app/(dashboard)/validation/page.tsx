@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   CheckCircle2, AlertTriangle, XCircle, ShieldCheck, ChevronRight,
-  ThumbsUp, RotateCcw, Clock, Sparkles, ExternalLink, X,
+  ThumbsUp, RotateCcw, Clock, Sparkles, ExternalLink, FileText, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +46,20 @@ export default function ValidationPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [acting, setActing] = useState(false);
   const [showRegen, setShowRegen] = useState(false);
+  const [docxLoading, setDocxLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; variant: 'success' | 'info' } | null>(null);
+
+  const handleDocx = async () => {
+    if (!selected) return;
+    setDocxLoading(true);
+    try {
+      await api.exportTaskDocx(selected.id);
+    } catch (e: any) {
+      alert(e?.userMessage || e?.message || 'Export Word échoué');
+    } finally {
+      setDocxLoading(false);
+    }
+  };
 
   const showToast = useCallback((msg: string, variant: 'success' | 'info' = 'success') => {
     setToast({ msg, variant });
@@ -244,17 +257,27 @@ export default function ValidationPage() {
               </div>
             )}
 
-            {/* Lire le document avant de trancher */}
-            {review.result_url && (
-              <a
-                href={review.result_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-secondary/40"
+            {/* Lire / récupérer le document avant de trancher */}
+            <div className="flex gap-2">
+              {review.result_url && (
+                <a
+                  href={review.result_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-secondary/40"
+                >
+                  <ExternalLink className="h-4 w-4" /> Ouvrir le PDF
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handleDocx}
+                disabled={docxLoading}
+                className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-secondary/40 disabled:opacity-60"
               >
-                <ExternalLink className="h-4 w-4" /> Ouvrir le PDF à relire
-              </a>
-            )}
+                <FileText className="h-4 w-4" /> {docxLoading ? 'Export…' : 'Télécharger Word'}
+              </button>
+            </div>
 
             {/* Permission */}
             {!review.can_approve && (

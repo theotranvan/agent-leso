@@ -13,6 +13,25 @@ from app.models.task import TaskCreate, TaskStatusResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
+# Libellés lisibles pour les exports Word
+_TASK_DOCX_LABELS = {
+    "redaction_cctp": "CCTP",
+    "justificatif_sia_380_1": "Justificatif thermique SIA 380-1",
+    "note_calcul_sia_260_267": "Note de calcul structure",
+    "chiffrage_dpgf": "DPGF",
+    "chiffrage_dqe": "DQE",
+    "aeai_rapport": "Rapport AEAI",
+    "aeai_checklist_generation": "Checklist AEAI",
+    "idc_geneve_rapport": "Rapport IDC",
+    "coordination_inter_lots": "Coordination inter-lots",
+    "dossier_mise_enquete": "Dossier mise a l'enquete",
+    "memoire_technique": "Memoire technique",
+    "compte_rendu_reunion": "Compte-rendu de reunion",
+    "rapport_chantier": "Rapport de chantier",
+    "reponse_observations_autorite": "Reponse aux observations",
+    "controle_reglementaire_geneve": "Controle reglementaire",
+}
+
 
 async def _get_redis_pool():
     """Pool ARQ pour publier des jobs."""
@@ -92,6 +111,72 @@ async def get_task(task_id: str, user: Annotated[AuthUser, Depends(get_current_u
     if not task.data:
         raise HTTPException(status_code=404, detail="Tâche introuvable")
     return task.data
+
+
+@router.get("/{task_id}/export.docx")
+async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_current_user)]):
+    """Exporte le livrable d'une tâche en Word (.docx) éditable.
+
+    Utilise le HTML source du livrable (sidecar) si disponible — sinon repli
+    sur l'aperçu texte. Renvoie toujours un .docx valide et modifiable.
+    """
+    from fastapi import Response
+
+    from app.database import get_storage
+    from app.services.docx_generator import html_to_docx_bytes, text_to_docx_bytes
+
+    admin = get_supabase_admin()
+    task = (
+        admin.table("tasks").select("*")
+        .eq("id", task_id).eq("organization_id", user.organization_id)
+        .maybe_single().execute()
+    )
+    if not task.data:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
+    t = task.data
+    if t.get("status") != "completed":
+        raise HTTPException(status_code=409, detail="Le livrable n'est pas encore prêt.")
+
+    ip = t.get("input_params") or {}
+    label = _TASK_DOCX_LABELS.get(t["task_type"], t["task_type"].replace("_", " ").title())
+    project_name = ip.get("project_name") or ""
+    title = label + (f" — {project_name}" if project_name else "")
+    footer = ("Document généré par LESO — à vérifier et valider par l'ingénieur "
+              "responsable avant diffusion.")
+
+    # HTML source (sidecar) si disponible, sinon repli sur l'aperçu texte
+    body_html = None
+    try:
+        raw = get_storage().download(f"{user.organization_id}/_docx_src/{task_id}.html")
+        body_html = raw.decode("utf-8")
+    except Exception:
+        body_html = None
+
+    if body_html:
+        branding = None
+        try:
+            from app.knowledge_base.templates.charter import get_org_branding
+            branding = await get_org_branding(user.organization_id)
+        except Exception:
+            branding = None
+        project_info = {k: v for k, v in {"Projet": project_name, "Type de document": label}.items() if v}
+        docx_bytes = html_to_docx_bytes(
+            body_html, title=title, project_info=project_info,
+            branding=branding, footer_note=footer,
+        )
+    else:
+        docx_bytes = text_to_docx_bytes(
+            t.get("result_preview") or "Aucun contenu disponible.",
+            title=title, footer_note=footer,
+        )
+
+    safe = "".join(c if c.isalnum() else "_" for c in label)[:40]
+    filename = f"{safe}_{task_id[:8]}.docx"
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/approve-via-token")

@@ -199,6 +199,7 @@ Produire la lettre complète en markdown."""
         "cost_eur": llm["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(md),
         "nb_observations": len(observations),
         "themes_detected": list({o["theme"] for o in observations}),
     }
