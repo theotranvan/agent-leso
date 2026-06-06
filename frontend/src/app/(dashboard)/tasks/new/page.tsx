@@ -227,12 +227,12 @@ const TASK_CATEGORIES: TaskCategory[] = [
   {
     id: 'coordination_inter_lots',
     title: 'Coordination inter-lots',
-    description: 'Détecte les conflits géométriques entre maquettes IFC de différents lots (structure, CVC, sanitaire…). Rapport + BCF.',
+    description: 'Pré-détection des conflits entre maquettes IFC (par enveloppe / bounding box) sur différents lots. Rapport + BCF à confirmer en géométrie fine.',
     icon: Layers, color: 'bg-indigo-50 text-indigo-700',
     days_saved: '2-4 j économisés',
     fields: ['project_name', 'ifc_multi_upload', 'author'],
     help: {
-      what: 'Compare plusieurs maquettes IFC (un lot chacune) et détecte les collisions géométriques. Produit un rapport et un fichier BCF ouvrable dans vos outils BIM.',
+      what: 'Compare plusieurs maquettes IFC (un lot chacune) et pré-détecte les collisions par recouvrement d\'enveloppes (bounding box). Produit un rapport et un fichier BCF ouvrable dans vos outils BIM, à confirmer en géométrie fine.',
       prereq: 'Au moins 2 maquettes IFC, une par lot (structure, CVC, sanitaire…), avec le nom du lot indiqué.',
       tips: 'Plus les maquettes sont géoréférencées au même point de base, plus la détection est fiable.',
     },
@@ -587,15 +587,19 @@ function AdaptiveFields({
           <Select value={form.lot || 'cvs'} onValueChange={(v) => setField('lot', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="cvs">CVS / Chauffage</SelectItem>
-              <SelectItem value="electricite">Électricité</SelectItem>
+              <SelectItem value="cvs">Chauffage / CVS</SelectItem>
+              <SelectItem value="ventilation">Ventilation</SelectItem>
               <SelectItem value="sanitaire">Sanitaire</SelectItem>
-              <SelectItem value="mcr">MCR</SelectItem>
-              <SelectItem value="structure">Structure</SelectItem>
-              <SelectItem value="enveloppe">Enveloppe</SelectItem>
-              <SelectItem value="second_oeuvre">Second œuvre</SelectItem>
+              <SelectItem value="electricite">Électricité</SelectItem>
+              <SelectItem value="mcr">MCR / GTB</SelectItem>
+              <SelectItem value="gros_oeuvre">Gros œuvre (béton, maçonnerie)</SelectItem>
+              <SelectItem value="facade">Façade / enveloppe</SelectItem>
+              <SelectItem value="second_oeuvre">Second œuvre (générique)</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Bibliothèque de prescriptions détaillée disponible pour tous les lots sauf « Second œuvre » (structure générique).
+          </p>
         </div>
       )}
 

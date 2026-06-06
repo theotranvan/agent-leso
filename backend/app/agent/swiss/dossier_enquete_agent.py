@@ -228,6 +228,10 @@ Structure du mémoire :
 Consignes :
 - Ton factuel et technique, pas commercial
 - Référencer les normes SIA/AEAI et les lois cantonales sans reproduction de texte
+- SURFACES : n'utilise QUE les valeurs fournies ci-dessus (SRE, volume, terrain, indices). \
+N'invente JAMAIS une décomposition SIA 416 chiffrée (SP/SB par niveau) qui ne serait pas fournie : \
+pour toute surface non communiquée, écris explicitement « [À COMPLÉTER — voir tableau SIA 416 de l'architecte] ». \
+Les surfaces définitives proviennent du tableau SIA 416 établi par l'architecte (ou du module Métrés IFC).
 - Lister clairement les pièces manquantes en conclusion (rubrique "Points d'attention")
 - Prévoir visa ingénieur + architecte en bas"""
 

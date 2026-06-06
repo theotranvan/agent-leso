@@ -65,10 +65,11 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
 {clashes_summary}
 
 Produire un rapport de coordination structuré en markdown, avec :
-1. Synthèse (nb conflits, criticité, lots impactés)
-2. Matrice conflits par couple de lots
-3. Liste détaillée des top 30 conflits les plus critiques avec analyse et résolution proposée
-4. Plan d'action
+1. Note de méthode : préciser que la détection est réalisée par recouvrement d'enveloppes (bounding box) — une première passe qui peut générer des faux positifs et doit être confirmée sur la géométrie fine dans l'outil BIM (Solibri, BIMcollab…)
+2. Synthèse (nb conflits, criticité, lots impactés)
+3. Matrice conflits par couple de lots
+4. Liste détaillée des top 30 conflits les plus critiques avec analyse et résolution proposée
+5. Plan d'action
 
 Sois concret et actionnable."""
 
@@ -87,7 +88,7 @@ Sois concret et actionnable."""
     pdf_bytes = render_pdf_from_html(
         body_html=body_html,
         title="Rapport de Coordination inter-lots",
-        subtitle=f"{len(clashes)} conflits détectés",
+        subtitle=f"{len(clashes)} conflits potentiels (détection par enveloppe / bounding box)",
         project_name=project_name,
         project_address=project_address,
         author=params.get("author", ""),
