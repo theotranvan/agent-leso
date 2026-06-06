@@ -35,8 +35,34 @@ type TaskCategory = {
   help?: TaskHelp;
 };
 
+// Ordre = fréquence d'usage réelle en bureau (du plus utilisé au plus spécialisé).
+// Modifier l'ordre ici suffit à réorganiser la page "Générer un livrable".
 const TASK_CATEGORIES: TaskCategory[] = [
-  // Livrables haute valeur
+  // ----- Cœur quotidien : rédaction & livrables réglementaires fréquents -----
+  {
+    id: 'redaction_cctp',
+    title: 'CCTP',
+    description: 'Descriptif des prestations par lot — rédigé selon SIA 451',
+    icon: ScrollText, color: 'bg-blue-50 text-blue-700',
+    fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'contraintes'],
+    help: {
+      what: 'Rédige le cahier des charges techniques d\'un lot : prescriptions, description du matériel, exigences de performance, contrôles et réceptions.',
+      prereq: 'Le lot concerné, le type d\'ouvrage et le niveau de prestation visé.',
+      tips: 'Précisez les contraintes particulières pour un texte sur mesure. Le résultat est éditable (PDF + Word) avant diffusion.',
+    },
+  },
+  {
+    id: 'justificatif_sia_380_1',
+    title: 'Justificatif SIA 380/1',
+    description: 'Thermique — requiert un modèle ou un IFC (redirige vers le module)',
+    icon: Flame, color: 'bg-orange-50 text-orange-700',
+    fields: ['redirect_thermique'],
+    help: {
+      what: 'Justificatif thermique officiel SIA 380/1. Ouvre le module Thermique : saisie de la composition (zones, parois, ouvertures) puis export/import Lesosai.',
+      prereq: 'La composition de l\'enveloppe : surfaces et valeurs U des parois, fenêtres. Les métrés IFC fournissent les surfaces.',
+      tips: 'Pensez à « Enregistrer la composition » avant de lancer l\'export. Un calcul indicatif rapide est aussi disponible en avant-projet.',
+    },
+  },
   {
     id: 'dossier_mise_enquete',
     title: 'Dossier mise en enquête',
@@ -64,16 +90,51 @@ const TASK_CATEGORIES: TaskCategory[] = [
     },
   },
   {
-    id: 'coordination_inter_lots',
-    title: 'Coordination inter-lots',
-    description: 'Détecte les conflits géométriques entre maquettes IFC de différents lots (structure, CVC, sanitaire…). Rapport + BCF.',
-    icon: Layers, color: 'bg-indigo-50 text-indigo-700',
-    days_saved: '2-4 j économisés',
-    fields: ['project_name', 'ifc_multi_upload', 'author'],
+    id: 'chiffrage_dpgf',
+    title: 'DPGF / Chiffrage',
+    description: 'Devis quantitatif structuré par lot à partir du programme',
+    icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
+    fields: ['project_name', 'lot', 'surface', 'notes'],
     help: {
-      what: 'Compare plusieurs maquettes IFC (un lot chacune) et détecte les collisions géométriques. Produit un rapport et un fichier BCF ouvrable dans vos outils BIM.',
-      prereq: 'Au moins 2 maquettes IFC, une par lot (structure, CVC, sanitaire…), avec le nom du lot indiqué.',
-      tips: 'Plus les maquettes sont géoréférencées au même point de base, plus la détection est fiable.',
+      what: 'Génère un bordereau DPGF par lot avec postes, unités et prix unitaires indicatifs (indice 2025, ajusté au canton).',
+      prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
+      tips: 'Les prix sont indicatifs : à ajuster selon vos sous-traitants et le marché.',
+    },
+  },
+  {
+    id: 'controle_reglementaire_geneve',
+    title: 'Contrôle réglementaire',
+    description: 'Rapport pré-dépôt : zone, énergie, LDTR, AEAI, stationnement',
+    icon: FileText, color: 'bg-blue-50 text-blue-700',
+    fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'nb_logements'],
+    help: {
+      what: 'Vérification automatique avant dépôt : indices d\'utilisation du sol, énergie, LDTR, AEAI, stationnement. Produit un rapport vert/rouge par critère.',
+      prereq: 'Canton, adresse, affectation, type d\'opération, SRE et nombre de logements.',
+      tips: 'Filet de sécurité avant dépôt — ce n\'est pas un avis juridique. Idéal pour repérer un point bloquant tôt.',
+    },
+  },
+  {
+    id: 'aeai_checklist_generation',
+    title: 'Checklist AEAI',
+    description: 'Checklist incendie pour une typologie donnée',
+    icon: Shield, color: 'bg-amber-50 text-amber-700',
+    fields: ['project_name', 'building_type', 'height_m', 'nb_occupants_max', 'special_context'],
+    help: {
+      what: 'Génère la checklist de conformité incendie AEAI adaptée à la typologie du bâtiment, avec les références des directives.',
+      prereq: 'La typologie, la hauteur et l\'occupation maximale du bâtiment.',
+      tips: 'Décrivez le « contexte particulier » (parking, local déchets, vélos…) : LESO ajoute les points de vigilance correspondants et l\'autorité cantonale compétente.',
+    },
+  },
+  {
+    id: 'idc_geneve_rapport',
+    title: 'IDC Genève',
+    description: 'Extraction factures, calcul, formulaire OCEN (redirige vers le module)',
+    icon: Building2, color: 'bg-emerald-50 text-emerald-700',
+    fields: ['redirect_idc'],
+    help: {
+      what: 'Calcule l\'indice de dépense de chaleur (IDC) genevois et produit le rapport annuel + le formulaire OCEN, à partir des consommations.',
+      prereq: 'EGID, SRE, énergie de chauffage et consommations des 3 dernières années (factures).',
+      tips: 'Obligatoire chaque année pour les bâtiments chauffés à Genève. Le module peut extraire les m³/kWh d\'une facture PDF.',
     },
   },
   {
@@ -90,102 +151,6 @@ const TASK_CATEGORIES: TaskCategory[] = [
     },
   },
   {
-    id: 'simulation_energetique_rapide',
-    title: 'Simulation énergétique rapide',
-    description: 'Estime Qh en 30 s depuis un programme — avant-projet ou concours, sans IFC',
-    icon: Zap, color: 'bg-orange-50 text-orange-700',
-    fields: ['project_name', 'canton', 'affectation', 'sre_m2', 'standard', 'heating_vector', 'facteur_forme'],
-    help: {
-      what: 'Estime le besoin de chaleur Qh d\'un bâtiment en 30 secondes à partir du programme, sans IFC ni saisie détaillée. Utile en concours ou pour comparer des variantes.',
-      prereq: 'Canton, affectation, SRE (m²), standard énergétique et vecteur de chauffage.',
-      tips: 'Résultat INDICATIF (avant-projet). Le justificatif officiel SIA 380/1 se fait dans le module Thermique avec Lesosai.',
-    },
-  },
-  {
-    id: 'redaction_cctp',
-    title: 'CCTP',
-    description: 'Descriptif des prestations par lot — rédigé selon SIA 451',
-    icon: ScrollText, color: 'bg-blue-50 text-blue-700',
-    fields: ['project_name', 'lot', 'type_ouvrage', 'niveau_prestation', 'surface', 'contraintes'],
-    help: {
-      what: 'Rédige le cahier des charges techniques d\'un lot : prescriptions, description du matériel, exigences de performance, contrôles et réceptions.',
-      prereq: 'Le lot concerné, le type d\'ouvrage et le niveau de prestation visé.',
-      tips: 'Précisez les contraintes particulières pour un texte sur mesure. Le résultat est éditable (PDF + Word) avant diffusion.',
-    },
-  },
-  {
-    id: 'chiffrage_dpgf',
-    title: 'DPGF / Chiffrage',
-    description: 'Devis quantitatif structuré par lot à partir du programme',
-    icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
-    fields: ['project_name', 'lot', 'surface', 'notes'],
-    help: {
-      what: 'Génère un bordereau DPGF par lot avec postes, unités et prix unitaires indicatifs (indice 2025, ajusté au canton).',
-      prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
-      tips: 'Les prix sont indicatifs : à ajuster selon vos sous-traitants et le marché.',
-    },
-  },
-  {
-    id: 'justificatif_sia_380_1',
-    title: 'Justificatif SIA 380/1',
-    description: 'Thermique — requiert un modèle ou un IFC (redirige vers le module)',
-    icon: Flame, color: 'bg-orange-50 text-orange-700',
-    fields: ['redirect_thermique'],
-    help: {
-      what: 'Justificatif thermique officiel SIA 380/1. Ouvre le module Thermique : saisie de la composition (zones, parois, ouvertures) puis export/import Lesosai.',
-      prereq: 'La composition de l\'enveloppe : surfaces et valeurs U des parois, fenêtres. Les métrés IFC fournissent les surfaces.',
-      tips: 'Pensez à « Enregistrer la composition » avant de lancer l\'export. Un calcul indicatif rapide est aussi disponible en avant-projet.',
-    },
-  },
-  {
-    id: 'note_calcul_sia_260_267',
-    title: 'Note structure SIA 260-267',
-    description: 'SAF pour Scia/RFEM puis note de calcul (redirige vers le module)',
-    icon: Building, color: 'bg-slate-50 text-slate-700',
-    fields: ['redirect_structure'],
-    help: {
-      what: 'Génère un fichier SAF (géométrie + combinaisons SIA 260) pour Scia/RFEM, puis — après import de vos résultats — un double-check analytique et la note de calcul SIA 260-267.',
-      prereq: 'La trame du bâtiment (niveaux, entraxes, sections) saisie dans le module, ou un IFC structure.',
-      tips: 'La note finale n\'est générée qu\'après votre validation explicite d\'ingénieur. Le calcul de résistance reste fait dans votre logiciel.',
-    },
-  },
-  {
-    id: 'idc_geneve_rapport',
-    title: 'IDC Genève',
-    description: 'Extraction factures, calcul, formulaire OCEN (redirige vers le module)',
-    icon: Building2, color: 'bg-emerald-50 text-emerald-700',
-    fields: ['redirect_idc'],
-    help: {
-      what: 'Calcule l\'indice de dépense de chaleur (IDC) genevois et produit le rapport annuel + le formulaire OCEN, à partir des consommations.',
-      prereq: 'EGID, SRE, énergie de chauffage et consommations des 3 dernières années (factures).',
-      tips: 'Obligatoire chaque année pour les bâtiments chauffés à Genève. Le module peut extraire les m³/kWh d\'une facture PDF.',
-    },
-  },
-  {
-    id: 'aeai_checklist_generation',
-    title: 'Checklist AEAI',
-    description: 'Checklist incendie pour une typologie donnée',
-    icon: Shield, color: 'bg-amber-50 text-amber-700',
-    fields: ['project_name', 'building_type', 'height_m', 'nb_occupants_max', 'special_context'],
-    help: {
-      what: 'Génère la checklist de conformité incendie AEAI adaptée à la typologie du bâtiment, avec les références des directives.',
-      prereq: 'La typologie, la hauteur et l\'occupation maximale du bâtiment.',
-      tips: 'Décrivez le « contexte particulier » (parking, local déchets, vélos…) : LESO ajoute les points de vigilance correspondants et l\'autorité cantonale compétente.',
-    },
-  },
-  {
-    id: 'controle_reglementaire_geneve',
-    title: 'Contrôle réglementaire',
-    description: 'Rapport pré-dépôt : zone, énergie, LDTR, AEAI, stationnement',
-    icon: FileText, color: 'bg-blue-50 text-blue-700',
-    fields: ['project_name', 'canton', 'address', 'affectation', 'operation_type', 'sre_m2', 'nb_logements'],
-    help: {
-      what: 'Vérification automatique avant dépôt : indices d\'utilisation du sol, énergie, LDTR, AEAI, stationnement. Produit un rapport vert/rouge par critère.',
-      prereq: 'Canton, adresse, affectation, type d\'opération, SRE et nombre de logements.',
-      tips: 'Filet de sécurité avant dépôt — ce n\'est pas un avis juridique. Idéal pour repérer un point bloquant tôt.',
-    },
-  },
-  {
     id: 'compte_rendu_reunion',
     title: 'Compte-rendu de réunion',
     description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
@@ -195,6 +160,19 @@ const TASK_CATEGORIES: TaskCategory[] = [
       what: 'Transforme des notes brutes en compte-rendu structuré : décisions, actions, délais, présents.',
       prereq: 'Vos notes de réunion (texte) et la liste des participants.',
       tips: 'Séparez les participants par des virgules. Plus les notes sont précises, meilleur est le CR.',
+    },
+  },
+  // ----- Situationnel : avant-projet, appels d'offres, suivi de chantier -----
+  {
+    id: 'simulation_energetique_rapide',
+    title: 'Simulation énergétique rapide',
+    description: 'Estime Qh en 30 s depuis un programme — avant-projet ou concours, sans IFC',
+    icon: Zap, color: 'bg-orange-50 text-orange-700',
+    fields: ['project_name', 'canton', 'affectation', 'sre_m2', 'standard', 'heating_vector', 'facteur_forme'],
+    help: {
+      what: 'Estime le besoin de chaleur Qh d\'un bâtiment en 30 secondes à partir du programme, sans IFC ni saisie détaillée. Utile en concours ou pour comparer des variantes.',
+      prereq: 'Canton, affectation, SRE (m²), standard énergétique et vecteur de chauffage.',
+      tips: 'Résultat INDICATIF (avant-projet). Le justificatif officiel SIA 380/1 se fait dans le module Thermique avec Lesosai.',
     },
   },
   {
@@ -222,18 +200,6 @@ const TASK_CATEGORIES: TaskCategory[] = [
     },
   },
   {
-    id: 'calcul_acoustique',
-    title: 'Note acoustique SIA 181',
-    description: 'Justificatif d\'isolement acoustique — avant-projet',
-    icon: FileText, color: 'bg-purple-50 text-purple-700',
-    fields: ['project_name', 'elements', 'hypotheses', 'author'],
-    help: {
-      what: 'Rédige une note d\'isolement acoustique selon SIA 181 : exigences, choix constructifs et performance estimée.',
-      prereq: 'Les éléments/locaux à justifier (séparations, façades…) et, si possible, vos hypothèses (valeurs visées, compositions).',
-      tips: 'Note d\'avant-projet : à confirmer par un calcul acoustique détaillé pour la phase d\'exécution.',
-    },
-  },
-  {
     id: 'rapport_chantier',
     title: 'Rapport de chantier',
     description: 'Compte-rendu de visite depuis des notes de terrain',
@@ -245,16 +211,30 @@ const TASK_CATEGORIES: TaskCategory[] = [
       tips: 'Restez factuel dans les notes : le rapport reprend vos constats, à valider avant diffusion.',
     },
   },
+  // ----- Spécialisé : ingénierie structure & coordination BIM -----
   {
-    id: 'resume_document',
-    title: 'Résumé de document',
-    description: 'Synthèse des points clés d\'un rapport, d\'une norme ou d\'un PDF',
-    icon: FileText, color: 'bg-slate-50 text-slate-700',
-    fields: ['project_name', 'document_upload'],
+    id: 'note_calcul_sia_260_267',
+    title: 'Note structure SIA 260-267',
+    description: 'SAF pour Scia/RFEM puis note de calcul (redirige vers le module)',
+    icon: Building, color: 'bg-slate-50 text-slate-700',
+    fields: ['redirect_structure'],
     help: {
-      what: 'Extrait et synthétise les points clés d\'un document long (rapport, norme, étude).',
-      prereq: 'Le PDF à résumer (max 50 Mo).',
-      tips: 'Idéal pour dégrossir une SIA, un rapport géotechnique ou un préavis volumineux.',
+      what: 'Génère un fichier SAF (géométrie + combinaisons SIA 260) pour Scia/RFEM, puis — après import de vos résultats — un double-check analytique et la note de calcul SIA 260-267.',
+      prereq: 'La trame du bâtiment (niveaux, entraxes, sections) saisie dans le module, ou un IFC structure.',
+      tips: 'La note finale n\'est générée qu\'après votre validation explicite d\'ingénieur. Le calcul de résistance reste fait dans votre logiciel.',
+    },
+  },
+  {
+    id: 'coordination_inter_lots',
+    title: 'Coordination inter-lots',
+    description: 'Détecte les conflits géométriques entre maquettes IFC de différents lots (structure, CVC, sanitaire…). Rapport + BCF.',
+    icon: Layers, color: 'bg-indigo-50 text-indigo-700',
+    days_saved: '2-4 j économisés',
+    fields: ['project_name', 'ifc_multi_upload', 'author'],
+    help: {
+      what: 'Compare plusieurs maquettes IFC (un lot chacune) et détecte les collisions géométriques. Produit un rapport et un fichier BCF ouvrable dans vos outils BIM.',
+      prereq: 'Au moins 2 maquettes IFC, une par lot (structure, CVC, sanitaire…), avec le nom du lot indiqué.',
+      tips: 'Plus les maquettes sont géoréférencées au même point de base, plus la détection est fiable.',
     },
   },
 ];
