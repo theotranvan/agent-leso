@@ -67,6 +67,26 @@ export const VECTEURS_ENERGETIQUES = [
   { value: 'solaire_thermique', label: 'Solaire thermique', unit: 'kWh' },
 ];
 
+export const GENERATEURS_CHALEUR = [
+  { value: 'pac_air_eau', label: 'PAC air-eau' },
+  { value: 'pac_sol_eau', label: 'PAC sol-eau (sondes)' },
+  { value: 'pac_eau_eau', label: 'PAC eau-eau (nappe)' },
+  { value: 'chaudiere_gaz', label: 'Chaudière à gaz' },
+  { value: 'chaudiere_mazout', label: 'Chaudière à mazout' },
+  { value: 'chaudiere_pellets', label: 'Chaudière à pellets' },
+  { value: 'chaudiere_buches', label: 'Chaudière à bûches' },
+  { value: 'cad', label: 'Chauffage à distance (CAD)' },
+  { value: 'electrique', label: 'Électrique direct' },
+  { value: 'solaire_thermique', label: 'Solaire thermique (appoint)' },
+];
+
+export const VENTILATION_TYPES = [
+  { value: 'naturelle', label: 'Ventilation naturelle (fenêtres)' },
+  { value: 'simple_flux', label: 'Simple flux (extraction)' },
+  { value: 'double_flux', label: 'Double flux avec récupération' },
+  { value: 'double_flux_geo', label: 'Double flux + puits canadien' },
+];
+
 export const AEAI_BUILDING_TYPES = [
   { value: 'habitation_faible', label: 'Habitation < 11 m' },
   { value: 'habitation_moyenne', label: 'Habitation 11-30 m' },

@@ -33,18 +33,22 @@ _B_FACTEUR = {
     "mur_exterieur": 1.0,
     "toiture": 1.0,
     "plancher": 1.0,
+    "dalle_sur_exterieur": 1.0,
     "dalle_sur_terrain": 0.6,
     "mur_contre_terre": 0.6,
     "dalle_sur_local_non_chauffe": 0.8,
+    "mur_local_non_chauffe": 0.8,
 }
 
 # Valeur U par défaut [W/m²·K] si non saisie, selon le type de paroi.
 _U_DEFAUT_PAROI = {
     "mur_exterieur": 0.17,
     "toiture": 0.15,
+    "dalle_sur_exterieur": 0.17,
     "dalle_sur_terrain": 0.25,
     "mur_contre_terre": 0.25,
     "dalle_sur_local_non_chauffe": 0.25,
+    "mur_local_non_chauffe": 0.25,
     "plancher": 0.25,
 }
 _U_DEFAUT_OUVERTURE = 1.2
@@ -83,7 +87,10 @@ def compute_indicative(model: dict) -> dict:
     bridges = model.get("thermal_bridges") or []
 
     # --- Surface de référence énergétique (SRE) et volume chauffé ---
-    sre = sum(_f(z.get("area")) for z in zones)
+    # Priorité à la SRE saisie explicitement par l'ingénieur (hypotheses.sre_m2),
+    # sinon somme des surfaces de zones, sinon repli sur les planchers déclarés.
+    sre_override = _f((model.get("hypotheses") or {}).get("sre_m2"))
+    sre = sre_override if sre_override > 0 else sum(_f(z.get("area")) for z in zones)
     if sre <= 0:
         # Repli : surfaces de plancher déclarées comme parois
         sre = sum(_f(w.get("area")) for w in walls

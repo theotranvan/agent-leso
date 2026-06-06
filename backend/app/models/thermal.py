@@ -36,6 +36,7 @@ class WallLayer(BaseModel):
 class Wall(BaseModel):
     id: Optional[str] = None
     type: str = "mur_exterieur"
+    name: Optional[str] = None  # désignation libre (ex. "Mur ext. type A — béton + 18 cm laine")
     orientation: Optional[str] = None  # N/S/E/W/horizontal
     area: float = Field(gt=0)
     u_value: Optional[float] = None
@@ -47,6 +48,7 @@ class Wall(BaseModel):
 class Opening(BaseModel):
     id: Optional[str] = None
     type: str = "fenetre"  # fenetre | porte_vitree | porte_opaque
+    name: Optional[str] = None  # désignation libre (ex. "Fenêtre triple vitrage bois-métal")
     area: float = Field(gt=0)
     u_value: Optional[float] = None
     g_value: Optional[float] = None
