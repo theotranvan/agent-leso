@@ -237,6 +237,7 @@ Conserve toutes les valeurs techniques et normes fournies."""
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": body_html,
         "kb_used": bool(cctp_structure),
         "custom_articles_used": bool(articles_libres),
         "lot_label": lot_label,

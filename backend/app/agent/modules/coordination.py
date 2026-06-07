@@ -129,6 +129,7 @@ Sois concret et actionnable."""
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": pdf_filename,
+        "result_html": body_html,
     }
 
 

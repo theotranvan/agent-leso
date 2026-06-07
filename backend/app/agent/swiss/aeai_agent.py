@@ -257,4 +257,5 @@ Produire un rapport markdown :
         "cost_eur": llm["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(md),
     }

@@ -137,6 +137,7 @@ Produire le CR complet en markdown avec toutes les sections standard (objet, par
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(cr_md),
     }
 
 
@@ -206,6 +207,7 @@ Produire le mémoire technique complet en markdown, convaincant et argumenté, a
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(md),
     }
 
 
@@ -280,4 +282,5 @@ async def _resume_document(task: dict[str, Any]) -> dict[str, Any]:
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(md),
     }

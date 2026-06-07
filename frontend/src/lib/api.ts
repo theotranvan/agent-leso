@@ -224,6 +224,27 @@ export const api = {
     const res = await fetch(`${API_URL}/api/tasks/${id}/retry`, { method: 'POST', headers: await authHeaders() });
     return handle<any>(res);
   },
+  // Export Word (.docx) éditable — télécharge le blob authentifié
+  exportTaskDocx: async (id: string, suggestedName?: string) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/export.docx`, { headers: await authHeaders() });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch {}
+      throw new ApiError(res.status, detail);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    const filename = m?.[1] || suggestedName || `livrable_${id.slice(0, 8)}.docx`;
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
 
   // V5 — Régénération intelligente
   regenerateTask: async (id: string, body: {
