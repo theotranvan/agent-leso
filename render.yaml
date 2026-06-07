@@ -44,6 +44,16 @@ services:
         sync: false
       - key: STRIPE_PRICE_ENTERPRISE
         sync: false
+      - key: STRIPE_PRICE_STARTER_YEARLY
+        sync: false
+      - key: STRIPE_PRICE_PRO_YEARLY
+        sync: false
+      - key: STRIPE_PRICE_ENTERPRISE_YEARLY
+        sync: false
+      # Bêta : true = boutons de paiement verrouillés. Mettre false pour activer
+      # le paiement Stripe self-service.
+      - key: BETA_MODE
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: FROM_EMAIL
@@ -109,17 +119,13 @@ services:
         sync: false
       - key: STRIPE_PRICE_ENTERPRISE
         sync: false
+      - key: STRIPE_PRICE_STARTER_YEARLY
+        sync: false
+      - key: STRIPE_PRICE_PRO_YEARLY
+        sync: false
+      - key: STRIPE_PRICE_ENTERPRISE_YEARLY
+        sync: false
       - key: RESEND_API_KEY
-        sync: false
-      - key: FROM_EMAIL
-        sync: false
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: LEGIFRANCE_CLIENT_ID
-        sync: false
-      - key: LEGIFRANCE_CLIENT_SECRET
-        sync: false
-      - key: ENCRYPTION_KEY
         sync: false
       - key: SENTRY_DSN
         sync: false
