@@ -254,21 +254,6 @@ async def execute_task(task_id: str) -> dict[str, Any]:
             "review_status": review_status,
         }).eq("id", task_id).execute()
 
-        # ==================== Source HTML pour export Word (non-bloquant) ====================
-        # On stocke le corps HTML du livrable en sidecar pour permettre un export
-        # .docx fidèle à la demande. Repli sur le preview si absent.
-        try:
-            result_html = result.get("result_html")
-            if result_html:
-                from app.database import get_storage
-                get_storage().upload(
-                    f"{task['organization_id']}/_docx_src/{task_id}.html",
-                    result_html.encode("utf-8"),
-                    content_type="text/html",
-                )
-        except Exception as exc:
-            logger.warning("Stockage source DOCX échec (non-bloquant) task=%s : %s", task_id, exc)
-
         # ==================== Auto-délégation (Levier 4) ====================
         # Si l'organisation l'autorise et que la tâche est éligible (non réservée,
         # confiance haute), elle passe directement en 'approved'.
