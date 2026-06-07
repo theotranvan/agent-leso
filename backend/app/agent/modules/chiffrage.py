@@ -234,6 +234,7 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": excel_bytes,
         "email_filename": excel_filename,
+        "result_html": markdown_to_html(recap_md),
     }
 
 

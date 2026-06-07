@@ -215,6 +215,29 @@ async def execute_task(task_id: str) -> dict[str, Any]:
             elif confidence_dict.get("level") == "low":
                 review_status = "needs_revision"
 
+        # ==================== Source HTML pour export Word (avant 'completed') ====================
+        # On stocke le corps HTML du livrable EN SIDECAR *avant* de marquer la
+        # tâche terminée : sinon le bouton Word peut apparaître (statut completed)
+        # alors que le sidecar n'est pas encore écrit → export tronqué (course).
+        # Repli : si l'agent n'expose pas de result_html, on synthétise un HTML
+        # depuis le markdown/preview pour que l'export Word reste fidèle.
+        try:
+            result_html = result.get("result_html")
+            if not result_html:
+                md_src = result.get("result_markdown") or result.get("preview") or ""
+                if md_src:
+                    from app.services.pdf_generator import markdown_to_html
+                    result_html = markdown_to_html(md_src)
+            if result_html:
+                from app.database import get_storage
+                get_storage().upload(
+                    f"{task['organization_id']}/_docx_src/{task_id}.html",
+                    result_html.encode("utf-8"),
+                    content_type="text/html",
+                )
+        except Exception as exc:
+            logger.warning("Stockage source DOCX échec (non-bloquant) task=%s : %s", task_id, exc)
+
         # Marque completed
         admin.table("tasks").update({
             "status": "completed",
@@ -230,21 +253,6 @@ async def execute_task(task_id: str) -> dict[str, Any]:
             "confidence_detail": confidence_dict,
             "review_status": review_status,
         }).eq("id", task_id).execute()
-
-        # ==================== Source HTML pour export Word (non-bloquant) ====================
-        # On stocke le corps HTML du livrable en sidecar pour permettre un export
-        # .docx fidèle à la demande. Repli sur le preview si absent.
-        try:
-            result_html = result.get("result_html")
-            if result_html:
-                from app.database import get_storage
-                get_storage().upload(
-                    f"{task['organization_id']}/_docx_src/{task_id}.html",
-                    result_html.encode("utf-8"),
-                    content_type="text/html",
-                )
-        except Exception as exc:
-            logger.warning("Stockage source DOCX échec (non-bloquant) task=%s : %s", task_id, exc)
 
         # ==================== Auto-délégation (Levier 4) ====================
         # Si l'organisation l'autorise et que la tâche est éligible (non réservée,
