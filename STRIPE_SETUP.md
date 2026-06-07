@@ -36,7 +36,11 @@ le code génère son prix à la volée.
 
 1. Va sur https://dashboard.stripe.com/register
 2. Crée le compte avec ton email pro.
-3. En haut à droite, vérifie que l'interrupteur **« Mode test »** est **activé**
+3. **Type d'entreprise = « Particulier / indépendant »** (pas « Société »).
+   Tant que ton chiffre d'affaires est sous 100 000 CHF/an, tu opères en
+   **raison individuelle** : nom + adresse personnels + **IBAN suisse perso**
+   suffisent. **Pas besoin d'IDE ni d'inscription au RC** pour démarrer.
+4. En haut à droite, vérifie que l'interrupteur **« Mode test »** est **activé**
    (toggle orange « Test mode »).
 
 ---
@@ -55,8 +59,8 @@ le code génère son prix à la volée.
 Menu **Catalogue de produits → + Ajouter un produit** (`/test/products`).
 
 Crée **3 produits**, chacun avec **2 prix récurrents** (mensuel + annuel),
-**devise CHF**, **comportement fiscal = « hors taxes »** (les prix sont HT, la
-TVA s'ajoute via Stripe Tax — voir Étape 4) :
+**devise CHF**. Laisse le **comportement fiscal par défaut** : tant que tu n'es
+pas assujetti à la TVA (Étape 4), tes prix sont **nets, sans TVA** :
 
 | Produit | Prix mensuel | Prix annuel (2 mois offerts) |
 |---|---|---|
@@ -80,19 +84,23 @@ Reporte les 6 IDs dans le tableau de l'aperçu (colonne « Contenu »).
 
 ---
 
-## Étape 4 — TVA suisse (8.1 %) — recommandé
+## Étape 4 — TVA suisse — PLUS TARD (pas maintenant)
 
-Tes prix sont **HT**. Pour que Stripe ajoute la TVA automatiquement :
+⚠️ En Suisse, tu n'es **assujetti à la TVA qu'au-dessus de 100 000 CHF de
+chiffre d'affaires par an**. En dessous, tu **ne factures pas de TVA** (et tu
+n'as pas le droit de la collecter sans être enregistré). **Donc : ne fais rien
+ici pour l'instant.** Tes prix sont nets (690 / 2 400 / 4 900 CHF).
 
-1. Menu **Plus → Tax** (Stripe Tax) → **Activer**.
-2. Renseigne l'adresse de ton entreprise (Suisse) et ton **n° TVA (IDE)**.
-3. Ajoute la Suisse comme juridiction de collecte.
-4. Dans chaque **prix**, vérifie que le comportement fiscal est **« hors taxes »**
-   (tax behavior = *exclusive*).
+Le jour où tu franchis 100 000 CHF/an :
 
-Résultat : un client suisse verra « 690 CHF + 8.1 % TVA » au paiement, et la TVA
-sera collectée/déclarée par Stripe. *(Tu peux activer Tax plus tard ; ce n'est
-pas bloquant pour tester.)*
+1. Inscris-toi à la TVA auprès de l'AFC et obtiens ton n° TVA (IDE).
+2. Menu **Plus → Tax** (Stripe Tax) → **Activer**, adresse + n° TVA, Suisse en
+   juridiction de collecte.
+3. Passe chaque **prix** en comportement fiscal **« hors taxes »** (exclusive).
+4. Côté app : réaffiche « HT · TVA 8.1 % » (voir note dans le récap ci-dessous).
+
+> Tu devras aussi t'annoncer comme **indépendant à l'AVS** dès que l'activité
+> est régulière (démarche sociale, sans rapport avec Stripe).
 
 ---
 
@@ -172,12 +180,25 @@ Quand tout marche en Test :
 
 ---
 
+## Réactiver l'affichage TVA dans l'app (le moment venu)
+
+Quand tu seras assujetti, rebascule l'affichage « HT · TVA 8.1 % » :
+- `frontend/src/app/page.tsx` : la note sous les tarifs + l'unité « CHF / mois ».
+- `frontend/src/app/(dashboard)/billing/page.tsx` : l'unité de prix + la note
+  « Prix nets · TVA non applicable ».
+- `frontend/src/app/(auth)/register/page.tsx` : la ligne du plan.
+
+C'est uniquement du texte (aucune logique de calcul) ; Stripe Tax s'occupe du
+montant réel de la TVA au paiement.
+
+---
+
 ## Checklist finale
 
 - [ ] `sk_…` (secret) renseignée
 - [ ] 3 produits Solo / Bureau / Enterprise créés
 - [ ] 6 prix (mensuel + annuel) créés, 6 `price_…` copiés
-- [ ] (option) Stripe Tax activé, TVA 8.1 % + IDE
+- [ ] ~~Stripe Tax / TVA~~ → **plus tard** (dès 100 000 CHF/an, cf. Étape 4)
 - [ ] Webhook créé sur `…/api/billing/webhook` avec les 5 événements
 - [ ] `whsec_…` renseigné
 - [ ] 8 variables Stripe sur Render

@@ -224,7 +224,7 @@ export default async function LandingPage() {
             Tous les modules dans chaque plan. Vous ne payez que le volume.
           </p>
           <p className="text-sm text-muted-foreground mt-3">
-            Prix HT (TVA 8.1 % en sus) · <span className="text-foreground font-medium">−17 % en annuel</span> (2 mois offerts) · Essai 1 mois sans engagement
+            Prix nets · TVA non applicable · <span className="text-foreground font-medium">−17 % en annuel</span> (2 mois offerts) · Essai 1 mois sans engagement
           </p>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-6 items-start">
@@ -242,7 +242,7 @@ export default async function LandingPage() {
                 <div className="text-sm text-muted-foreground mb-4">{plan.tagline}</div>
                 <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-4xl font-semibold tracking-tight">{plan.price}</span>
-                  <span className="text-muted-foreground">CHF / mois HT</span>
+                  <span className="text-muted-foreground">CHF / mois</span>
                 </div>
                 <div className="text-xs text-emerald-600 mb-1">ou {plan.priceYearly} CHF / an · 2 mois offerts</div>
                 <div className="text-sm text-muted-foreground mb-6">{plan.tasks}</div>

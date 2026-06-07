@@ -92,7 +92,7 @@ export default function RegisterPage() {
             <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Créer un compte</CardTitle>
-          <CardDescription>Plan Solo {planPrice} / mois HT · ~200 livrables · essai 1 mois</CardDescription>
+          <CardDescription>Plan Solo {planPrice} / mois · ~200 livrables · essai 1 mois</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
