@@ -216,20 +216,31 @@ def _extract_metres(ifc_bytes: bytes) -> dict[str, Any]:
             vol_st = 0.0
             nb_sp = 0
 
-            # Parcours des IfcSpace directement rattachés
+            # Les IfcSpace peuvent être rattachés à l'étage de DEUX façons selon
+            # l'exporteur : par containment (IfcRelContainedInSpatialStructure →
+            # ContainsElements) OU par décomposition (IfcRelAggregates →
+            # IsDecomposedBy). On lit les deux et on dédoublonne, sinon les fichiers
+            # qui utilisent l'agrégation (très courant) donnent un détail à zéro.
+            storey_spaces = {}
             for rel in getattr(storey, "ContainsElements", None) or []:
                 for e in rel.RelatedElements:
-                    if not e.is_a("IfcSpace"):
-                        continue
-                    nb_sp += 1
-                    qtos = util_el.get_psets(e) or {}
-                    bq = qtos.get("Qto_SpaceBaseQuantities") or qtos.get("BaseQuantities") or {}
-                    gfa = _safe_num(bq.get("GrossFloorArea"))
-                    nfa = _safe_num(bq.get("NetFloorArea"))
-                    nv = _safe_num(bq.get("NetVolume")) or _safe_num(bq.get("GrossVolume"))
-                    sb_st += gfa if gfa else (nfa * 1.1 if nfa else 0)
-                    su_st += nfa if nfa else (gfa * 0.9 if gfa else 0)
-                    vol_st += nv
+                    if e.is_a("IfcSpace"):
+                        storey_spaces[e.id()] = e
+            for rel in getattr(storey, "IsDecomposedBy", None) or []:
+                for e in getattr(rel, "RelatedObjects", None) or []:
+                    if e.is_a("IfcSpace"):
+                        storey_spaces[e.id()] = e
+
+            for e in storey_spaces.values():
+                nb_sp += 1
+                qtos = util_el.get_psets(e) or {}
+                bq = qtos.get("Qto_SpaceBaseQuantities") or qtos.get("BaseQuantities") or {}
+                gfa = _safe_num(bq.get("GrossFloorArea"))
+                nfa = _safe_num(bq.get("NetFloorArea"))
+                nv = _safe_num(bq.get("NetVolume")) or _safe_num(bq.get("GrossVolume"))
+                sb_st += gfa if gfa else (nfa * 1.1 if nfa else 0)
+                su_st += nfa if nfa else (gfa * 0.9 if gfa else 0)
+                vol_st += nv
 
             total_sb += sb_st
             total_su += su_st
@@ -312,7 +323,14 @@ def _extract_metres(ifc_bytes: bytes) -> dict[str, Any]:
                     if not isinstance(pset_data, dict):
                         continue
                     if pset_name.startswith("Qto_"):
-                        s = _safe_num(pset_data.get("NetArea")) or _safe_num(pset_data.get("GrossArea"))
+                        # NetArea/GrossArea pour dalles/toitures ; NetSideArea/
+                        # GrossSideArea pour les murs (Qto_WallBaseQuantities).
+                        s = (
+                            _safe_num(pset_data.get("NetArea"))
+                            or _safe_num(pset_data.get("GrossArea"))
+                            or _safe_num(pset_data.get("NetSideArea"))
+                            or _safe_num(pset_data.get("GrossSideArea"))
+                        )
                         v = _safe_num(pset_data.get("NetVolume")) or _safe_num(pset_data.get("GrossVolume"))
                         surface += s
                         volume += v
