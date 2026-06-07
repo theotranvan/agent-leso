@@ -117,6 +117,26 @@ def handle_webhook_event(event: stripe.Event) -> None:
         _handle_payment_failed(event["data"]["object"])
 
 
+def _update_org(admin, organization_id: str, payload: dict) -> None:
+    """Met à jour une organisation en tolérant l'absence des colonnes quota.
+
+    Si la migration 005 (colonnes tokens_*) n'est pas encore appliquée, PostgREST
+    rejette l'écriture de `tokens_limit_monthly` (PGRST204). Dans ce cas on réessaie
+    sans les colonnes quota pour que l'activation du plan (plan, active, stripe_*)
+    aboutisse quand même.
+    """
+    try:
+        admin.table("organizations").update(payload).eq("id", organization_id).execute()
+    except Exception as e:
+        safe = {k: v for k, v in payload.items()
+                if k not in ("tokens_limit_monthly", "tokens_used_current_month", "tokens_pack_remaining")}
+        if safe != payload:
+            logger.warning("Update org sans colonnes quota (migration 005 ?) : %s", e)
+            admin.table("organizations").update(safe).eq("id", organization_id).execute()
+        else:
+            raise
+
+
 def _handle_checkout_completed(session: dict) -> None:
     organization_id = session.get("metadata", {}).get("organization_id")
     session_type = session.get("metadata", {}).get("type", "subscription")
@@ -170,13 +190,13 @@ def _handle_checkout_completed(session: dict) -> None:
     # V5 : on utilise les quotas tokens au lieu des tasks_limit
     tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN])
 
-    admin.table("organizations").update({
+    _update_org(admin, organization_id, {
         "plan": plan,
         "tokens_limit_monthly": tokens_limit,
         "stripe_customer_id": customer_id,
         "stripe_subscription_id": subscription_id,
         "active": True,
-    }).eq("id", organization_id).execute()
+    })
 
     logger.info(f"Organisation {organization_id} activée sur plan {plan} ({tokens_limit:,} tokens/mois)")
 
@@ -204,12 +224,12 @@ def _handle_subscription_updated(subscription: dict) -> None:
     tokens_limit = QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN])
 
     admin = get_supabase_admin()
-    admin.table("organizations").update({
+    _update_org(admin, organization_id, {
         "plan": plan,
         "tokens_limit_monthly": tokens_limit,
         "stripe_subscription_id": subscription["id"],
         "active": active,
-    }).eq("id", organization_id).execute()
+    })
     logger.info("Subscription updated: org=%s plan=%s active=%s", organization_id, plan, active)
 
 

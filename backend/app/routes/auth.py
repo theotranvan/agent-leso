@@ -53,7 +53,6 @@ async def register(request: Request, body: UserCreate):
             # existantes (ex. pilote Conti) ne sont PAS affectées par ce défaut.
             "active": not settings.BETA_MODE,
             "tasks_limit": settings.PLAN_LIMITS["solo"]["tasks"],
-            "tokens_limit_monthly": settings.PLAN_LIMITS["solo"]["tokens"],
             "country": country,
             "canton": body.canton,
             "language": body.language or "fr",
