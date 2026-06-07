@@ -39,11 +39,27 @@ def _get_jwks(force_refresh: bool = False) -> dict:
     return _jwks_cache
 
 
+# Algorithmes acceptés explicitement. Empêche toute attaque de substitution
+# d'algorithme (ex. "none", ou confusion RS256↔HS256) en refusant tout en-tête
+# alg hors de cette liste AVANT décodage.
+_ALLOWED_JWT_ALGS = frozenset({"HS256", "RS256", "ES256"})
+
+
 def verify_supabase_jwt(token: str) -> dict:
     try:
         header = jwt.get_unverified_header(token)
         alg = header.get("alg", "HS256")
 
+        # Whitelist stricte : un en-tête alg non prévu est rejeté d'emblée.
+        if alg not in _ALLOWED_JWT_ALGS:
+            raise HTTPException(
+                status_code=401, detail="Algorithme de token non autorisé",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # HS256 = secret symétrique Supabase. Les algos asymétriques (RS/ES)
+        # n'utilisent JAMAIS ce secret : on les vérifie uniquement via JWKS,
+        # ce qui exclut la confusion clé publique → secret HMAC.
         if alg == "HS256":
             return jwt.decode(
                 token, settings.SUPABASE_JWT_SECRET,
