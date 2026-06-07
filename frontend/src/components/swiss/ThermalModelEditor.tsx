@@ -346,6 +346,14 @@ export function ThermalModelEditor({
           )}
 
           {walls.length === 0 && <p className="text-xs text-muted-foreground">Aucune paroi.</p>}
+          {walls.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 px-2 text-[11px] text-muted-foreground">
+              <span className="col-span-5">Type de paroi</span>
+              <span className="col-span-3">Orientation</span>
+              <span className="col-span-2">Surface (m²)</span>
+              <span className="col-span-2">U (W/m²·K)</span>
+            </div>
+          )}
           {walls.map((w, i) => (
             <div key={w.id} className="rounded-md border p-2 space-y-2">
               <div className="flex items-center gap-2">
@@ -422,6 +430,15 @@ export function ThermalModelEditor({
           )}
 
           {openings.length === 0 && <p className="text-xs text-muted-foreground">Aucune ouverture.</p>}
+          {openings.length > 0 && (
+            <div className="grid grid-cols-12 gap-2 px-2 text-[11px] text-muted-foreground">
+              <span className="col-span-4">Type d'ouverture</span>
+              <span className="col-span-3">Orientation</span>
+              <span className="col-span-2">Surface (m²)</span>
+              <span className="col-span-2">U (W/m²·K)</span>
+              <span className="col-span-1">g</span>
+            </div>
+          )}
           {openings.map((o, i) => (
             <div key={o.id} className="rounded-md border p-2 space-y-2">
               <div className="flex items-center gap-2">

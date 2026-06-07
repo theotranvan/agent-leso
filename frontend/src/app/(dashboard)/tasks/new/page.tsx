@@ -155,7 +155,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     title: 'Compte-rendu de réunion',
     description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
     icon: Users, color: 'bg-slate-50 text-slate-700',
-    fields: ['project_name', 'meeting_title', 'meeting_date', 'meeting_lieu', 'participants', 'notes'],
+    fields: ['project_name', 'meeting_title', 'meeting_date', 'meeting_heure', 'meeting_lieu', 'participants', 'notes'],
     help: {
       what: 'Transforme des notes brutes en compte-rendu structuré : décisions, actions, délais, présents.',
       prereq: 'Vos notes de réunion (texte) et la liste des participants.',
@@ -837,6 +837,14 @@ function AdaptiveFields({
         </div>
       )}
 
+      {fields.includes('meeting_heure') && (
+        <div>
+          <Label>Heure de la réunion</Label>
+          <Input type="time" value={form.meeting_heure || ''}
+            onChange={(e) => setField('meeting_heure', e.target.value)} />
+        </div>
+      )}
+
       {fields.includes('meeting_lieu') && (
         <div>
           <Label>Lieu</Label>
@@ -857,10 +865,14 @@ function AdaptiveFields({
 
       {fields.includes('participants') && (
         <div>
-          <Label>Participants</Label>
+          <Label>Participants (nom et qualité)</Label>
           <Input value={form.participants || ''}
-            placeholder="Noms séparés par des virgules"
+            placeholder="Théo Tran-van (BET CVC), Marie Fontaine (Architecte)…"
             onChange={(e) => setField('participants', e.target.value)} />
+          <p className="text-xs text-muted-foreground mt-1">
+            Séparez par des virgules. Indiquez la qualité entre parenthèses : « Nom (rôle) ».
+            Elle est reprise telle quelle dans le compte-rendu.
+          </p>
         </div>
       )}
 
@@ -1210,6 +1222,7 @@ function buildTaskPayload(
       const [y, m, d] = String(form.meeting_date).split('-');
       p.date = d && m && y ? `${d}.${m}.${y}` : form.meeting_date;
     }
+    if (form.meeting_heure) p.heure = form.meeting_heure;
     if (form.meeting_lieu) p.lieu = form.meeting_lieu;
     p.participants = form.participants
       ? String(form.participants).split(',').map((s) => s.trim()).filter(Boolean)
