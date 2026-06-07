@@ -72,15 +72,19 @@ async def _compte_rendu(task: dict[str, Any]) -> dict[str, Any]:
     if isinstance(participants, str):
         participants = [s.strip() for s in participants.split(",") if s.strip()]
     date_reunion = params.get("date", datetime.now().strftime("%d/%m/%Y"))
+    heure = params.get("heure", "")
+    date_affichee = f"{date_reunion} à {heure}" if heure else date_reunion
     objet = params.get("objet") or params.get("meeting_title") or "Réunion de projet"
     lieu = params.get("lieu", "")
 
+    # Les participants peuvent porter leur qualité entre parenthèses
+    # (« Nom (rôle) ») : on la conserve telle quelle pour le CR.
     participants_str = "\n".join(f"- {p}" for p in participants) if participants else "Non précisés"
 
     user_content = f"""Rédiger un compte-rendu professionnel de la réunion suivante.
 
 **Objet :** {objet}
-**Date :** {date_reunion}
+**Date :** {date_affichee}
 **Lieu :** {lieu}
 **Projet :** {project_name}
 **Participants :**

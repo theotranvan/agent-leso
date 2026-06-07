@@ -164,8 +164,8 @@ def _checklist_to_md(checklist: dict) -> str:
         md.append("|---|---|---|---|")
         for i in subset:
             md.append(
-                f"| {i.get('reference', '')} | {i.get('title', '')} | "
-                f"{i.get('status', '')} | {i.get('notes', '')} |"
+                f"| {i.get('reference') or ''} | {i.get('title') or ''} | "
+                f"{i.get('status') or ''} | {i.get('notes') or ''} |"
             )
         md.append("")
 

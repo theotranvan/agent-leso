@@ -152,6 +152,7 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
     except Exception:
         body_html = None
 
+    docx_bytes = None
     if body_html:
         branding = None
         try:
@@ -160,6 +161,19 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
         except Exception:
             branding = None
         project_info = {k: v for k, v in {"Projet": project_name, "Type de document": label}.items() if v}
+        # La conversion HTML→DOCX ne doit JAMAIS faire échouer le bouton : si le
+        # HTML de l'agent contient une structure imprévue, on retombe sur l'aperçu
+        # texte plutôt que de renvoyer une 500.
+        try:
+            docx_bytes = html_to_docx_bytes(
+                body_html, title=title, project_info=project_info,
+                branding=branding, footer_note=footer,
+            )
+        except Exception as exc:
+            logger.warning("Export DOCX depuis HTML échoué (repli texte) task=%s : %s", task_id, exc)
+            docx_bytes = None
+
+    if not docx_bytes:
         docx_bytes = html_to_docx_bytes(
             body_html, title=title, project_info=project_info,
             branding=branding, footer_note=footer,

@@ -197,15 +197,29 @@ def markdown_to_html(md: str) -> str:
     lines = md.split("\n")
     html_parts = []
     in_list = False
+    in_olist = False
     in_table = False
     in_code = False
     table_rows: list[str] = []
+    quote_buf: list[str] = []
 
     def flush_list():
-        nonlocal in_list
+        nonlocal in_list, in_olist
         if in_list:
             html_parts.append("</ul>")
             in_list = False
+        if in_olist:
+            html_parts.append("</ol>")
+            in_olist = False
+
+    def flush_quote():
+        nonlocal quote_buf
+        if quote_buf:
+            # Le contenu d'une citation peut lui-même être du markdown
+            # (listes, gras) → conversion récursive, puis on encadre.
+            inner = markdown_to_html("\n".join(quote_buf))
+            html_parts.append(f"<blockquote>{inner}</blockquote>")
+            quote_buf = []
 
     def flush_table():
         nonlocal in_table, table_rows
@@ -226,15 +240,30 @@ def markdown_to_html(md: str) -> str:
             in_table = False
             table_rows = []
 
+    import re as _re
+    _heading_re = _re.compile(r"^(#{1,6})\s+(.*)$")
+    _olist_re = _re.compile(r"^\d+[.)]\s+(.*)$")
+
     for raw in lines:
         line = raw.rstrip()
 
         if line.startswith("```"):
+            flush_quote()
             in_code = not in_code
             continue
         if in_code:
             html_parts.append(f"<div class='formula'>{_escape(line)}</div>")
             continue
+
+        # Citations (blockquote) : on accumule les lignes « > … » consécutives.
+        stripped = line.lstrip()
+        if stripped == ">" or stripped.startswith("> "):
+            flush_list()
+            flush_table()
+            quote_buf.append(stripped[1:].lstrip() if stripped != ">" else "")
+            continue
+        else:
+            flush_quote()
 
         # Tableaux markdown
         if "|" in line and line.strip().startswith("|"):
@@ -249,29 +278,39 @@ def markdown_to_html(md: str) -> str:
         else:
             flush_table()
 
+        heading = _heading_re.match(line)
+        olist = _olist_re.match(line)
+
         if line.strip() in ("---", "***", "___"):
             flush_list()
             html_parts.append("<hr>")
-        elif line.startswith("### "):
+        elif heading:
             flush_list()
-            html_parts.append(f"<h3>{_inline(line[4:])}</h3>")
-        elif line.startswith("## "):
-            flush_list()
-            html_parts.append(f"<h2>{_inline(line[3:])}</h2>")
-        elif line.startswith("# "):
-            flush_list()
-            html_parts.append(f"<h1>{_inline(line[2:])}</h1>")
+            level = min(len(heading.group(1)), 6)
+            html_parts.append(f"<h{level}>{_inline(heading.group(2))}</h{level}>")
         elif line.startswith("- ") or line.startswith("* "):
+            if in_olist:
+                html_parts.append("</ol>")
+                in_olist = False
             if not in_list:
                 html_parts.append("<ul>")
                 in_list = True
             html_parts.append(f"<li>{_inline(line[2:])}</li>")
+        elif olist:
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            if not in_olist:
+                html_parts.append("<ol>")
+                in_olist = True
+            html_parts.append(f"<li>{_inline(olist.group(1))}</li>")
         elif line.strip():
             flush_list()
             html_parts.append(f"<p>{_inline(line)}</p>")
         else:
             flush_list()
 
+    flush_quote()
     flush_list()
     flush_table()
     return "\n".join(html_parts)
@@ -282,9 +321,21 @@ def _escape(text: str) -> str:
 
 
 def _inline(text: str) -> str:
-    """Formatting inline: **gras**, *italique*."""
+    """Formatting inline: liens [texte](url), **gras**, *italique*, `code`."""
     import re
     text = _escape(text)
+
+    # Liens markdown [texte](url). Les ancres internes (#...) ne résolvent pas en
+    # PDF → on ne garde que le texte ; les liens http(s) deviennent cliquables.
+    def _link(m):
+        label, url = m.group(1), m.group(2)
+        if url.startswith("#"):
+            return label
+        return f'<a href="{url}">{label}</a>'
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", _link, text)
+
+    # `code` inline
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<!\*)\*([^\*]+?)\*(?!\*)", r"<em>\1</em>", text)
     return text

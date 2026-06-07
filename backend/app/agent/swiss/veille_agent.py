@@ -31,7 +31,7 @@ async def run_veille_romande() -> dict:
 
     if not all_items:
         logger.info("Veille CH : aucun nouvel élément détecté")
-        return {"new_alerts": 0, "critical": 0, "skipped": True}
+        return {"new_alerts": 0, "critical": 0, "items_analyzed": 0, "skipped": True}
 
     # 2. Analyse LLM
     system = get_prompt_ch("veille_romande")

@@ -42,7 +42,7 @@ def _base_items(building_type: str) -> list[dict]:
         },
         {
             "id": "aeai_detection",
-            "reference": "AEAI 18-15f",
+            "reference": "AEAI 20-15f",
             "title": "Détection et alarme incendie",
             "description": "Système conforme à l'occupation et à la taille.",
             "status": "A_VERIFIER",
@@ -94,14 +94,14 @@ def items_habitation_moyenne() -> list[dict]:
         },
         {
             "id": "aeai_hab_m_02",
-            "reference": "AEAI 15-15f",
+            "reference": "AEAI 18-15f",
             "title": "Système d'extinction automatique selon surface et occupation",
             "status": "A_VERIFIER",
             "severity": "IMPORTANT",
         },
         {
             "id": "aeai_hab_m_03",
-            "reference": "AEAI 16-15f",
+            "reference": "AEAI 21-15f",
             "title": "Désenfumage cage d'escalier si deux niveaux souterrains ou plus",
             "status": "A_VERIFIER",
             "severity": "IMPORTANT",
@@ -354,6 +354,63 @@ def _items_context(special_context: str | None) -> list[dict]:
     return out
 
 
+# Mapping des typologies du formulaire vers les clés de la base calibrée
+# (checklists_calibrees.py), plus précise et avec références au paragraphe près.
+_CALIBRATED_ALIASES = {
+    "parking": "parking_souterrain",
+    "parking_souterrain": "parking_souterrain",
+    "habitation_faible": "habitation_faible",
+    "habitation_moyenne": "habitation_moyenne",
+    "habitation_elevee": "habitation_elevee",
+    "erp_moyen": "erp_moyen",
+}
+
+# Catégories à traiter comme bloquantes (les autres → IMPORTANT).
+_BLOQUANT_CATEGORIES = {
+    "compartimentage", "voies_evacuation", "structure", "structure_portante",
+    "parking", "ventilation_desenfumage",
+}
+
+
+def _from_calibrated(building_type: str, canton: str | None) -> list[dict] | None:
+    """Convertit la checklist calibrée (si elle couvre la typologie) au format
+    attendu par l'UI/route : {id, reference, title, description, status, severity}.
+
+    Renvoie None si la base calibrée ne couvre pas cette typologie."""
+    key = _CALIBRATED_ALIASES.get(building_type)
+    if not key:
+        return None
+    try:
+        from app.knowledge_base.aeai.checklists_calibrees import get_checklist_aeai
+        cl = get_checklist_aeai(key, canton)
+    except Exception:
+        return None
+    if not cl:
+        return None
+
+    items: list[dict] = []
+    for cat_key, cat in cl["categories"].items():
+        severity = "BLOQUANT" if cat_key in _BLOQUANT_CATEGORIES else "IMPORTANT"
+        for it in cat["items"]:
+            ref = it.get("reference_aeai", "")
+            desc_bits = []
+            part = it.get(f"particularites_{canton}") if canton else ""
+            if part:
+                desc_bits.append(part)
+            if it.get("documents"):
+                desc_bits.append("Pièces : " + ", ".join(it["documents"]))
+            items.append({
+                "id": it["id"],
+                "reference": f"AEAI {ref}" if ref else "AEAI",
+                "title": it.get("critere", ""),
+                "description": " · ".join(desc_bits),
+                "category": cat.get("label", cat_key),
+                "status": "A_VERIFIER",
+                "severity": severity,
+            })
+    return items or None
+
+
 def build_checklist(
     building_type: str,
     height_m: float | None = None,
@@ -363,10 +420,27 @@ def build_checklist(
 ) -> list[dict]:
     """Factory principale : retourne la checklist AEAI appropriée.
 
-    `canton` et `special_context` enrichissent la liste de façon déterministe
-    (référence à l'autorité cantonale + points de vigilance selon le contexte).
-    Aucun appel LLM : les ajouts sont des rappels AEAI standards.
+    Priorité à la base CALIBRÉE (références AEAI au paragraphe près, critères
+    précis ECA-VD / OCAS-GE). Repli sur les templates génériques pour les
+    typologies non couvertes. `canton` et `special_context` enrichissent ensuite
+    la liste de façon déterministe. Aucun appel LLM.
     """
+    items = _from_calibrated(building_type, canton)
+    if items is None:
+        items = _build_generic(building_type, height_m)
+
+    # Enrichissement déterministe (canton + contexte), sans doublon d'id.
+    extra = _items_canton(canton) + _items_context(special_context)
+    seen = {i["id"] for i in items}
+    for it in extra:
+        if it["id"] not in seen:
+            items = items + [it]
+            seen.add(it["id"])
+    return items
+
+
+def _build_generic(building_type: str, height_m: float | None = None) -> list[dict]:
+    """Templates génériques (repli quand la base calibrée ne couvre pas)."""
     dispatch = {
         "habitation_faible": items_habitation_faible,
         "habitation_moyenne": items_habitation_moyenne,
@@ -392,14 +466,6 @@ def build_checklist(
         items = fn(height_m=height_m)
     else:
         items = fn()
-
-    # Enrichissement déterministe (canton + contexte), sans doublon d'id.
-    extra = _items_canton(canton) + _items_context(special_context)
-    seen = {i["id"] for i in items}
-    for it in extra:
-        if it["id"] not in seen:
-            items = items + [it]
-            seen.add(it["id"])
     return items
 
 

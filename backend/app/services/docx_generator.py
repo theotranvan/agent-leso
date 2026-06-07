@@ -19,6 +19,8 @@ from docx.shared import Pt, RGBColor
 
 logger = logging.getLogger(__name__)
 
+_BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr"}
+_HEADING_MAP = {"h1": 0, "h2": 1, "h3": 2, "h4": 3, "h5": 4, "h6": 4}
 _BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "li", "tr"}
 _HEADING_MAP = {"h1": 0, "h2": 1, "h3": 2, "h4": 3}
 

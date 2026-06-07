@@ -33,7 +33,12 @@ export default function VeillePage() {
     setRunResult(null);
     try {
       const r = await api.veille.runNow();
-      setRunResult(`Exécutée : ${r.new_alerts} nouvelles alertes, ${r.critical} critiques sur ${r.items_analyzed} items analysés.`);
+      const analyzed = r.items_analyzed ?? 0;
+      setRunResult(
+        analyzed === 0
+          ? `Exécutée : aucun nouvel élément publié par les sources (Fedlex + cantons) depuis le dernier passage.`
+          : `Exécutée : ${r.new_alerts} nouvelle(s) alerte(s), ${r.critical} critique(s) sur ${analyzed} éléments analysés.`,
+      );
       load();
     } catch (e: any) {
       setRunResult(`Erreur : ${e.message}`);

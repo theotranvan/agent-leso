@@ -228,6 +228,10 @@ CASES = [
 # données (checklist) et n'ont pas d'artefact fichier.
 _DATA_ONLY = {"aeai_checklist_generation"}
 
+# Livrables sans corps HTML rédigé exportable en Word : la checklist AEAI (données)
+# et le DQE (artefact = classeur Excel multi-lots, pas un document texte).
+_NO_DOCX_HTML = {"aeai_checklist_generation", "chiffrage_dqe"}
+
 
 @pytest.mark.parametrize("task_type,module_path,attr,params,llm_text", CASES,
                          ids=[c[0] for c in CASES])
@@ -255,6 +259,17 @@ def test_deliverable_pipeline_does_not_crash(
             or result.get("email_bytes") is not None
             or result.get("result_html") is not None
         ), f"{task_type} ne produit aucun artefact (url/bytes/html)"
+
+    # Export Word : tout livrable « rédigé » doit exposer un result_html exploitable
+    # par l'export .docx (sinon le bouton Word retombe sur l'aperçu = tronqué).
+    if task_type not in _NO_DOCX_HTML:
+        html = result.get("result_html")
+        assert html, f"{task_type} n'expose pas de result_html (export Word tronqué)"
+        from app.services.docx_generator import html_to_docx_bytes
+        docx_bytes = html_to_docx_bytes(html, title=task_type)
+        # En-tête .docx = archive zip (PK\\x03\\x04) ; preuve d'un fichier valide.
+        assert docx_bytes[:2] == b"PK", f"{task_type} : export .docx invalide"
+        assert len(docx_bytes) > 2000, f"{task_type} : export .docx court"
 
 
 # ----------------------------------------------------------------------------

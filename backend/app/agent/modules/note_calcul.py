@@ -147,6 +147,7 @@ Produire la note de calcul complète en markdown. Toutes les formules doivent ê
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": pdf_bytes,
         "email_filename": filename,
+        "result_html": body_html,
     }
 
 
