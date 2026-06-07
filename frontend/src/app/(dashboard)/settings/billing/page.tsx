@@ -18,11 +18,15 @@ type Usage = {
   tokens_limit: number;
   tokens_pack_remaining: number;
   tokens_total_available: number;
+  livrables_used?: number;
+  livrables_limit?: number;
+  livrables_pack_remaining?: number;
+  livrables_total_available?: number;
   used_pct: number;
   cost_chf_estimated: number;
   by_model: Record<string, { tokens: number; cost_chf: number; calls: number }>;
   credit_packs: any[];
-  pack_info: { tokens_per_pack: number; price_chf_per_pack: number };
+  pack_info: { tokens_per_pack: number; price_chf_per_pack: number; livrables_per_pack?: number };
   beta_mode?: boolean;
   billing_contact?: string;
 };
@@ -154,10 +158,11 @@ export default function BillingUsagePage() {
               Quota mensuel — {usage.month}
             </p>
             <h2 className="text-3xl font-semibold">
-              {formatTokens(usage.tokens_used)} <span className="text-muted-foreground text-xl">/ {formatTokens(usage.tokens_limit)} tokens</span>
+              {usage.livrables_used ?? 0} <span className="text-muted-foreground text-xl">/ {usage.livrables_limit ?? 0} livrables</span>
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Plan <span className="font-medium capitalize">{usage.plan}</span> · {usage.used_pct}% consommé
+              Plan <span className="font-medium capitalize">{usage.plan}</span> · {usage.used_pct}% consommé ·{' '}
+              <span title="Détail technique">{formatTokens(usage.tokens_used)} / {formatTokens(usage.tokens_limit)} tokens</span>
             </p>
           </div>
           {usage.used_pct >= 80 && (
@@ -196,16 +201,18 @@ export default function BillingUsagePage() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-semibold">{formatTokens(usage.tokens_pack_remaining)}</p>
-            <p className="text-xs text-muted-foreground">disponibles</p>
+            <p className="text-2xl font-semibold">~{usage.livrables_pack_remaining ?? 0}</p>
+            <p className="text-xs text-muted-foreground">livrables · {formatTokens(usage.tokens_pack_remaining)} tokens</p>
           </div>
         </div>
 
         <div className="rounded-md bg-muted/50 p-4 border">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="font-medium text-sm">Pack de {formatTokens(usage.pack_info.tokens_per_pack)} tokens</p>
-              <p className="text-xs text-muted-foreground">Sans date d'expiration · Facturation unique</p>
+              <p className="font-medium text-sm">Pack de ~{usage.pack_info.livrables_per_pack ?? 100} livrables</p>
+              <p className="text-xs text-muted-foreground">
+                {formatTokens(usage.pack_info.tokens_per_pack)} tokens · sans expiration · facturation unique
+              </p>
             </div>
             <p className="text-lg font-semibold">{usage.pack_info.price_chf_per_pack} CHF</p>
           </div>
@@ -240,7 +247,7 @@ export default function BillingUsagePage() {
                   >+</button>
                 </div>
                 <span className="text-xs text-muted-foreground ml-2">
-                  = {formatTokens(usage.pack_info.tokens_per_pack * packQuantity)} tokens pour {usage.pack_info.price_chf_per_pack * packQuantity} CHF
+                  = ~{(usage.pack_info.livrables_per_pack ?? 100) * packQuantity} livrables pour {usage.pack_info.price_chf_per_pack * packQuantity} CHF
                 </span>
               </div>
 

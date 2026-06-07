@@ -84,7 +84,11 @@ async def portal(user: Annotated[AuthUser, Depends(get_current_user)]):
 @router.get("/status")
 async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
     """Statut actuel de la facturation et du quota (tokens)."""
-    from app.services.token_quota import QUOTA_PLANS
+    from app.services.token_quota import (
+        DEFAULT_PLAN,
+        QUOTA_PLANS,
+        tokens_to_livrables,
+    )
     admin = get_supabase_admin()
     org = admin.table("organizations").select(
         "plan, tokens_used_current_month, tokens_limit_monthly, "
@@ -94,9 +98,9 @@ async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
         raise HTTPException(status_code=404, detail="Organisation introuvable")
 
     d = org.data
-    plan = d.get("plan") or "pilot"
+    plan = d.get("plan") or DEFAULT_PLAN
     tokens_used = int(d.get("tokens_used_current_month") or 0)
-    tokens_limit = int(d.get("tokens_limit_monthly") or QUOTA_PLANS.get(plan, 8_000_000))
+    tokens_limit = int(d.get("tokens_limit_monthly") or QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN]))
     tokens_pack = int(d.get("tokens_pack_remaining") or 0)
 
     return {
@@ -107,6 +111,10 @@ async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
         "tokens_limit": tokens_limit,
         "tokens_pack_remaining": tokens_pack,
         "tokens_total_available": max(0, tokens_limit - tokens_used) + tokens_pack,
+        # Vue « livrables » (affichage principal client).
+        "livrables_used": tokens_to_livrables(tokens_used),
+        "livrables_limit": tokens_to_livrables(tokens_limit),
+        "livrables_total_available": tokens_to_livrables(max(0, tokens_limit - tokens_used) + tokens_pack),
         "quota_pct": round(100 * tokens_used / max(tokens_limit, 1), 1),
         "plan_details": settings.PLAN_LIMITS.get(plan, {}),
         "beta_mode": settings.BETA_MODE,

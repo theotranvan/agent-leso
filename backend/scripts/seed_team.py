@@ -49,8 +49,9 @@ def _get_or_create_org(admin, name: str, contact_email: str) -> str:
     org = admin.table("organizations").insert({
         "name": name,
         "email": contact_email,
-        "plan": "starter",
-        "tasks_limit": settings.PLAN_LIMITS["starter"]["tasks"],
+        "plan": "solo",
+        "tasks_limit": settings.PLAN_LIMITS["solo"]["tasks"],
+        "tokens_limit_monthly": settings.PLAN_LIMITS["solo"]["tokens"],
         "country": "CH",
         "language": "fr",
         "currency": "CHF",

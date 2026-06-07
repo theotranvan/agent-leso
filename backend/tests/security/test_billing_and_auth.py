@@ -109,7 +109,7 @@ def fake_store():
             "email": "client@example.ch",
             "name": "Bureau Test",
             "stripe_customer_id": "cus_1",
-            "plan": "pilot",
+            "plan": "solo",
             "tokens_limit_monthly": 8_000_000,
             "tokens_used_current_month": 1_000_000,
             "tokens_pack_remaining": 0,
@@ -125,18 +125,20 @@ def fake_store():
 class TestStripeBillingCycle:
     def test_subscription_update_sets_token_quota(self, fake_store, monkeypatch):
         """Changement de plan → tokens_limit_monthly recalculé (bug corrigé)."""
+        from app.config import settings
         from app.services import stripe_service
         monkeypatch.setattr(stripe_service, "get_supabase_admin", lambda: FakeAdmin(fake_store))
 
-        # price_p = plan "pro" (cf. env de test) → QUOTA_PLANS["pro"] = 20M
+        # Le price Pro mappe vers le plan "bureau" → QUOTA_PLANS["bureau"] = 20M.
+        # On lit l'ID de prix réellement configuré (indépendant de l'env).
         stripe_service._handle_subscription_updated({
             "id": "sub_1",
             "metadata": {"organization_id": "org1"},
-            "items": {"data": [{"price": {"id": "price_p"}}]},
+            "items": {"data": [{"price": {"id": settings.STRIPE_PRICE_PRO}}]},
             "status": "active",
         })
         org = fake_store["organizations"][0]
-        assert org["plan"] == "pro"
+        assert org["plan"] == "bureau"
         assert org["tokens_limit_monthly"] == 20_000_000, "Le quota tokens doit suivre le plan"
         assert org["active"] is True
 
@@ -200,11 +202,14 @@ class TestBillingStatusRoute:
         user = AuthUser(id="u1", email="a@b.ch", organization_id="org1",
                         role="admin", access_token="x")
         out = await billing.status(user)
-        assert out["plan"] == "pilot"
+        assert out["plan"] == "solo"
         assert out["tokens_limit"] == 8_000_000
         assert out["tokens_used"] == 1_000_000
         assert out["quota_pct"] == pytest.approx(12.5, abs=0.1)
         assert "tokens_total_available" in out
+        # Vue livrables : 8M / 40k = 200 ; 1M / 40k = 25
+        assert out["livrables_limit"] == 200
+        assert out["livrables_used"] == 25
 
 
 # ==========================================================================

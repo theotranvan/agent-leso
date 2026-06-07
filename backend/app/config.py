@@ -73,10 +73,23 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
 
+    # Forfaits — vocabulaire unique (solo / bureau / enterprise) partagé par le
+    # marketing, Stripe et le quota tokens. Prix HT en CHF (TVA 8.1 % en sus).
+    # `tokens` = garde-fou de coût interne ; `livrables` = volume affiché au
+    # client (≈ 40 000 tokens par livrable). `seats` = 0 → illimité.
     PLAN_LIMITS: dict = Field(default_factory=lambda: {
-        "starter": {"tasks": 500, "price_eur": 690, "price_chf": 690},
-        "pro": {"tasks": 2000, "price_eur": 1900, "price_chf": 1900},
-        "enterprise": {"tasks": 999_999, "price_eur": 5000, "price_chf": 5000},
+        "solo": {
+            "name": "Solo", "price_chf": 690, "price_eur": 690,
+            "tokens": 8_000_000, "livrables": 200, "seats": 1, "tasks": 200,
+        },
+        "bureau": {
+            "name": "Bureau", "price_chf": 2400, "price_eur": 2400,
+            "tokens": 20_000_000, "livrables": 500, "seats": 0, "tasks": 500,
+        },
+        "enterprise": {
+            "name": "Enterprise", "price_chf": 4900, "price_eur": 4900,
+            "tokens": 60_000_000, "livrables": 1500, "seats": 0, "tasks": 100_000,
+        },
     })
 
     RATE_LIMIT_PER_MINUTE: int = 100

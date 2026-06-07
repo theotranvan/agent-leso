@@ -9,26 +9,26 @@ import { Badge } from '@/components/ui/badge';
 
 const PLANS = [
   {
-    id: 'starter',
-    name: 'Starter',
+    id: 'solo',
+    name: 'Solo',
     price: 690,
-    tasks: 500,
-    features: ['CCTP, notes de calcul, chiffrages', 'Coordination IFC', 'Support email', 'Stockage documents 10 Go'],
+    livrables: '~200 livrables / mois',
+    features: ['CCTP, notes de calcul, chiffrages', 'Coordination IFC', '1 utilisateur', 'Support email'],
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    price: 1900,
-    tasks: 2000,
-    features: ['Tout Starter', 'Veille réglementaire quotidienne', 'Multi-utilisateurs illimité', 'Stockage 50 Go', 'Support prioritaire'],
+    id: 'bureau',
+    name: 'Bureau',
+    price: 2400,
+    livrables: '~500 livrables / mois',
+    features: ['Tout Solo', 'Veille réglementaire quotidienne', 'Utilisateurs illimités', 'Validation déléguée', 'Support prioritaire'],
     highlight: true,
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 5000,
-    tasks: 'Illimité',
-    features: ['Tout Pro', 'Tâches illimitées', 'SLA 99.9%', 'Account manager dédié', 'Intégrations sur mesure'],
+    price: 'dès 4 900',
+    livrables: 'Volume sur mesure',
+    features: ['Tout Bureau', 'SLA 99.9%', 'Account manager dédié', 'Intégrations sur mesure'],
   },
 ];
 
@@ -41,7 +41,7 @@ export default function BillingPage() {
     api.getBillingStatus().then(setStatus).finally(() => setLoading(false));
   }, []);
 
-  const handleUpgrade = async (plan: 'starter' | 'pro' | 'enterprise') => {
+  const handleUpgrade = async (plan: 'solo' | 'bureau' | 'enterprise') => {
     setUpgrading(plan);
     try {
       const { checkout_url } = await api.checkout(plan);
@@ -63,7 +63,9 @@ export default function BillingPage() {
 
   if (loading) return <div className="text-muted-foreground">Chargement...</div>;
 
-  const quotaPct = status ? Math.round((status.tasks_used_this_month / Math.max(status.tasks_limit, 1)) * 100) : 0;
+  const quotaPct = status ? Math.round(status.quota_pct ?? 0) : 0;
+  const fmtTokens = (n?: number) =>
+    n == null ? '—' : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`;
   const betaMode = status?.beta_mode !== false; // par défaut bêta tant que non démenti
   const contact = status?.billing_contact || 'theo.cours34@gmail.com';
 
@@ -97,7 +99,9 @@ export default function BillingPage() {
         <CardHeader>
           <CardTitle>Consommation du mois</CardTitle>
           <CardDescription>
-            Plan <span className="font-medium text-foreground capitalize">{status?.plan}</span> · {status?.tasks_used_this_month} / {status?.tasks_limit} tâches
+            Plan <span className="font-medium text-foreground capitalize">{status?.plan}</span> ·{' '}
+            {status?.livrables_used ?? 0} / {status?.livrables_limit ?? 0} livrables
+            <span className="text-muted-foreground"> ({fmtTokens(status?.tokens_used)} / {fmtTokens(status?.tokens_limit)} tokens)</span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -132,9 +136,7 @@ export default function BillingPage() {
                       {' '}{status?.currency || 'CHF'} / mois HT
                     </span>
                   </div>
-                  <CardDescription>
-                    {typeof plan.tasks === 'number' ? `${plan.tasks.toLocaleString('fr-CH')} tâches / mois` : plan.tasks}
-                  </CardDescription>
+                  <CardDescription>{plan.livrables}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <ul className="space-y-2">
