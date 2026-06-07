@@ -173,6 +173,7 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         "cost_eur": 0,
         "email_bytes": pdf_bytes,
         "email_filename": pdf_filename,
+        "result_html": markdown_to_html(full_md),
         "metres": {
             "sb_m2": metres["sb_m2"],
             "sre_m2": metres["sre_m2"],
