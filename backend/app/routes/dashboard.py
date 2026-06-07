@@ -26,7 +26,7 @@ async def overview(user: Annotated[AuthUser, Depends(get_current_user)]):
     ).execute()
 
     org = admin.table("organizations").select("plan, tasks_used_this_month, tasks_limit").eq("id", org_id).maybe_single().execute()
-    plan = (org.data.get("plan") if org.data else None) or "starter"
+    plan = (org.data.get("plan") if org.data else None) or "solo"
 
     cost_this_month = sum((t.get("cost_euros") or 0) for t in (tasks_month.data or []))
 
@@ -310,7 +310,7 @@ async def engineer_dashboard(user: Annotated[AuthUser, Depends(get_current_user)
             "tokens_used": tokens_used,
             "tokens_quota": tokens_quota,
             "tokens_pct": round(tokens_used / tokens_quota * 100) if tokens_quota else 0,
-            "plan": odata.get("plan", "starter"),
+            "plan": odata.get("plan", "solo"),
         },
         "to_validate": to_validate[:8],
         "active_projects": active_projects[:8],

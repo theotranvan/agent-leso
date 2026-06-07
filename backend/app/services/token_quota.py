@@ -100,10 +100,10 @@ class TokenQuotaExceeded(Exception):
         self.tokens_limit = tokens_limit
         self.tokens_pack_remaining = tokens_pack_remaining
 
-        overage = tokens_used - tokens_limit
         self.user_message = (
-            f"Quota mensuel atteint : {tokens_used:,} / {tokens_limit:,} tokens "
-            f"({overage:,} au-delà). Tu peux acheter un pack de {CREDIT_PACK_TOKENS:,} tokens "
+            f"Quota mensuel atteint ({tokens_to_livrables(tokens_used)} / "
+            f"{tokens_to_livrables(tokens_limit)} livrables environ). "
+            f"Tu peux acheter un pack d'environ {CREDIT_PACK_LIVRABLES} livrables "
             f"pour {CREDIT_PACK_PRICE_CHF} CHF dans Paramètres → Facturation, "
             f"ou attendre le {_next_month_str()} pour le reset automatique."
         )

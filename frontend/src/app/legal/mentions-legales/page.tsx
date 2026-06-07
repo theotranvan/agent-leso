@@ -13,7 +13,7 @@ export default function MentionsLegalesPage() {
 
       <h2>Éditeur</h2>
       <ul>
-        <li>Raison sociale : Théo Tran-van (entreprise individuelle)</li>
+        <li>Raison sociale : Théo Tran-van — entreprise individuelle, enseigne « Digitran »</li>
         <li>Forme juridique : Raison individuelle</li>
         <li>Adresse : Rue de la Gare 19, 1348 Le Brassus (VD), Suisse</li>
         <li>Numéro IDE : non applicable — entreprise individuelle non inscrite au registre du commerce (CA &lt; 100 000 CHF)</li>
