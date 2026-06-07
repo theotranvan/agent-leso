@@ -71,7 +71,7 @@ export default function BillingPage() {
   const fmtTokens = (n?: number) =>
     n == null ? '—' : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`;
   const betaMode = status?.beta_mode !== false; // par défaut bêta tant que non démenti
-  const contact = status?.billing_contact || 'theo.cours34@gmail.com';
+  const contact = status?.billing_contact || 'contact@digitran.ch';
 
   return (
     <div className="space-y-8">

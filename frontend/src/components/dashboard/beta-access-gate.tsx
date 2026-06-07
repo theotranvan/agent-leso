@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Lock, Mail } from 'lucide-react';
 import { api } from '@/lib/api';
 
-const FALLBACK_CONTACT = 'theo.cours34@gmail.com';
+const FALLBACK_CONTACT = 'contact@digitran.ch';
 
 /**
  * Garde d'accès bêta.

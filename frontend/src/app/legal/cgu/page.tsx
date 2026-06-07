@@ -4,13 +4,11 @@ export default function CguPage() {
   return (
     <>
       <div className="not-prose mb-8 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-        <strong>Modèle à faire valider par un juriste.</strong> Ce texte est une base de
-        travail à adapter à votre raison sociale et à faire relire avant mise en production.
-        Les éléments entre crochets <code>[…]</code> doivent être complétés.
+        <strong>À faire relire par un juriste</strong> avant usage commercial intensif.
       </div>
 
       <h1>Conditions générales d&apos;utilisation</h1>
-      <p>Dernière mise à jour : [date]. Éditeur : [Raison sociale], [adresse], Suisse (ci-après « LESO »).</p>
+      <p>Dernière mise à jour : 7 juin 2026. Éditeur : Théo Tran-van (entreprise individuelle), Rue de la Gare 19, 1348 Le Brassus (VD), Suisse (ci-après « LESO »).</p>
 
       <h2>1. Objet</h2>
       <p>
@@ -41,7 +39,7 @@ export default function CguPage() {
       <p>
         L&apos;accès est fourni selon la formule souscrite. La consommation peut être encadrée
         par un quota (jetons/tokens). La facturation est gérée via notre prestataire de paiement
-        [Stripe]. Les conditions tarifaires, la durée et les modalités de résiliation sont
+        Stripe. Les conditions tarifaires, la durée et les modalités de résiliation sont
         précisées lors de la souscription.
       </p>
 
@@ -73,12 +71,12 @@ export default function CguPage() {
 
       <h2>9. Droit applicable et for</h2>
       <p>
-        Les présentes sont soumises au droit suisse. Le for exclusif est à [siège de l&apos;éditeur],
+        Les présentes sont soumises au droit suisse. Le for exclusif est à Le Brassus (VD),
         sous réserve des dispositions impératives.
       </p>
 
       <h2>10. Contact</h2>
-      <p>Pour toute question : [email de contact].</p>
+      <p>Pour toute question : contact@digitran.ch.</p>
     </>
   );
 }

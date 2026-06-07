@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     # forfait doit être activé manuellement. Le contact paiement/activation est
     # affiché dans l'UI à la place des boutons Stripe.
     BETA_MODE: bool = True
-    BETA_BILLING_CONTACT_EMAIL: str = "theo.cours34@gmail.com"
+    BETA_BILLING_CONTACT_EMAIL: str = "contact@digitran.ch"
 
     @property
     def cors_origins(self) -> list[str]:
