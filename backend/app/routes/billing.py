@@ -83,18 +83,32 @@ async def portal(user: Annotated[AuthUser, Depends(get_current_user)]):
 
 @router.get("/status")
 async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
-    """Statut actuel de la facturation et du quota."""
+    """Statut actuel de la facturation et du quota (tokens)."""
+    from app.services.token_quota import QUOTA_PLANS
     admin = get_supabase_admin()
-    org = admin.table("organizations").select("plan, tasks_used_this_month, tasks_limit, active, stripe_subscription_id").eq("id", user.organization_id).maybe_single().execute()
+    org = admin.table("organizations").select(
+        "plan, tokens_used_current_month, tokens_limit_monthly, "
+        "tokens_pack_remaining, active, stripe_subscription_id"
+    ).eq("id", user.organization_id).maybe_single().execute()
     if not org.data:
         raise HTTPException(status_code=404, detail="Organisation introuvable")
 
+    d = org.data
+    plan = d.get("plan") or "pilot"
+    tokens_used = int(d.get("tokens_used_current_month") or 0)
+    tokens_limit = int(d.get("tokens_limit_monthly") or QUOTA_PLANS.get(plan, 8_000_000))
+    tokens_pack = int(d.get("tokens_pack_remaining") or 0)
+
     return {
-        **org.data,
-        "plan_details": settings.PLAN_LIMITS.get(org.data["plan"], {}),
-        "quota_pct": round(100 * (org.data["tasks_used_this_month"] / max(org.data["tasks_limit"], 1)), 1),
-        # Bêta : le front masque/verrouille les boutons de paiement Stripe et
-        # affiche le contact d'activation tant que BETA_MODE est actif.
+        "plan": plan,
+        "active": d.get("active"),
+        "stripe_subscription_id": d.get("stripe_subscription_id"),
+        "tokens_used": tokens_used,
+        "tokens_limit": tokens_limit,
+        "tokens_pack_remaining": tokens_pack,
+        "tokens_total_available": max(0, tokens_limit - tokens_used) + tokens_pack,
+        "quota_pct": round(100 * tokens_used / max(tokens_limit, 1), 1),
+        "plan_details": settings.PLAN_LIMITS.get(plan, {}),
         "beta_mode": settings.BETA_MODE,
         "billing_contact": settings.BETA_BILLING_CONTACT_EMAIL,
     }
@@ -213,5 +227,10 @@ async def checkout_credit_pack(
         logger.exception("Création session Stripe pack échouée")
         raise HTTPException(500, f"Stripe : {e}")
 
-    audit_log(user, "credit_pack_checkout_created", {"quantity": qty})
+    await audit_log(
+        action="credit_pack_checkout_created",
+        organization_id=user.organization_id,
+        user_id=user.id,
+        metadata={"quantity": qty},
+    )
     return {"checkout_url": session_url, "quantity": qty}
