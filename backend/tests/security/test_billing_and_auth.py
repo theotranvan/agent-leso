@@ -25,7 +25,6 @@ import pytest
 from fastapi import HTTPException
 from jose import jwt
 
-
 # ==========================================================================
 # Fake Supabase admin — chaînage table/select/insert/update/eq/maybe_single
 # ==========================================================================
@@ -399,7 +398,7 @@ class TestJwtHardening:
 
 class TestCctpInputCaps:
     def test_normal_input_unchanged(self):
-        from app.agent.modules.cctp import _clip, _MAX_ARTICLES_LIBRES
+        from app.agent.modules.cctp import _MAX_ARTICLES_LIBRES, _clip
         txt = "Article 1 : robinetterie inox. Article 2 : PAC air-eau COP ≥ 4."
         assert _clip(txt, _MAX_ARTICLES_LIBRES) == txt
 

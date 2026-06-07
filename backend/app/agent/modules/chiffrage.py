@@ -266,7 +266,6 @@ async def _generate_dqe(task, params, project_name, org_name, metre_text, rag_co
         ]
 
     # Canton du projet (pour ajuster la base de prix réelle)
-    org_id = task["organization_id"]
     project_id = task.get("project_id")
     canton = params.get("canton", "VD")
     if project_id:
