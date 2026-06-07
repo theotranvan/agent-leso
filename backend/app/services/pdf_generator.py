@@ -321,9 +321,21 @@ def _escape(text: str) -> str:
 
 
 def _inline(text: str) -> str:
-    """Formatting inline: **gras**, *italique*."""
+    """Formatting inline: liens [texte](url), **gras**, *italique*, `code`."""
     import re
     text = _escape(text)
+
+    # Liens markdown [texte](url). Les ancres internes (#...) ne résolvent pas en
+    # PDF → on ne garde que le texte ; les liens http(s) deviennent cliquables.
+    def _link(m):
+        label, url = m.group(1), m.group(2)
+        if url.startswith("#"):
+            return label
+        return f'<a href="{url}">{label}</a>'
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", _link, text)
+
+    # `code` inline
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<!\*)\*([^\*]+?)\*(?!\*)", r"<em>\1</em>", text)
     return text
