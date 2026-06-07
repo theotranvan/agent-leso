@@ -106,6 +106,10 @@ class TestStructuralFidelity:
         )
         doc = _reopen(data)
         joined = "\n".join(p.text for p in doc.paragraphs)
+        # Les infos projet sont rendues dans un tableau de garde (à la charte).
+        joined += "\n" + "\n".join(
+            c.text for t in doc.tables for r in t.rows for c in r.cells
+        )
         assert "Villa Dupont" in joined and "Ing. X" in joined
         assert "Lot 230" in joined
 
