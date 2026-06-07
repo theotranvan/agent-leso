@@ -56,7 +56,7 @@ def generate_dpgf_excel(
     ws.merge_cells("A3:F3")
 
     # Ligne d'en-tête colonnes (ligne 5)
-    headers = ["N° Article", "Désignation", "Unité", "Quantité", "P.U. HT (€)", "Total HT (€)"]
+    headers = ["N° Article", "Désignation", "Unité", "Quantité", "P.U. HT (CHF)", "Total HT (CHF)"]
     for col_idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=5, column=col_idx, value=header)
         _apply_header_style(cell)
@@ -87,8 +87,8 @@ def generate_dpgf_excel(
 
             # Format nombres
             ws.cell(row=row_num, column=4).number_format = "#,##0.00"
-            ws.cell(row=row_num, column=5).number_format = "#,##0.00 €"
-            ws.cell(row=row_num, column=6).number_format = "#,##0.00 €"
+            ws.cell(row=row_num, column=5).number_format = '#,##0.00 "CHF"'
+            ws.cell(row=row_num, column=6).number_format = '#,##0.00 "CHF"'
 
             for c in range(1, 7):
                 cell = ws.cell(row=row_num, column=c)
@@ -109,24 +109,24 @@ def generate_dpgf_excel(
     total_cell = ws.cell(row=row_num, column=6, value=f"=SUM(F{first_data_row}:F{last_data_row})")
     total_cell.font = Font(bold=True, size=12)
     total_cell.fill = PatternFill(start_color="E5E7EB", end_color="E5E7EB", fill_type="solid")
-    total_cell.number_format = "#,##0.00 €"
+    total_cell.number_format = '#,##0.00 "CHF"'
     _apply_cell_border(total_cell)
 
     row_num += 1
-    cell = ws.cell(row=row_num, column=5, value="TVA 20%")
+    cell = ws.cell(row=row_num, column=5, value="TVA 8.1%")
     cell.alignment = Alignment(horizontal="right")
-    tva_cell = ws.cell(row=row_num, column=6, value=f"=F{row_num - 1}*0.2")
-    tva_cell.number_format = "#,##0.00 €"
+    tva_cell = ws.cell(row=row_num, column=6, value=f"=F{row_num - 1}*0.081")
+    tva_cell.number_format = '#,##0.00 "CHF"'
 
     row_num += 1
     cell = ws.cell(row=row_num, column=5, value="TOTAL TTC")
     cell.font = Font(bold=True, size=13)
     cell.alignment = Alignment(horizontal="right")
-    ttc_cell = ws.cell(row=row_num, column=6, value=f"=F{row_num - 2}*1.2")
+    ttc_cell = ws.cell(row=row_num, column=6, value=f"=F{row_num - 2}*1.081")
     ttc_cell.font = Font(bold=True, size=13)
     ttc_cell.fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
     ttc_cell.font = Font(bold=True, size=13, color="FFFFFF")
-    ttc_cell.number_format = "#,##0.00 €"
+    ttc_cell.number_format = '#,##0.00 "CHF"'
 
     # Largeurs colonnes
     widths = {1: 12, 2: 55, 3: 8, 4: 12, 5: 14, 6: 16}
@@ -164,7 +164,7 @@ def generate_dqe_excel(
     ws_recap["A3"].font = Font(size=9, color="737373")
     ws_recap.merge_cells("A3:C3")
 
-    for idx, header in enumerate(["Lot", "Total HT (€)", "% du total"], start=1):
+    for idx, header in enumerate(["Lot", "Total HT (CHF)", "% du total"], start=1):
         cell = ws_recap.cell(row=5, column=idx, value=header)
         _apply_header_style(cell)
 
@@ -183,7 +183,7 @@ def generate_dqe_excel(
         # Pour éviter les casse-pieds, on recalcule:
         ws_recap.cell(row=row, column=1, value=lot_name)
         ws_recap.cell(row=row, column=2, value=f"=SUM('{sheet_name}'!F6:F{last_line})")
-        ws_recap.cell(row=row, column=2).number_format = "#,##0.00 €"
+        ws_recap.cell(row=row, column=2).number_format = '#,##0.00 "CHF"'
         total_formula_refs.append(f"B{row}")
         row += 1
 
@@ -194,7 +194,7 @@ def generate_dqe_excel(
         sum_formula = f"=SUM({','.join(total_formula_refs)})"
         total_cell = ws_recap.cell(row=row, column=2, value=sum_formula)
         total_cell.font = Font(bold=True, size=12)
-        total_cell.number_format = "#,##0.00 €"
+        total_cell.number_format = '#,##0.00 "CHF"'
         total_cell.fill = PatternFill(start_color="E5E7EB", end_color="E5E7EB", fill_type="solid")
 
         # Pourcentages
@@ -220,7 +220,7 @@ def _fill_lot_sheet(ws, project_name: str, lot_name: str, lines: list[dict], org
     ws["A2"] = f"Projet : {project_name}"
     ws.merge_cells("A2:F2")
 
-    headers = ["N°", "Désignation", "Unité", "Quantité", "P.U. HT (€)", "Total HT (€)"]
+    headers = ["N°", "Désignation", "Unité", "Quantité", "P.U. HT (CHF)", "Total HT (CHF)"]
     for col_idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=5, column=col_idx, value=header)
         _apply_header_style(cell)
@@ -235,8 +235,8 @@ def _fill_lot_sheet(ws, project_name: str, lot_name: str, lines: list[dict], org
         ws.cell(row=row_num, column=5, value=line.get("prix_unitaire") or 0)
         ws.cell(row=row_num, column=6, value=f"=D{row_num}*E{row_num}")
         ws.cell(row=row_num, column=4).number_format = "#,##0.00"
-        ws.cell(row=row_num, column=5).number_format = "#,##0.00 €"
-        ws.cell(row=row_num, column=6).number_format = "#,##0.00 €"
+        ws.cell(row=row_num, column=5).number_format = '#,##0.00 "CHF"'
+        ws.cell(row=row_num, column=6).number_format = '#,##0.00 "CHF"'
         for c in range(1, 7):
             _apply_cell_border(ws.cell(row=row_num, column=c))
         row_num += 1
@@ -247,7 +247,7 @@ def _fill_lot_sheet(ws, project_name: str, lot_name: str, lines: list[dict], org
     ws.cell(row=row_num, column=5).alignment = Alignment(horizontal="right")
     total = ws.cell(row=row_num, column=6, value=f"=SUM(F{first_data_row}:F{row_num - 2})")
     total.font = Font(bold=True)
-    total.number_format = "#,##0.00 €"
+    total.number_format = '#,##0.00 "CHF"'
 
     widths = {1: 10, 2: 50, 3: 8, 4: 12, 5: 14, 6: 16}
     for col, w in widths.items():

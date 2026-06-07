@@ -160,6 +160,22 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
     incertitude = data.get("taux_incertitude_pct", 15)
     hypotheses = data.get("hypotheses_globales", [])
 
+    # Garde-fou : si le lot n'est pas couvert par la base de prix (ou si aucun
+    # article n'a pu être chiffré), on signale clairement « prix à compléter »
+    # plutôt que de laisser un tableau silencieusement à zéro.
+    if not prix_catalogue or total_ht <= 0:
+        avertissement = (
+            f"> ⚠ **Prix à compléter manuellement.** Le lot « {lot} » n'est pas couvert "
+            "par la base de prix de référence (lots chiffrés automatiquement : chauffage/CVS, "
+            "ventilation, sanitaire, électricité, MCR/GTB). Les quantités sont estimées, mais "
+            "les prix unitaires doivent être saisis par le métreur."
+        )
+    else:
+        avertissement = (
+            "> Prix unitaires issus de la base de référence Suisse romande (indice 2025), "
+            "ajustés au canton. À valider en consultation."
+        )
+
     recap_md = f"""# Récapitulatif DPGF — Lot {lot}
 
 **Projet :** {project_name}
@@ -168,7 +184,7 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
 **Fourchette :** {total_min:,.0f} – {total_max:,.0f} CHF
 **Taux d'incertitude estimé :** ±{incertitude} %
 
-> Prix unitaires issus de la base de référence Suisse romande (indice 2025), ajustés au canton. À valider en consultation.
+{avertissement}
 
 ## Hypothèses retenues
 """ + ("\n".join(f"- {h}" for h in hypotheses) if hypotheses else "- Aucune hypothèse spécifique signalée.") + """
