@@ -162,6 +162,18 @@ const TASK_CATEGORIES: TaskCategory[] = [
       tips: 'Séparez les participants par des virgules. Plus les notes sont précises, meilleur est le CR.',
     },
   },
+  {
+    id: 'resume_document',
+    title: 'Résumé de document',
+    description: 'Synthèse claire d\'un PDF technique (rapport, norme, étude)',
+    icon: ScrollText, color: 'bg-slate-50 text-slate-700',
+    fields: ['project_name', 'document_upload'],
+    help: {
+      what: 'Produit un résumé structuré d\'un document PDF : points clés, conclusions, points de vigilance.',
+      prereq: 'Le document PDF à résumer (rapport de sol, norme, notice, étude…).',
+      tips: 'Idéal pour dégrossir un rapport long. À relire : le résumé ne remplace pas la lecture du document source.',
+    },
+  },
   // ----- Situationnel : avant-projet, appels d'offres, suivi de chantier -----
   {
     id: 'simulation_energetique_rapide',

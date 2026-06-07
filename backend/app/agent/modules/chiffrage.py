@@ -166,9 +166,10 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
     if not prix_catalogue or total_ht <= 0:
         avertissement = (
             f"> ⚠ **Prix à compléter manuellement.** Le lot « {lot} » n'est pas couvert "
-            "par la base de prix de référence (lots chiffrés automatiquement : chauffage/CVS, "
-            "ventilation, sanitaire, électricité, MCR/GTB). Les quantités sont estimées, mais "
-            "les prix unitaires doivent être saisis par le métreur."
+            "par la base de prix de référence (lots chiffrés automatiquement : gros œuvre, "
+            "façade/enveloppe, second œuvre, chauffage/CVS, ventilation, sanitaire, électricité, "
+            "MCR/GTB, ascenseurs). Les quantités sont estimées, mais les prix unitaires doivent "
+            "être saisis par le métreur."
         )
     else:
         avertissement = (
@@ -264,21 +265,62 @@ async def _generate_dqe(task, params, project_name, org_name, metre_text, rag_co
             "gros_oeuvre", "second_oeuvre", "cvc", "electricite", "plomberie",
         ]
 
+    # Canton du projet (pour ajuster la base de prix réelle)
+    org_id = task["organization_id"]
+    project_id = task.get("project_id")
+    canton = params.get("canton", "VD")
+    if project_id:
+        proj = get_supabase_admin().table("projects").select("canton").eq("id", project_id).maybe_single().execute()
+        if proj.data and proj.data.get("canton"):
+            canton = proj.data["canton"]
+
+    # Base de prix réelle par lot (même source que le DPGF) : on l'injecte dans
+    # le prompt ET on s'en sert pour FORCER les prix après génération, comme pour
+    # le DPGF. Les lots non couverts restent estimés par le LLM (signalés).
+    from app.knowledge_base.dpgf import list_prix_for_lot
+    prix_par_lot: dict[str, dict] = {}
+    lots_sans_base: list[str] = []
+    prix_blocks = []
+    for lot in lots_input:
+        cat = list_prix_for_lot(lot, params.get("niveau_prestation", "standard"), canton)
+        if cat:
+            prix_par_lot[lot] = {p["code"]: p for p in cat}
+            bloc = f"Lot « {lot} » — base de prix réelle (CHF HT, canton {canton}) :\n"
+            for p in cat:
+                bloc += f"  - [{p['code']}] {p['designation']} | {p['unite']} | médian {p['prix_median']} CHF\n"
+            prix_blocks.append(bloc)
+        else:
+            lots_sans_base.append(lot)
+
+    prix_section = (
+        "\n".join(prix_blocks) if prix_blocks
+        else "Aucune base de prix disponible pour ces lots — estime et signale-le."
+    )
+    if lots_sans_base:
+        prix_section += (
+            f"\n\nLots SANS base de prix (à estimer prudemment, prix à valider) : "
+            f"{', '.join(lots_sans_base)}."
+        )
+
     system_prompt = get_system_prompt("chiffrage_dqe")
     user_content = f"""Générer le DQE multi-lots pour ce projet.
 
 **Projet :** {project_name}
 **Lots à chiffrer :** {', '.join(lots_input)}
+**Canton :** {canton}
 
 **Métré / descriptif fourni :**
 {metre_text[:15000] if metre_text else "Aucun métré fourni — poser les hypothèses."}
 
+**BASE DE PRIX RÉELLE (utilise ces codes et prix médians, n'invente pas) :**
+{prix_section}
+
 {rag_context}
 
-Retourner un JSON :
+Retourner un JSON. Pour les lots avec base de prix, REPRENDS les codes d'article fournis :
 {{
   "lots": {{
-    "nom_lot_1": [ {{"article": "1.1", "designation": "...", "unite": "...", "quantite": X, "prix_unitaire": Y}}, ... ],
+    "nom_lot_1": [ {{"article": "231.110", "designation": "...", "unite": "...", "quantite": X, "prix_unitaire": Y}}, ... ],
     ...
   }}
 }}
@@ -296,6 +338,17 @@ Aucun autre texte."""
     lots_data = data.get("lots", {})
     if not lots_data:  # tolérance format
         lots_data = {lot: data.get(lot, []) for lot in lots_input if lot in data}
+
+    # Force les prix unitaires sur la base réelle (sécurité anti-invention),
+    # comme pour le DPGF. On tolère que la clé de lot du LLM diffère légèrement.
+    for lot_name, lines in lots_data.items():
+        lookup = prix_par_lot.get(lot_name) or prix_par_lot.get(lot_name.lower().replace(" ", "_"))
+        if not lookup:
+            continue
+        for ln in lines:
+            code = ln.get("article")
+            if code and code in lookup:
+                ln["prix_unitaire"] = lookup[code]["prix_median"]
 
     excel_bytes = generate_dqe_excel(
         project_name=project_name,

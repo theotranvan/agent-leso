@@ -332,15 +332,183 @@ PRIX_MCR = {
 
 
 # ==========================================================================
+# LOT GROS ŒUVRE (CFC 211) — prix indicatifs CHF HT, à valider au marché
+# ==========================================================================
+
+PRIX_GROS_OEUVRE = {
+    "211.110": {
+        "designation": "Terrassement en pleine masse, évacuation comprise",
+        "unite": "m³",
+        "prix": {
+            "economique": {"min": 30, "median": 40, "max": 55},
+            "standard": {"min": 40, "median": 55, "max": 75},
+            "premium": {"min": 60, "median": 85, "max": 120},
+        },
+        "notes": "Hors évacuation de matériaux pollués et hors blindage de fouille.",
+    },
+    "211.210": {
+        "designation": "Béton armé en élévation (voiles/dalles), coffrage et armature compris",
+        "unite": "m³",
+        "prix": {
+            "economique": {"min": 380, "median": 480, "max": 600},
+            "standard": {"min": 480, "median": 620, "max": 800},
+            "premium": {"min": 700, "median": 900, "max": 1200},
+        },
+        "notes": "Inclut coffrage 2 faces + armature ~120 kg/m³. À affiner selon ratio acier.",
+    },
+    "211.310": {
+        "designation": "Maçonnerie brique terre cuite / silico-calcaire, ep. 15-20 cm",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 130, "median": 170, "max": 210},
+            "standard": {"min": 170, "median": 220, "max": 280},
+            "premium": {"min": 250, "median": 320, "max": 400},
+        },
+    },
+}
+
+
+# ==========================================================================
+# LOT FAÇADE / ENVELOPPE (CFC 215 / 221 / 226)
+# ==========================================================================
+
+PRIX_FACADE = {
+    "226.110": {
+        "designation": "Isolation périphérique crépie (ITE), isolant + sous-enduit + finition",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 150, "median": 190, "max": 240},
+            "standard": {"min": 190, "median": 240, "max": 300},
+            "premium": {"min": 280, "median": 360, "max": 460},
+        },
+        "notes": "Épaisseur isolant 16-24 cm selon exigence U. Hors échafaudage.",
+    },
+    "215.110": {
+        "designation": "Façade ventilée (ossature + isolant + bardage)",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 380, "median": 480, "max": 600},
+            "standard": {"min": 480, "median": 650, "max": 850},
+            "premium": {"min": 800, "median": 1100, "max": 1500},
+        },
+        "notes": "Selon parement (fibrociment, métal, pierre). Hors échafaudage.",
+    },
+    "221.110": {
+        "designation": "Fenêtre triple vitrage bois-métal, pose comprise",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 700, "median": 850, "max": 1000},
+            "standard": {"min": 850, "median": 1050, "max": 1300},
+            "premium": {"min": 1200, "median": 1500, "max": 1900},
+        },
+        "notes": "Uw ≤ 1.0 W/m²K. Prix au m² de baie, hors stores.",
+    },
+    "228.110": {
+        "designation": "Store à lamelles orientables, commande électrique",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 180, "median": 230, "max": 290},
+            "standard": {"min": 230, "median": 300, "max": 380},
+            "premium": {"min": 350, "median": 450, "max": 580},
+        },
+    },
+}
+
+
+# ==========================================================================
+# LOT SECOND ŒUVRE (CFC 271 / 273 / 281 / 285)
+# ==========================================================================
+
+PRIX_SECOND_OEUVRE = {
+    "271.110": {
+        "designation": "Cloison plâtrerie sèche sur ossature, 2 plaques par face",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 75, "median": 95, "max": 120},
+            "standard": {"min": 95, "median": 125, "max": 160},
+            "premium": {"min": 150, "median": 190, "max": 240},
+        },
+    },
+    "273.110": {
+        "designation": "Porte intérieure bois, bâti et quincaillerie compris",
+        "unite": "pièce",
+        "prix": {
+            "economique": {"min": 550, "median": 700, "max": 880},
+            "standard": {"min": 700, "median": 950, "max": 1250},
+            "premium": {"min": 1200, "median": 1700, "max": 2400},
+        },
+    },
+    "281.110": {
+        "designation": "Chape ciment (incl. isolation phonique/thermique sous chape)",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 40, "median": 52, "max": 65},
+            "standard": {"min": 52, "median": 68, "max": 88},
+            "premium": {"min": 80, "median": 105, "max": 140},
+        },
+    },
+    "281.210": {
+        "designation": "Revêtement de sol (parquet ou carrelage), pose comprise",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 80, "median": 110, "max": 140},
+            "standard": {"min": 110, "median": 150, "max": 200},
+            "premium": {"min": 190, "median": 260, "max": 360},
+        },
+    },
+    "285.110": {
+        "designation": "Peinture intérieure murs et plafonds (préparation + 2 couches)",
+        "unite": "m²",
+        "prix": {
+            "economique": {"min": 22, "median": 30, "max": 38},
+            "standard": {"min": 30, "median": 40, "max": 52},
+            "premium": {"min": 48, "median": 62, "max": 80},
+        },
+    },
+}
+
+
+# ==========================================================================
+# LOT ASCENSEURS (CFC 261)
+# ==========================================================================
+
+PRIX_ASCENSEUR = {
+    "261.110": {
+        "designation": "Ascenseur électrique sans local des machines, 6-8 personnes",
+        "unite": "pièce (par appareil)",
+        "prix": {
+            "economique": {"min": 42000, "median": 55000, "max": 70000},
+            "standard": {"min": 55000, "median": 72000, "max": 95000},
+            "premium": {"min": 90000, "median": 120000, "max": 160000},
+        },
+        "notes": "Pour 4-6 niveaux desservis. +~6000-9000 CHF par niveau supplémentaire.",
+    },
+    "261.210": {
+        "designation": "Supplément cabine PMR / dimensions adaptées SIA 500",
+        "unite": "pièce",
+        "prix": {
+            "economique": {"min": 6000, "median": 9000, "max": 12000},
+            "standard": {"min": 9000, "median": 13000, "max": 18000},
+            "premium": {"min": 16000, "median": 22000, "max": 30000},
+        },
+    },
+}
+
+
+# ==========================================================================
 # REGISTRE CONSOLIDÉ
 # ==========================================================================
 
 PRIX_DPGF_REGISTRY = {
     "230": PRIX_CHAUFFAGE, "chauffage": PRIX_CHAUFFAGE, "cvs": PRIX_CHAUFFAGE,
     "244": PRIX_VENTILATION, "ventilation": PRIX_VENTILATION,
-    "250": PRIX_SANITAIRE, "sanitaire": PRIX_SANITAIRE,
+    "250": PRIX_SANITAIRE, "sanitaire": PRIX_SANITAIRE, "plomberie": PRIX_SANITAIRE,
     "240": PRIX_ELECTRICITE, "electricite": PRIX_ELECTRICITE,
     "245": PRIX_MCR, "mcr": PRIX_MCR, "gtb": PRIX_MCR,
+    "211": PRIX_GROS_OEUVRE, "gros_oeuvre": PRIX_GROS_OEUVRE,
+    "215": PRIX_FACADE, "facade": PRIX_FACADE, "enveloppe": PRIX_FACADE,
+    "271": PRIX_SECOND_OEUVRE, "second_oeuvre": PRIX_SECOND_OEUVRE,
+    "261": PRIX_ASCENSEUR, "ascenseur": PRIX_ASCENSEUR,
 }
 
 
