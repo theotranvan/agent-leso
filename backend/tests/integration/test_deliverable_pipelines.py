@@ -255,3 +255,102 @@ def test_deliverable_pipeline_does_not_crash(
             or result.get("email_bytes") is not None
             or result.get("result_html") is not None
         ), f"{task_type} ne produit aucun artefact (url/bytes/html)"
+
+
+# ----------------------------------------------------------------------------
+# Livrables à entrée binaire : IFC synthétique + factures inline
+# ----------------------------------------------------------------------------
+
+def _synthetic_ifc() -> bytes:
+    """IFC minimal : 1 étage + 2 espaces à quantités connues."""
+    import ifcopenshell
+    import ifcopenshell.api
+
+    f = ifcopenshell.api.run("project.create_file")
+    proj = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcProject", name="SMOKE")
+    ifcopenshell.api.run("unit.assign_unit", f)
+    ifcopenshell.api.run("context.add_context", f, context_type="Model")
+    site = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcSite", name="S")
+    bld = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuilding", name="B")
+    storey = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuildingStorey", name="RDC")
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[site], relating_object=proj)
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[bld], relating_object=site)
+    ifcopenshell.api.run("aggregate.assign_object", f, products=[storey], relating_object=bld)
+    for i, (gfa, nfa, nv) in enumerate([(120.0, 108.0, 336.0), (80.0, 72.0, 224.0)]):
+        sp = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcSpace", name=f"L{i}")
+        ifcopenshell.api.run("aggregate.assign_object", f, products=[sp], relating_object=storey)
+        qto = ifcopenshell.api.run("pset.add_qto", f, product=sp, name="Qto_SpaceBaseQuantities")
+        ifcopenshell.api.run("pset.edit_qto", f, qto=qto, properties={
+            "GrossFloorArea": gfa, "NetFloorArea": nfa, "NetVolume": nv})
+    return f.to_string().encode("utf-8")
+
+
+class _IfcStorage(_FakeStorage):
+    def __init__(self, ifc_bytes: bytes):
+        self._ifc = ifc_bytes
+
+    def download(self, path):
+        return self._ifc
+
+
+class _DocAdmin(_FakeAdmin):
+    """Comme _FakeAdmin mais renvoie une ligne documents sur select maybe_single."""
+    def table(self, name):
+        q = _Query()
+        if name == "documents":
+            orig = q.execute
+
+            def _exec():
+                if q._mode == "select" and q._single:
+                    return _Result({"storage_path": "x.ifc", "filename": "lot.ifc",
+                                    "organization_id": "org-smoke", "file_type": "ifc"})
+                return orig()
+            q.execute = _exec
+        return q
+
+
+def test_metres_pipeline_does_not_crash(monkeypatch):
+    from app.agent.swiss import metres_agent
+    storage = _IfcStorage(_synthetic_ifc())
+    monkeypatch.setattr(metres_agent, "get_storage", lambda: storage, raising=False)
+    monkeypatch.setattr(metres_agent, "get_supabase_admin", lambda: _FakeAdmin(), raising=False)
+    result = asyncio.run(metres_agent.execute(_task(
+        "metres_automatiques_ifc",
+        {"ifc_storage_path": "x.ifc", "project_name": "Test"},
+    )))
+    assert isinstance(result, dict)
+    assert result.get("preview")
+
+
+def test_coordination_pipeline_does_not_crash(monkeypatch):
+    from app.agent.modules import coordination
+    storage = _IfcStorage(_synthetic_ifc())
+    monkeypatch.setattr(coordination, "call_llm", _fake_llm_factory(_MD), raising=False)
+    monkeypatch.setattr(coordination, "get_storage", lambda: storage, raising=False)
+    monkeypatch.setattr(coordination, "get_supabase_admin", lambda: _DocAdmin(), raising=False)
+    monkeypatch.setattr(coordination, "get_project_summary", _noop_dict, raising=False)
+    result = asyncio.run(coordination.execute(_task(
+        "coordination_inter_lots",
+        {"ifc_documents": [
+            {"lot": "cvc", "document_id": "d1"},
+            {"lot": "electricite", "document_id": "d2"},
+        ]},
+    )))
+    assert isinstance(result, dict)
+    assert result.get("preview")
+
+
+def test_idc_pipeline_does_not_crash(monkeypatch):
+    from app.agent.swiss import idc_agent
+    monkeypatch.setattr(idc_agent, "call_llm", _fake_llm_factory(_MD), raising=False)
+    monkeypatch.setattr(idc_agent, "get_storage", lambda: _FakeStorage(), raising=False)
+    monkeypatch.setattr(idc_agent, "get_supabase_admin", lambda: _FakeAdmin(), raising=False)
+    result = asyncio.run(idc_agent.execute(_task(
+        "idc_geneve_rapport",
+        {"building": {"sre_m2": 1000, "heating_vector": "gaz", "egid": "123",
+                      "address": "Rue X 1", "nb_logements": 18},
+         "year": 2024,
+         "consumptions": [{"value": 60000, "unit": "kwh"}]},
+    )))
+    assert isinstance(result, dict)
+    assert result.get("preview")
