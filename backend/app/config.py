@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     STRIPE_PRICE_STARTER: str = ""
     STRIPE_PRICE_PRO: str = ""
     STRIPE_PRICE_ENTERPRISE: str = ""
+    # Prix annuels (−17 %, 2 mois offerts). Optionnels : tant qu'ils ne sont pas
+    # créés dans le dashboard Stripe, la facturation annuelle renvoie une erreur
+    # claire au lieu de facturer au tarif mensuel.
+    STRIPE_PRICE_STARTER_YEARLY: str = ""
+    STRIPE_PRICE_PRO_YEARLY: str = ""
+    STRIPE_PRICE_ENTERPRISE_YEARLY: str = ""
 
     # Email
     RESEND_API_KEY: str = ""
@@ -80,15 +86,18 @@ class Settings(BaseSettings):
     PLAN_LIMITS: dict = Field(default_factory=lambda: {
         "solo": {
             "name": "Solo", "price_chf": 690, "price_eur": 690,
-            "tokens": 8_000_000, "livrables": 200, "seats": 1, "tasks": 200,
+            "price_chf_yearly": 6900, "tokens": 8_000_000,
+            "livrables": 200, "seats": 1, "tasks": 200,
         },
         "bureau": {
             "name": "Bureau", "price_chf": 2400, "price_eur": 2400,
-            "tokens": 20_000_000, "livrables": 500, "seats": 0, "tasks": 500,
+            "price_chf_yearly": 24000, "tokens": 20_000_000,
+            "livrables": 500, "seats": 0, "tasks": 500,
         },
         "enterprise": {
             "name": "Enterprise", "price_chf": 4900, "price_eur": 4900,
-            "tokens": 60_000_000, "livrables": 1500, "seats": 0, "tasks": 100_000,
+            "price_chf_yearly": 49000, "tokens": 60_000_000,
+            "livrables": 1500, "seats": 0, "tasks": 100_000,
         },
     })
 

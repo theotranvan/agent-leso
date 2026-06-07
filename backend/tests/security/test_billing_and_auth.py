@@ -212,6 +212,58 @@ class TestBillingStatusRoute:
         assert out["livrables_used"] == 25
 
 
+class TestCheckoutInterval:
+    """Sélection du prix Stripe selon l'intervalle mensuel / annuel."""
+
+    def test_unknown_plan_raises(self):
+        from app.services import stripe_service
+        with pytest.raises(ValueError):
+            stripe_service.create_checkout_session(
+                "cus_1", "inconnu", "org1", "s", "c", interval="monthly")
+
+    def test_yearly_unconfigured_raises_clear_error(self):
+        """Prix annuel absent de Stripe → erreur explicite, jamais de bascule mensuelle."""
+        from app.services import stripe_service
+        with pytest.raises(ValueError) as e:
+            stripe_service.create_checkout_session(
+                "cus_1", "solo", "org1", "s", "c", interval="yearly")
+        assert "annuel" in str(e.value).lower()
+
+    def test_monthly_uses_monthly_price(self, monkeypatch):
+        from app.services import stripe_service
+        captured = {}
+
+        class _S:
+            url = "https://stripe/checkout"
+
+        monkeypatch.setattr(
+            stripe_service.stripe.checkout.Session, "create",
+            lambda **kw: (captured.update(kw) or _S()),
+        )
+        url = stripe_service.create_checkout_session(
+            "cus_1", "bureau", "org1", "s", "c", interval="monthly")
+        assert url == "https://stripe/checkout"
+        assert captured["line_items"][0]["price"] == stripe_service.PLAN_TO_PRICE_ID["monthly"]["bureau"]
+        assert captured["metadata"]["interval"] == "monthly"
+
+    def test_yearly_uses_yearly_price_when_configured(self, monkeypatch):
+        from app.services import stripe_service
+        monkeypatch.setitem(stripe_service.PLAN_TO_PRICE_ID["yearly"], "bureau", "price_bureau_yearly")
+        captured = {}
+
+        class _S:
+            url = "u"
+
+        monkeypatch.setattr(
+            stripe_service.stripe.checkout.Session, "create",
+            lambda **kw: (captured.update(kw) or _S()),
+        )
+        stripe_service.create_checkout_session(
+            "cus_1", "bureau", "org1", "s", "c", interval="yearly")
+        assert captured["line_items"][0]["price"] == "price_bureau_yearly"
+        assert captured["metadata"]["interval"] == "yearly"
+
+
 # ==========================================================================
 # 2. SIGNATURE WEBHOOK STRIPE
 # ==========================================================================

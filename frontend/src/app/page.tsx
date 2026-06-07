@@ -38,16 +38,16 @@ export default async function LandingPage() {
 
   const plans = [
     {
-      name: 'Solo', price: '690', tagline: 'Ingénieur indépendant', tasks: '~200 livrables / mois',
+      name: 'Solo', price: '690', priceYearly: '6 900', tagline: 'Ingénieur indépendant', tasks: '~200 livrables / mois',
       features: ['Tous les modules suisses', '1 utilisateur', 'Documents à votre charte', 'Support par email'],
     },
     {
-      name: 'Bureau', price: '2 400', tagline: 'Bureau de 5 à 20 personnes', tasks: '~500 livrables / mois',
+      name: 'Bureau', price: '2 400', priceYearly: '24 000', tagline: 'Bureau de 5 à 20 personnes', tasks: '~500 livrables / mois',
       features: ['Tout Solo, plus :', 'Utilisateurs illimités', 'Veille personnalisée', 'Validation déléguée', 'Vue multi-affaires', 'Support prioritaire'],
       highlight: true,
     },
     {
-      name: 'Enterprise', price: 'dès 4 900', tagline: 'Grand bureau', tasks: 'Volume sur mesure',
+      name: 'Enterprise', price: 'dès 4 900', priceYearly: 'dès 49 000', tagline: 'Grand bureau', tasks: 'Volume sur mesure',
       features: ['Tout Bureau, plus :', 'SLA 99.9 %', 'Account manager dédié', 'Intégrations sur mesure'],
     },
   ];
@@ -244,6 +244,7 @@ export default async function LandingPage() {
                   <span className="text-4xl font-semibold tracking-tight">{plan.price}</span>
                   <span className="text-muted-foreground">CHF / mois HT</span>
                 </div>
+                <div className="text-xs text-emerald-600 mb-1">ou {plan.priceYearly} CHF / an · 2 mois offerts</div>
                 <div className="text-sm text-muted-foreground mb-6">{plan.tasks}</div>
                 <Link href="/register">
                   <Button className="w-full mb-6" variant={plan.highlight ? 'default' : 'outline'}>
