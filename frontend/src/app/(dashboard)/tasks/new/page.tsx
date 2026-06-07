@@ -594,7 +594,8 @@ function AdaptiveFields({
               <SelectItem value="mcr">MCR / GTB</SelectItem>
               <SelectItem value="gros_oeuvre">Gros œuvre (béton, maçonnerie)</SelectItem>
               <SelectItem value="facade">Façade / enveloppe</SelectItem>
-              <SelectItem value="second_oeuvre">Second œuvre (générique)</SelectItem>
+              <SelectItem value="second_oeuvre">Second œuvre (plâtrerie, sols, peinture)</SelectItem>
+              <SelectItem value="ascenseur">Ascenseurs</SelectItem>
               <SelectItem value="custom">Autre lot (à décrire) …</SelectItem>
             </SelectContent>
           </Select>
@@ -602,7 +603,7 @@ function AdaptiveFields({
             <div className="mt-2">
               <Input
                 value={form.lot_custom || ''}
-                placeholder="Nom du lot (ex. Cloisonnement / doublages, Serrurerie, Ascenseurs…)"
+                placeholder="Nom du lot (ex. Serrurerie / métallerie, Cuisines, Stores…)"
                 onChange={(e) => setField('lot_custom', e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
@@ -611,7 +612,7 @@ function AdaptiveFields({
             </div>
           ) : (
             <p className="text-[11px] text-muted-foreground mt-1">
-              Bibliothèque de prescriptions détaillée disponible pour tous les lots sauf « Second œuvre » (structure générique).
+              Bibliothèque de prescriptions détaillée disponible pour tous les lots de la liste. Pour un lot hors liste, choisissez « Autre lot ».
             </p>
           )}
         </div>
