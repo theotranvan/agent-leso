@@ -228,7 +228,7 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
 
     return {
         "result_url": excel_url,
-        "preview": f"DPGF généré — {len(lines)} articles — Total HT : {total_ht:,.2f} €\n\nFichiers : Excel (actif) + PDF récap",
+        "preview": f"DPGF généré — {len([ln for ln in lines if not ln.get('is_section')])} articles — Total HT médian : {total_ht:,.0f} CHF (fourchette {total_min:,.0f}–{total_max:,.0f})\n\nFichiers : Excel (actif) + PDF récap",
         "model": llm_result["model"],
         "tokens_used": llm_result["tokens_used"],
         "cost_eur": llm_result["cost_eur"],
@@ -240,8 +240,12 @@ Retourne le JSON strict avec les quantités estimées et les prix médians fourn
 async def _generate_dqe(task, params, project_name, org_name, metre_text, rag_context) -> dict[str, Any]:
     lots_input = params.get("lots", [])
     if not lots_input:
-        # Fallback : déduire les lots du métré
-        lots_input = ["gros_oeuvre", "second_oeuvre", "cvc", "electricite", "plomberie"]
+        # Respecte le lot choisi par l'ingénieur s'il n'a pas fourni de liste,
+        # sinon liste type multi-lots.
+        single = params.get("lot")
+        lots_input = [single] if single else [
+            "gros_oeuvre", "second_oeuvre", "cvc", "electricite", "plomberie",
+        ]
 
     system_prompt = get_system_prompt("chiffrage_dqe")
     user_content = f"""Générer le DQE multi-lots pour ce projet.
@@ -306,7 +310,7 @@ Aucun autre texte."""
 
     return {
         "result_url": signed_url,
-        "preview": f"DQE généré — {len(lots_data)} lots — Total HT : {total:,.2f} €",
+        "preview": f"DQE généré — {len(lots_data)} lots — Total HT : {total:,.0f} CHF",
         "model": llm_result["model"],
         "tokens_used": llm_result["tokens_used"],
         "cost_eur": llm_result["cost_eur"],
