@@ -65,11 +65,13 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
 
-    # Bêta — pendant la phase pilote, le paiement en ligne (Stripe self-service)
-    # n'est pas encore ouvert. Les nouveaux comptes sont créés "inactifs" et un
-    # forfait doit être activé manuellement. Le contact paiement/activation est
-    # affiché dans l'UI à la place des boutons Stripe.
-    BETA_MODE: bool = True
+    # Bêta — interrupteur du paiement Stripe self-service.
+    #   False (défaut) : paiement en ligne OUVERT, nouveaux comptes actifs,
+    #     redirection Stripe à l'inscription.
+    #   True : verrouille les boutons de paiement et crée les comptes inactifs
+    #     (activation manuelle) — utile pour repasser en pilote fermé.
+    # Surchargeable par la variable d'env BETA_MODE.
+    BETA_MODE: bool = False
     BETA_BILLING_CONTACT_EMAIL: str = "contact@digitran.ch"
 
     @property
