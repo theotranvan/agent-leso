@@ -94,7 +94,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     title: 'DPGF / Chiffrage',
     description: 'Devis quantitatif structuré par lot à partir du programme',
     icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
-    fields: ['project_name', 'lot', 'surface', 'notes'],
+    fields: ['project_name', 'lot', 'niveau_prestation', 'surface', 'notes'],
     help: {
       what: 'Génère un bordereau DPGF par lot avec postes, unités et prix unitaires indicatifs (indice 2025, ajusté au canton).',
       prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
@@ -143,7 +143,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Lettre argumentée point par point depuis un courrier DALE, DGT ou CAMAC',
     icon: MessageSquareWarning, color: 'bg-red-50 text-red-700',
     days_saved: '1-3 j économisés',
-    fields: ['project_name', 'canton', 'autorite_pdf_upload', 'author'],
+    fields: ['project_name', 'canton', 'authority', 'autorite_pdf_upload', 'author'],
     help: {
       what: 'Lit le courrier d\'observations d\'une autorité et rédige une réponse structurée, point par point, prête à renvoyer.',
       prereq: 'Le PDF du courrier de l\'autorité (DALE, DGT, CAMAC…) + le canton.',
@@ -155,7 +155,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     title: 'Compte-rendu de réunion',
     description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
     icon: Users, color: 'bg-slate-50 text-slate-700',
-    fields: ['project_name', 'meeting_title', 'participants', 'notes'],
+    fields: ['project_name', 'meeting_title', 'meeting_date', 'meeting_lieu', 'participants', 'notes'],
     help: {
       what: 'Transforme des notes brutes en compte-rendu structuré : décisions, actions, délais, présents.',
       prereq: 'Vos notes de réunion (texte) et la liste des participants.',
@@ -192,7 +192,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     title: 'DQE',
     description: 'Devis quantitatif estimatif structuré par lot, avec prix unitaires',
     icon: Calculator, color: 'bg-emerald-50 text-emerald-700',
-    fields: ['project_name', 'lot', 'surface', 'notes'],
+    fields: ['project_name', 'lot', 'niveau_prestation', 'surface', 'notes'],
     help: {
       what: 'Devis quantitatif estimatif détaillé par lot, avec quantités et prix unitaires indicatifs.',
       prereq: 'Le lot et la surface concernée (ou un métré collé dans les notes).',
@@ -829,6 +829,32 @@ function AdaptiveFields({
         </div>
       )}
 
+      {fields.includes('meeting_date') && (
+        <div>
+          <Label>Date de la réunion</Label>
+          <Input type="date" value={form.meeting_date || ''}
+            onChange={(e) => setField('meeting_date', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('meeting_lieu') && (
+        <div>
+          <Label>Lieu</Label>
+          <Input value={form.meeting_lieu || ''}
+            placeholder="Bureau, visioconférence, chantier…"
+            onChange={(e) => setField('meeting_lieu', e.target.value)} />
+        </div>
+      )}
+
+      {fields.includes('authority') && (
+        <div>
+          <Label>Autorité émettrice</Label>
+          <Input value={form.authority || ''}
+            placeholder="Ex : DALE (GE), DGT (VD), CAMAC, commune…"
+            onChange={(e) => setField('authority', e.target.value)} />
+        </div>
+      )}
+
       {fields.includes('participants') && (
         <div>
           <Label>Participants</Label>
@@ -1119,6 +1145,7 @@ function buildTaskPayload(
   } else if (taskType === 'reponse_observations_autorite') {
     // L'agent attend observations_document_id + project_context (pas project_data)
     p.observations_document_id = uploadedDocId;
+    if (form.authority) p.authority = form.authority;
     p.project_context = {
       canton: form.canton,
       sre_m2: form.sre_m2 ? Number(form.sre_m2) : undefined,
@@ -1144,6 +1171,7 @@ function buildTaskPayload(
     // L'agent chiffre à partir de metre_text (ou metre_document_id), pas de
     // champs surface/notes isolés : on compose un métré minimal lisible.
     p.lot = form.lot;
+    p.niveau_prestation = form.niveau_prestation || 'standard';
     const metreLines: string[] = [];
     if (form.surface) metreLines.push(`Surface concernée : ${form.surface} m²`);
     if (form.notes) metreLines.push(String(form.notes));
@@ -1178,6 +1206,11 @@ function buildTaskPayload(
     // L'agent lit "objet" (pas meeting_title) et itère sur participants :
     // il faut une LISTE, sinon une string serait parcourue caractère par caractère.
     p.objet = form.meeting_title || 'Réunion de projet';
+    if (form.meeting_date) {
+      const [y, m, d] = String(form.meeting_date).split('-');
+      p.date = d && m && y ? `${d}.${m}.${y}` : form.meeting_date;
+    }
+    if (form.meeting_lieu) p.lieu = form.meeting_lieu;
     p.participants = form.participants
       ? String(form.participants).split(',').map((s) => s.trim()).filter(Boolean)
       : [];
