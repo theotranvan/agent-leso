@@ -13,13 +13,27 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 # Vocabulaire unique solo/bureau/enterprise. Les noms des variables d'env Stripe
 # (STRIPE_PRICE_STARTER/PRO/ENTERPRISE) restent inchangés : ce ne sont que des
 # identifiants pointant vers les objets Price du dashboard Stripe.
+# Deux intervalles : "monthly" (mensuel) et "yearly" (annuel, −17 %).
 PLAN_TO_PRICE_ID = {
-    "solo": settings.STRIPE_PRICE_STARTER,
-    "bureau": settings.STRIPE_PRICE_PRO,
-    "enterprise": settings.STRIPE_PRICE_ENTERPRISE,
+    "monthly": {
+        "solo": settings.STRIPE_PRICE_STARTER,
+        "bureau": settings.STRIPE_PRICE_PRO,
+        "enterprise": settings.STRIPE_PRICE_ENTERPRISE,
+    },
+    "yearly": {
+        "solo": settings.STRIPE_PRICE_STARTER_YEARLY,
+        "bureau": settings.STRIPE_PRICE_PRO_YEARLY,
+        "enterprise": settings.STRIPE_PRICE_ENTERPRISE_YEARLY,
+    },
 }
 
-PRICE_ID_TO_PLAN = {v: k for k, v in PLAN_TO_PRICE_ID.items()}
+# Tout price_id (mensuel OU annuel) → plan, pour les webhooks de souscription.
+PRICE_ID_TO_PLAN = {
+    pid: plan
+    for interval in PLAN_TO_PRICE_ID.values()
+    for plan, pid in interval.items()
+    if pid
+}
 
 
 def create_customer(email: str, organization_name: str, organization_id: str) -> str:
@@ -38,10 +52,22 @@ def create_checkout_session(
     organization_id: str,
     success_url: str,
     cancel_url: str,
+    interval: str = "monthly",
 ) -> str:
-    """Crée une session Stripe Checkout. Retourne l'URL."""
-    price_id = PLAN_TO_PRICE_ID.get(plan)
+    """Crée une session Stripe Checkout. Retourne l'URL.
+
+    `interval` : "monthly" (défaut) ou "yearly" (−17 %). Si le prix annuel n'est
+    pas encore configuré dans Stripe, lève une ValueError explicite plutôt que
+    de facturer silencieusement au tarif mensuel.
+    """
+    interval = interval if interval in PLAN_TO_PRICE_ID else "monthly"
+    price_id = PLAN_TO_PRICE_ID[interval].get(plan)
     if not price_id:
+        if interval == "yearly":
+            raise ValueError(
+                "La facturation annuelle n'est pas encore disponible pour ce plan. "
+                "Choisissez le mensuel ou contactez-nous."
+            )
         raise ValueError(f"Plan inconnu: {plan}")
 
     session = stripe.checkout.Session.create(
@@ -50,8 +76,8 @@ def create_checkout_session(
         line_items=[{"price": price_id, "quantity": 1}],
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={"organization_id": organization_id, "plan": plan},
-        subscription_data={"metadata": {"organization_id": organization_id, "plan": plan}},
+        metadata={"organization_id": organization_id, "plan": plan, "interval": interval},
+        subscription_data={"metadata": {"organization_id": organization_id, "plan": plan, "interval": interval}},
         allow_promotion_codes=True,
         billing_address_collection="required",
     )

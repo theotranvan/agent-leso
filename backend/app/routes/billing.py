@@ -15,7 +15,8 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 
 class CheckoutRequest(BaseModel):
-    plan: str  # starter | pro | enterprise
+    plan: str  # solo | bureau | enterprise
+    interval: str = "monthly"  # monthly | yearly (annuel −17 %)
 
 
 @router.post("/checkout")
@@ -45,19 +46,23 @@ async def checkout(
         )
         admin.table("organizations").update({"stripe_customer_id": customer_id}).eq("id", user.organization_id).execute()
 
-    url = stripe_service.create_checkout_session(
-        customer_id=customer_id,
-        plan=body.plan,
-        organization_id=user.organization_id,
-        success_url=f"{settings.FRONTEND_URL}/billing?success=1",
-        cancel_url=f"{settings.FRONTEND_URL}/billing?canceled=1",
-    )
+    try:
+        url = stripe_service.create_checkout_session(
+            customer_id=customer_id,
+            plan=body.plan,
+            organization_id=user.organization_id,
+            success_url=f"{settings.FRONTEND_URL}/billing?success=1",
+            cancel_url=f"{settings.FRONTEND_URL}/billing?canceled=1",
+            interval=body.interval,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     await audit_log(
         action="checkout_initiated",
         organization_id=user.organization_id,
         user_id=user.id,
-        metadata={"plan": body.plan},
+        metadata={"plan": body.plan, "interval": body.interval},
         ip_address=request.client.host if request.client else None,
     )
     return {"checkout_url": url}

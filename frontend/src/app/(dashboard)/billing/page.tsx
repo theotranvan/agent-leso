@@ -12,6 +12,7 @@ const PLANS = [
     id: 'solo',
     name: 'Solo',
     price: 690,
+    priceYearly: 6900,
     livrables: '~200 livrables / mois',
     features: ['CCTP, notes de calcul, chiffrages', 'Coordination IFC', '1 utilisateur', 'Support email'],
   },
@@ -19,6 +20,7 @@ const PLANS = [
     id: 'bureau',
     name: 'Bureau',
     price: 2400,
+    priceYearly: 24000,
     livrables: '~500 livrables / mois',
     features: ['Tout Solo', 'Veille réglementaire quotidienne', 'Utilisateurs illimités', 'Validation déléguée', 'Support prioritaire'],
     highlight: true,
@@ -27,6 +29,7 @@ const PLANS = [
     id: 'enterprise',
     name: 'Enterprise',
     price: 'dès 4 900',
+    priceYearly: 'dès 49 000',
     livrables: 'Volume sur mesure',
     features: ['Tout Bureau', 'SLA 99.9%', 'Account manager dédié', 'Intégrations sur mesure'],
   },
@@ -36,6 +39,7 @@ export default function BillingPage() {
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
     api.getBillingStatus().then(setStatus).finally(() => setLoading(false));
@@ -44,7 +48,7 @@ export default function BillingPage() {
   const handleUpgrade = async (plan: 'solo' | 'bureau' | 'enterprise') => {
     setUpgrading(plan);
     try {
-      const { checkout_url } = await api.checkout(plan);
+      const { checkout_url } = await api.checkout(plan, billingInterval);
       window.location.href = checkout_url;
     } catch (e: any) {
       alert(`Erreur : ${e.message}`);
@@ -119,10 +123,27 @@ export default function BillingPage() {
       </Card>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Plans disponibles</h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 className="text-lg font-semibold">Plans disponibles</h2>
+          <div className="inline-flex items-center rounded-lg border p-0.5 text-sm">
+            <button
+              onClick={() => setBillingInterval('monthly')}
+              className={`px-3 py-1 rounded-md transition-colors ${billingInterval === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Mensuel
+            </button>
+            <button
+              onClick={() => setBillingInterval('yearly')}
+              className={`px-3 py-1 rounded-md transition-colors ${billingInterval === 'yearly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Annuel <span className="text-emerald-600 font-medium">−17 %</span>
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => {
             const isCurrent = status?.plan === plan.id;
+            const shownPrice = billingInterval === 'yearly' ? plan.priceYearly : plan.price;
             return (
               <Card key={plan.id} className={plan.highlight ? 'border-primary' : ''}>
                 <CardHeader>
@@ -131,11 +152,14 @@ export default function BillingPage() {
                     {plan.highlight && <Badge>Populaire</Badge>}
                   </div>
                   <div className="mt-2">
-                    <span className="text-3xl font-bold">{plan.price}</span>
+                    <span className="text-3xl font-bold">{shownPrice}</span>
                     <span className="text-sm text-muted-foreground">
-                      {' '}{status?.currency || 'CHF'} / mois HT
+                      {' '}{status?.currency || 'CHF'} / {billingInterval === 'yearly' ? 'an' : 'mois'} HT
                     </span>
                   </div>
+                  {billingInterval === 'yearly' && (
+                    <p className="text-xs text-emerald-600 mt-0.5">2 mois offerts</p>
+                  )}
                   <CardDescription>{plan.livrables}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
