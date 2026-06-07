@@ -143,7 +143,7 @@ async def run_first_payment_onboarding(stripe_customer_id: str) -> dict[str, Any
             to=[org["email"]],
             organization_name=org["name"],
             canton=org.get("canton") or "GE",
-            plan=org.get("plan") or "starter",
+            plan=org.get("plan") or "solo",
             demo_project_id=demo_project_id,
         )
         result["welcome_email_sent"] = True

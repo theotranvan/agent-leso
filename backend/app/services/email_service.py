@@ -184,7 +184,7 @@ def send_welcome_email(
     to: list[str],
     organization_name: str,
     canton: str = "GE",
-    plan: str = "starter",
+    plan: str = "solo",
     demo_project_id: Optional[str] = None,
 ) -> Optional[str]:
     """Email de bienvenue après activation d'un plan payant."""
@@ -193,7 +193,11 @@ def send_welcome_email(
     base_url = settings.FRONTEND_URL.rstrip("/")
     demo_link = f"{base_url}/projects/{demo_project_id}" if demo_project_id else f"{base_url}/dashboard"
 
-    plan_labels = {"starter": "Starter (490 CHF/mois)", "pro": "Pro (1 900 CHF/mois)", "enterprise": "Enterprise"}
+    plan_labels = {
+        "solo": "Solo (690 CHF/mois)",
+        "bureau": "Bureau (2 400 CHF/mois)",
+        "enterprise": "Enterprise",
+    }
     plan_label = plan_labels.get(plan, plan.capitalize())
 
     body_html = f"""

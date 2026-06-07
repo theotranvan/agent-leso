@@ -4,7 +4,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-PlanType = Literal["starter", "pro", "enterprise"]
+PlanType = Literal["solo", "bureau", "enterprise"]
 
 
 class OrganizationBase(BaseModel):
@@ -14,7 +14,7 @@ class OrganizationBase(BaseModel):
 
 
 class OrganizationCreate(OrganizationBase):
-    plan: PlanType = "starter"
+    plan: PlanType = "solo"
 
 
 class Organization(OrganizationBase):

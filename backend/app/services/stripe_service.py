@@ -256,9 +256,13 @@ def create_credit_pack_session(
 ) -> str:
     """Crée une session Stripe one-shot pour l'achat d'un/plusieurs credit packs.
 
-    Chaque pack = 5M tokens = 200 CHF. Mode 'payment' (pas d'abonnement).
+    Chaque pack = ~100 livrables additionnels = 200 CHF. Mode 'payment' (pas d'abonnement).
     """
-    from app.services.token_quota import CREDIT_PACK_PRICE_CHF, CREDIT_PACK_TOKENS
+    from app.services.token_quota import (
+        CREDIT_PACK_LIVRABLES,
+        CREDIT_PACK_PRICE_CHF,
+        CREDIT_PACK_TOKENS,
+    )
 
     session = stripe.checkout.Session.create(
         customer=customer_id,
@@ -268,8 +272,8 @@ def create_credit_pack_session(
             "price_data": {
                 "currency": "chf",
                 "product_data": {
-                    "name": f"Pack de {CREDIT_PACK_TOKENS:,} tokens LESO",
-                    "description": "Tokens additionnels consommés après le quota mensuel",
+                    "name": f"Pack LESO — ~{CREDIT_PACK_LIVRABLES} livrables additionnels",
+                    "description": "Livrables supplémentaires consommés après le quota mensuel",
                 },
                 "unit_amount": CREDIT_PACK_PRICE_CHF * 100,  # en centimes CHF
             },
