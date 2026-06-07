@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 _BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr"}
 _HEADING_MAP = {"h1": 0, "h2": 1, "h3": 2, "h4": 3, "h5": 4, "h6": 4}
+# Balises dont le CONTENU ne doit jamais finir dans le Word (CSS, JS, métadonnées).
+# Uniquement des balises à fermeture explicite : les éléments vides (meta, link)
+# n'ont pas de </…> et bloqueraient le compteur _skip indéfiniment.
+_SKIP_TAGS = {"style", "script", "head", "title"}
 
 
 class _HtmlToDocx(HTMLParser):
@@ -40,6 +44,9 @@ class _HtmlToDocx(HTMLParser):
         self._cell_buf: list[str] | None = None
         self._is_header_row = False
         self._header_rows: list[bool] = []
+        # Contenu non textuel à ignorer (sinon le CSS/JS d'un document complet
+        # est recopié tel quel dans le Word).
+        self._skip = 0
 
     # ---- helpers ----
     def _new_para(self, style: str | None = None):
@@ -63,6 +70,11 @@ class _HtmlToDocx(HTMLParser):
 
     # ---- HTMLParser callbacks ----
     def handle_starttag(self, tag, attrs):
+        if tag in _SKIP_TAGS:
+            self._skip += 1
+            return
+        if self._skip:
+            return
         if tag in ("strong", "b"):
             self._bold += 1
         elif tag in ("em", "i"):
@@ -94,6 +106,11 @@ class _HtmlToDocx(HTMLParser):
                 self._is_header_row = True
 
     def handle_endtag(self, tag):
+        if tag in _SKIP_TAGS:
+            self._skip = max(0, self._skip - 1)
+            return
+        if self._skip:
+            return
         if tag in ("strong", "b"):
             self._bold = max(0, self._bold - 1)
         elif tag in ("em", "i"):
@@ -118,6 +135,8 @@ class _HtmlToDocx(HTMLParser):
             self._in_table = False
 
     def handle_data(self, data):
+        if self._skip:
+            return
         if self._cell_buf is not None:
             self._cell_buf.append(data)
             return
