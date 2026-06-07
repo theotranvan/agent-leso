@@ -156,6 +156,7 @@ const TASK_CATEGORIES: TaskCategory[] = [
     description: 'Résumé structuré depuis des notes ou un enregistrement de réunion',
     icon: Users, color: 'bg-slate-50 text-slate-700',
     fields: ['project_name', 'meeting_title', 'meeting_date', 'meeting_heure', 'meeting_lieu', 'participants', 'notes'],
+    fields: ['project_name', 'meeting_title', 'meeting_date', 'meeting_lieu', 'participants', 'notes'],
     help: {
       what: 'Transforme des notes brutes en compte-rendu structuré : décisions, actions, délais, présents.',
       prereq: 'Vos notes de réunion (texte) et la liste des participants.',

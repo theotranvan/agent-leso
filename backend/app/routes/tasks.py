@@ -174,6 +174,11 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
             docx_bytes = None
 
     if not docx_bytes:
+        docx_bytes = html_to_docx_bytes(
+            body_html, title=title, project_info=project_info,
+            branding=branding, footer_note=footer,
+        )
+    else:
         docx_bytes = text_to_docx_bytes(
             t.get("result_preview") or "Aucun contenu disponible.",
             title=title, footer_note=footer,
