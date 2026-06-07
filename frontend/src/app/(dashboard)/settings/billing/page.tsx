@@ -126,7 +126,7 @@ export default function BillingUsagePage() {
 
   const totalPackTokens = (usage.credit_packs || []).reduce((sum, p) => sum + (p.tokens_granted || 0), 0);
   const betaMode = usage.beta_mode !== false; // bêta par défaut tant que non démenti
-  const contact = usage.billing_contact || 'theo.cours34@gmail.com';
+  const contact = usage.billing_contact || 'contact@digitran.ch';
 
   return (
     <div className="space-y-6 max-w-4xl">
