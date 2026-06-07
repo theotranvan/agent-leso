@@ -285,10 +285,13 @@ export default async function LandingPage() {
       <footer className="border-t">
         <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <Logo />
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <a href="#tarifs" className="hover:text-foreground transition-colors">Tarifs</a>
             <a href="#modules" className="hover:text-foreground transition-colors">Modules</a>
             <Link href="/login" className="hover:text-foreground transition-colors">Se connecter</Link>
+            <Link href="/legal/cgu" className="hover:text-foreground transition-colors">CGU</Link>
+            <Link href="/legal/confidentialite" className="hover:text-foreground transition-colors">Confidentialité</Link>
+            <Link href="/legal/mentions-legales" className="hover:text-foreground transition-colors">Mentions légales</Link>
           </div>
           <div>© {new Date().getFullYear()} LESO · Suisse romande</div>
         </div>
