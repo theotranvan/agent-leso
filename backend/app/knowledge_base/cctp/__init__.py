@@ -17,6 +17,8 @@ from typing import Literal
 
 from app.knowledge_base.cctp.lot_chauffage import LOT_CHAUFFAGE
 from app.knowledge_base.cctp.lot_electricite import LOT_ELECTRICITE
+from app.knowledge_base.cctp.lot_facade import LOT_FACADE
+from app.knowledge_base.cctp.lot_gros_oeuvre import LOT_GROS_OEUVRE
 from app.knowledge_base.cctp.lot_mcr import LOT_MCR
 from app.knowledge_base.cctp.lot_sanitaire import LOT_SANITAIRE
 from app.knowledge_base.cctp.lot_ventilation import LOT_VENTILATION
@@ -39,6 +41,17 @@ LOTS_REGISTRY = {
     "mcr": LOT_MCR,
     "245": LOT_MCR,
     "gtb": LOT_MCR,
+
+    "gros_oeuvre": LOT_GROS_OEUVRE,
+    "211": LOT_GROS_OEUVRE,
+    "maconnerie": LOT_GROS_OEUVRE,
+    "beton": LOT_GROS_OEUVRE,
+
+    "facade": LOT_FACADE,
+    "215": LOT_FACADE,
+    "enveloppe": LOT_FACADE,
+    "fenetres": LOT_FACADE,
+    "toiture": LOT_FACADE,
 }
 
 
