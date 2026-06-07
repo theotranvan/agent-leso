@@ -1,6 +1,6 @@
 'use client';
 import { LogoMark } from '@/components/brand/logo';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CantonPicker } from '@/components/swiss/CantonPicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { validateCheVat } from '@/lib/ch';
+import { api } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
+type PlanId = 'solo' | 'bureau' | 'enterprise';
+const PLANS: { id: PlanId; name: string; monthly: number; yearly: number; livrables: string }[] = [
+  { id: 'solo', name: 'Solo', monthly: 690, yearly: 6900, livrables: '~200 livrables / mois' },
+  { id: 'bureau', name: 'Bureau', monthly: 2400, yearly: 24000, livrables: '~500 livrables / mois' },
+  { id: 'enterprise', name: 'Enterprise', monthly: 4900, yearly: 49000, livrables: 'Volume sur mesure' },
+];
+
 export default function RegisterPage() {
   const router = useRouter();
+  const [plan, setPlan] = useState<PlanId>('bureau');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -31,6 +41,15 @@ export default function RegisterPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pré-sélection du plan / intervalle depuis l'URL (deep-link depuis la landing).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const p = (params.get('plan') || '').toLowerCase();
+    if (p === 'solo' || p === 'bureau' || p === 'enterprise') setPlan(p);
+    const i = (params.get('interval') || '').toLowerCase();
+    if (i === 'monthly' || i === 'yearly') setBillingInterval(i);
+  }, []);
 
   const handleChangeCountry = (country: string) => {
     setForm({
@@ -72,8 +91,17 @@ export default function RegisterPage() {
       });
       if (loginErr) throw loginErr;
 
-      router.push('/dashboard');
-      router.refresh();
+      // Paiement à la fin de la création : on envoie l'utilisateur vers Stripe
+      // pour le plan choisi. Si Stripe est indisponible, on entre quand même
+      // dans l'app (le forfait pourra être réglé depuis Facturation).
+      try {
+        const { checkout_url } = await api.checkout(plan, billingInterval);
+        window.location.href = checkout_url;
+        return;
+      } catch {
+        router.push('/dashboard');
+        router.refresh();
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -81,7 +109,9 @@ export default function RegisterPage() {
     }
   };
 
-  const planPrice = form.currency === 'CHF' ? '690 CHF' : '690 €';
+  const selected = PLANS.find((p) => p.id === plan)!;
+  const price = billingInterval === 'yearly' ? selected.yearly : selected.monthly;
+  const cur = form.currency === 'CHF' ? 'CHF' : '€';
 
   return (
     <div className="min-h-screen grid place-items-center bg-muted/30 px-4 py-8">
@@ -92,9 +122,58 @@ export default function RegisterPage() {
             <span className="font-semibold">LESO</span>
           </div>
           <CardTitle>Créer un compte</CardTitle>
-          <CardDescription>Plan Solo {planPrice} / mois · ~200 livrables · essai 1 mois</CardDescription>
+          <CardDescription>
+            Choisissez votre forfait, créez le compte, puis réglez en ligne. Essai 1 mois · résiliable à tout moment.
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Sélecteur de plan + intervalle */}
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Forfait</Label>
+              <div className="inline-flex items-center rounded-lg border p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('monthly')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${billingInterval === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Mensuel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('yearly')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${billingInterval === 'yearly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Annuel <span className="text-emerald-600 font-medium">−17%</span>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {PLANS.map((p) => {
+                const active = p.id === plan;
+                const pr = billingInterval === 'yearly' ? p.yearly : p.monthly;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlan(p.id)}
+                    className={`rounded-lg border p-3 text-left transition-all ${active ? 'border-primary ring-1 ring-primary bg-primary/5' : 'hover:border-foreground/30'}`}
+                  >
+                    <div className="text-sm font-semibold">{p.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {pr.toLocaleString('fr-CH')} {cur}/{billingInterval === 'yearly' ? 'an' : 'mois'}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-1">{p.livrables}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sélection : <span className="font-medium text-foreground">{selected.name}</span> ·{' '}
+              {price.toLocaleString('fr-CH')} {cur}/{billingInterval === 'yearly' ? 'an' : 'mois'} · Prix nets (TVA non applicable)
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -172,8 +251,11 @@ export default function RegisterPage() {
             {error && <div className="text-sm text-destructive">{error}</div>}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Création...' : 'Créer mon compte'}
+              {loading ? 'Création…' : `Créer mon compte et régler (${price.toLocaleString('fr-CH')} ${cur}/${billingInterval === 'yearly' ? 'an' : 'mois'})`}
             </Button>
+            <p className="text-[11px] text-muted-foreground text-center">
+              Vous serez redirigé vers le paiement sécurisé Stripe après la création.
+            </p>
           </form>
 
           <p className="text-sm text-muted-foreground text-center mt-4">

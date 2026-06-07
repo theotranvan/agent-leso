@@ -246,7 +246,7 @@ export default async function LandingPage() {
                 </div>
                 <div className="text-xs text-emerald-600 mb-1">ou {plan.priceYearly} CHF / an · 2 mois offerts</div>
                 <div className="text-sm text-muted-foreground mb-6">{plan.tasks}</div>
-                <Link href="/register">
+                <Link href={`/register?plan=${plan.name.toLowerCase()}`}>
                   <Button className="w-full mb-6" variant={plan.highlight ? 'default' : 'outline'}>
                     Commencer
                   </Button>
