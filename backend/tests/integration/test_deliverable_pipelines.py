@@ -1,0 +1,257 @@
+"""Smoke test des pipelines de livrables — aucun ne doit planter.
+
+Pour chaque type de livrable, on exécute le pipeline COMPLET de l'agent
+(`execute(task)`) avec LLM + stockage + base de données SIMULÉS. On ne valide
+PAS la qualité du texte généré (c'est le rôle de l'étape « À valider »), mais on
+prouve que toute la mécanique tient : lecture des champs, appel LLM, parsing,
+génération PDF/Excel/HTML, assemblage, et retour d'un dict exploitable.
+
+Couvre les livrables « texte → LLM → rendu → stockage » sans entrée binaire
+(les livrables qui exigent un IFC/PDF réel — coordination, métrés, IDC sur
+factures — sont hors de ce smoke et couverts ailleurs).
+"""
+from __future__ import annotations
+
+import asyncio
+import importlib
+import json
+
+import pytest
+
+# ----------------------------------------------------------------------------
+# Fakes : stockage + base
+# ----------------------------------------------------------------------------
+
+class _FakeStorage:
+    def upload(self, path, data, content_type="application/octet-stream"):
+        return path
+
+    def get_signed_url(self, path, expires_in=3600):
+        return f"https://fake.local/{path}"
+
+    def download(self, path):
+        return b""
+
+    def delete(self, path):
+        return None
+
+
+class _Result:
+    def __init__(self, data, count=None):
+        self.data = data
+        self.count = count
+
+
+class _Query:
+    def __init__(self):
+        self._mode = "select"
+        self._payload = None
+        self._single = False
+
+    def select(self, *a, **k):
+        self._mode = "select"
+        return self
+
+    def insert(self, row):
+        self._mode = "insert"
+        self._payload = row
+        return self
+
+    def update(self, row):
+        self._mode = "update"
+        self._payload = row
+        return self
+
+    def eq(self, *a, **k):
+        return self
+
+    def maybe_single(self):
+        self._single = True
+        return self
+
+    def limit(self, n):
+        return self
+
+    def order(self, *a, **k):
+        return self
+
+    def execute(self):
+        if self._mode == "insert":
+            row = dict(self._payload) if isinstance(self._payload, dict) else {}
+            row.setdefault("id", "fake-doc-id")
+            return _Result([row])
+        if self._mode == "update":
+            return _Result([])
+        # select → vide (branding tombe sur DEFAULT, org_name "")
+        return _Result(None if self._single else [], count=0)
+
+
+class _FakeAdmin:
+    def table(self, name):
+        return _Query()
+
+    def rpc(self, *a, **k):
+        return _Query()
+
+
+def _fake_llm_factory(text: str):
+    async def _fake_llm(*args, **kwargs):
+        return {
+            "text": text,
+            "model": "claude-sonnet-4-6",
+            "tokens_used": 200,
+            "input_tokens": 100,
+            "output_tokens": 100,
+            "cost_eur": 0.01,
+            "cost_chf": 0.01,
+            "fallback_used": False,
+        }
+    return _fake_llm
+
+
+async def _noop_str(*args, **kwargs):
+    return ""
+
+
+async def _noop_dict(*args, **kwargs):
+    return {}
+
+
+def _patch_module(monkeypatch, module, llm_text: str):
+    """Neutralise LLM/stockage/DB/RAG dans le namespace d'un module agent."""
+    monkeypatch.setattr(module, "call_llm", _fake_llm_factory(llm_text), raising=False)
+    monkeypatch.setattr(module, "get_storage", lambda: _FakeStorage(), raising=False)
+    monkeypatch.setattr(module, "get_supabase_admin", lambda: _FakeAdmin(), raising=False)
+    monkeypatch.setattr(module, "build_project_context", _noop_str, raising=False)
+    monkeypatch.setattr(module, "get_project_summary", _noop_dict, raising=False)
+
+
+# ----------------------------------------------------------------------------
+# Textes LLM simulés par format attendu
+# ----------------------------------------------------------------------------
+
+_HTML = "<h2>CFC 230 — Production</h2><p>Prescription contextualisée.</p><ul><li>PAC air-eau</li></ul>"
+_MD = "# Livrable\n\n## Section\n\nContenu rédigé.\n\n- point 1\n- point 2\n"
+_JSON_DPGF = json.dumps({
+    "lines": [
+        {"is_section": True, "designation": "CFC 231 — Production de chaleur"},
+        {"article": "231.110", "designation": "PAC air-eau", "unite": "kW",
+         "quantite": 50, "prix_unitaire": 1700, "hypothese": "Selon SRE"},
+    ],
+    "hypotheses_globales": ["Puissance estimée selon SRE"],
+    "taux_incertitude_pct": 15,
+})
+_JSON_DQE = json.dumps({
+    "lots": {
+        "chauffage": [
+            {"article": "1.1", "designation": "PAC air-eau", "unite": "kW",
+             "quantite": 50, "prix_unitaire": 1700},
+        ],
+    },
+})
+
+
+def _task(task_type: str, params: dict) -> dict:
+    return {
+        "id": "task-smoke-1",
+        "organization_id": "org-smoke",
+        "project_id": None,
+        "task_type": task_type,
+        "input_params": params,
+    }
+
+
+# ----------------------------------------------------------------------------
+# Cas de livrables : (task_type, module_path, agent_attr, params, llm_text)
+# ----------------------------------------------------------------------------
+
+CASES = [
+    ("redaction_cctp", "app.agent.modules.cctp", "execute",
+     {"lot": "chauffage", "type_ouvrage": "PAC air-eau", "niveau_prestation": "standard",
+      "surface": "500", "contraintes": "Accès difficile", "articles_libres": "Article sur mesure : robinetterie inox."},
+     _HTML),
+
+    ("compte_rendu_reunion", "app.agent.modules.rapport", "execute",
+     {"objet": "Réunion de coordination", "notes": "Point sur le planning et les lots.",
+      "participants": ["Ing. A", "Arch. B"], "date": "07.06.2026", "lieu": "Bureau Lausanne"},
+     _MD),
+
+    ("memoire_technique", "app.agent.modules.rapport", "execute",
+     {"brief": "Appel d'offres CVC immeuble 18 logements à Genève."},
+     _MD),
+
+    ("resume_document", "app.agent.modules.rapport", "execute",
+     {"content": "Texte long à résumer. " * 50},
+     _MD),
+
+    ("chiffrage_dpgf", "app.agent.modules.chiffrage", "execute",
+     {"lot": "chauffage", "niveau_prestation": "standard", "metre_text": "Surface : 500 m²"},
+     _JSON_DPGF),
+
+    ("chiffrage_dqe", "app.agent.modules.chiffrage", "execute",
+     {"lot": "chauffage", "metre_text": "Surface : 500 m²"},
+     _JSON_DQE),
+
+    ("controle_reglementaire_geneve", "app.agent.swiss.geneva_agent", "execute",
+     {"project_data": {"canton": "GE", "address": "Rue X 1", "affectation": "logement_collectif",
+                       "operation_type": "neuf", "sre_m2": 1000, "nb_logements": 18}},
+     _MD),
+
+    ("dossier_mise_enquete", "app.agent.swiss.dossier_enquete_agent", "execute",
+     {"project_data": {"canton": "GE", "address": "Rue X 1", "affectation": "logement_collectif",
+                       "operation_type": "neuf", "sre_m2": 1000, "nb_logements": 18},
+      "specificities": "Parcelle en zone 3, proximité voie ferrée."},
+     _MD),
+
+    ("reponse_observations_autorite", "app.agent.swiss.observations_agent", "execute",
+     {"observations_text": "L'autorité demande des précisions sur le concept énergétique et le stationnement.",
+      "authority": "DALE", "project_context": {"canton": "GE", "sre_m2": 1000}},
+     _MD),
+
+    ("calcul_acoustique", "app.agent.modules.note_calcul", "execute",
+     {"elements": "Dalle béton 24 cm, cloisons légères", "hypotheses": "Logements superposés",
+      "localisation": "Suisse"},
+     _MD),
+
+    ("simulation_energetique_rapide", "app.agent.swiss.simulation_rapide_agent", "execute",
+     {"sre_m2": 1000, "affectation": "logement_collectif", "canton": "GE",
+      "standard": "sia_380_1_neuf", "heating_vector": "gaz", "facteur_forme": "compact"},
+     _MD),
+
+    ("aeai_checklist_generation", "app.agent.swiss.aeai_agent", "execute_checklist",
+     {"building_type": "habitation_moyenne", "height_m": 18, "nb_occupants_max": 60,
+      "special_context": "Parking souterrain", "canton": "GE"},
+     _MD),
+]
+
+# Livrables qui produisent un fichier (PDF/Excel) — les autres renvoient des
+# données (checklist) et n'ont pas d'artefact fichier.
+_DATA_ONLY = {"aeai_checklist_generation"}
+
+
+@pytest.mark.parametrize("task_type,module_path,attr,params,llm_text", CASES,
+                         ids=[c[0] for c in CASES])
+def test_deliverable_pipeline_does_not_crash(
+    monkeypatch, task_type, module_path, attr, params, llm_text,
+):
+    module = importlib.import_module(module_path)
+
+    # Patch le module de dispatch + la source app.database (imports tardifs).
+    _patch_module(monkeypatch, module, llm_text)
+    import app.database as dbmod
+    monkeypatch.setattr(dbmod, "get_storage", lambda: _FakeStorage(), raising=False)
+    monkeypatch.setattr(dbmod, "get_supabase_admin", lambda: _FakeAdmin(), raising=False)
+
+    execute = getattr(module, attr)
+    result = asyncio.run(execute(_task(task_type, params)))
+
+    # Contrat minimal : dict avec un aperçu non vide.
+    assert isinstance(result, dict), f"{task_type} ne retourne pas un dict"
+    assert result.get("preview"), f"{task_type} sans preview"
+    # Les livrables « fichier » exposent une URL, des octets email ou du HTML.
+    if task_type not in _DATA_ONLY:
+        assert (
+            result.get("result_url") is not None
+            or result.get("email_bytes") is not None
+            or result.get("result_html") is not None
+        ), f"{task_type} ne produit aucun artefact (url/bytes/html)"
