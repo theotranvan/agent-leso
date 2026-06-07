@@ -51,7 +51,6 @@ def _get_or_create_org(admin, name: str, contact_email: str) -> str:
         "email": contact_email,
         "plan": "solo",
         "tasks_limit": settings.PLAN_LIMITS["solo"]["tasks"],
-        "tokens_limit_monthly": settings.PLAN_LIMITS["solo"]["tokens"],
         "country": "CH",
         "language": "fr",
         "currency": "CHF",

@@ -95,14 +95,15 @@ async def status(user: Annotated[AuthUser, Depends(get_current_user)]):
         tokens_to_livrables,
     )
     admin = get_supabase_admin()
-    org = admin.table("organizations").select(
-        "plan, tokens_used_current_month, tokens_limit_monthly, "
-        "tokens_pack_remaining, active, stripe_subscription_id"
-    ).eq("id", user.organization_id).maybe_single().execute()
-    if not org.data:
+    # select("*") + limit(1) : tolère l'absence des colonnes tokens_* si la
+    # migration 005 n'est pas encore appliquée (évite un 400 PostgREST).
+    org_q = admin.table("organizations").select("*").eq(
+        "id", user.organization_id,
+    ).limit(1).execute()
+    d = (org_q.data or [None])[0]
+    if not d:
         raise HTTPException(status_code=404, detail="Organisation introuvable")
 
-    d = org.data
     plan = d.get("plan") or DEFAULT_PLAN
     tokens_used = int(d.get("tokens_used_current_month") or 0)
     tokens_limit = int(d.get("tokens_limit_monthly") or QUOTA_PLANS.get(plan, QUOTA_PLANS[DEFAULT_PLAN]))
