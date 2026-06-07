@@ -140,6 +140,7 @@ export default function BillingPage() {
             </button>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mb-4">Prix nets · TVA non applicable</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => {
             const isCurrent = status?.plan === plan.id;
@@ -154,7 +155,7 @@ export default function BillingPage() {
                   <div className="mt-2">
                     <span className="text-3xl font-bold">{shownPrice}</span>
                     <span className="text-sm text-muted-foreground">
-                      {' '}{status?.currency || 'CHF'} / {billingInterval === 'yearly' ? 'an' : 'mois'} HT
+                      {' '}{status?.currency || 'CHF'} / {billingInterval === 'yearly' ? 'an' : 'mois'}
                     </span>
                   </div>
                   {billingInterval === 'yearly' && (
