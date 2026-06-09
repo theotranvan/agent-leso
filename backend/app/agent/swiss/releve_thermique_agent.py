@@ -359,22 +359,33 @@ def _fmt(v, unit="m²"):
     return f"{v:,.1f} {unit}".replace(",", "'") if isinstance(v, (int, float)) else "_à compléter_"
 
 
+def _sum_orient(d: dict) -> float | None:
+    """Somme des valeurs non nulles d'un dict par orientation (None si tout vide)."""
+    vals = [v for v in (d or {}).values() if isinstance(v, (int, float))]
+    return round(sum(vals), 1) if vals else None
+
+
 def _build_report_md(project_name: str, canton: str, t: dict, per_plan: list[dict]) -> str:
     md = f"""# Relevé thermique depuis plans 2D
 
 **Projet :** {project_name}{(' · Canton : ' + canton) if canton else ''}
 **Planches analysées :** {len([p for p in per_plan if not p.get('error')])}
 
-> ⚠ Relevé établi par lecture automatique des plans (IA vision). Valeurs **à vérifier et valider par l'ingénieur thermicien** avant saisie Lesosai. L'ingénieur signataire reste responsable du modèle énergétique.
+> ⚠ Relevé établi par lecture des plans (mesure CAO pour les fichiers DXF/DWG, lecture IA vision pour les PDF/images). Valeurs **à vérifier et valider par l'ingénieur thermicien** avant saisie Lesosai. L'ingénieur signataire reste responsable du modèle énergétique.
 
-## 1. Synthèse des données Lesosai
+## 1. Réponse à votre demande — données pour le bilan Lesosai
 
-| Donnée (SIA 380/1) | Valeur relevée |
-|---|---|
-| Surface de référence énergétique (SRE) | {_fmt(t['sre_m2'])} |
-| Surface de toiture | {_fmt(t['surface_toiture_m2'])} |
-| Surface de façades contre terre | {_fmt(t['surface_facade_contre_terre_m2'])} |
-| Surface de planchers (ext./terre/non chauffé) | {_fmt(t['surface_plancher_ext_terre_m2'])} |
+| # | Donnée demandée | Valeur relevée | Détail |
+|---|---|---|---|
+| 1 | Surface de référence énergétique (SRE) | {_fmt(t['sre_m2'])} | locaux chauffés |
+| 2 | Surface de toiture | {_fmt(t['surface_toiture_m2'])} | — |
+| 3 | Surfaces de façades ext. **par orientation** | {_fmt(_sum_orient(t['facades']))} (total) | **voir § 2** |
+| 4 | Surfaces de façades **contre terre** | {_fmt(t['surface_facade_contre_terre_m2'])} | sous-sol / coupes |
+| 5 | Surfaces des fenêtres **par orientation** | {_fmt(_sum_orient(t['fenetres']))} (total) | **voir § 3** |
+| 6 | Surfaces de planchers (ext./terre/local non chauffé) | {_fmt(t['surface_plancher_ext_terre_m2'])} | dalles |
+| 7 | Ponts thermiques (longueur + type) | {len(t['ponts_thermiques'])} repéré(s) | **voir § 4** |
+
+_« à compléter » = donnée non lisible sur les planches fournies (à relever sur un plan/coupe complémentaire ou à confirmer par le thermicien)._
 
 ## 2. Façades par orientation
 
