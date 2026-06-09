@@ -1,7 +1,11 @@
 """Agent métrés automatiques depuis un fichier IFC.
 
-Extrait les quantités SIA 416 (surfaces brutes, nettes, SRE, volumes par CFC) et
-produit un DPGF pré-rempli + un tableau de surfaces.
+Extrait les surfaces et volumes (SIA 416) et les quantités par CFC/eCCC-Bât
+depuis la maquette, produit un DPGF pré-rempli + un tableau de surfaces, et
+rappelle la « base du projet » (identification, sources, objet, normes).
+
+La surface de référence énergétique (SRE) est rattachée à SIA 380/1 (et non
+à SIA 416), conformément aux règles de mesure du bilan thermique.
 
 Gain : 1-2 jours d'ingénieur par affaire sur les phases 31-33.
 """
@@ -13,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from app.agent.rag import get_project_summary
 from app.database import get_storage, get_supabase_admin
 from app.services.excel_generator import generate_dpgf_excel
 from app.services.pdf_generator import markdown_to_html, render_pdf_from_html
@@ -75,6 +80,9 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     # Parsing IFC
     metres = _extract_metres(ifc_bytes)
 
+    # Contexte projet (pour la "Base du projet")
+    project = await get_project_summary(org_id, project_id) if project_id else {}
+
     # Tableau surfaces SIA 416 (markdown)
     surfaces_md = _build_surfaces_table(metres)
 
@@ -87,47 +95,52 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     )
 
     # PDF récapitulatif métrés
-    full_md = f"""# Métrés automatiques SIA 416
+    full_md = f"""# Métrés automatiques — surfaces, volumes et quantités
 
-**Projet** : {params.get('project_name', '')}
-**Source IFC** : {source_name}
-**Date extraction** : {datetime.now().strftime('%d.%m.%Y %H:%M')}
+{_build_base_section(params, project, source_name)}
 
-## Résumé
+## 1. Synthèse des grandeurs
 
-| Grandeur | Valeur |
-|----------|--------|
-| Nombre d'étages | {metres['nb_storeys']} |
-| Nombre d'espaces (IfcSpace) | {metres['nb_spaces']} |
-| Surface brute de plancher (SB) | {metres['sb_m2']} m² |
-| Surface utile (SU) | {metres['su_m2']} m² |
-| Surface de référence énergétique (SRE) | {metres['sre_m2']} m² |
-| Volume bâti SIA 416 | {metres['volume_m3']} m³ |
-| Surface enveloppe extérieure | {metres['envelope_m2']} m² |
+| Grandeur | Valeur | Référence |
+|----------|--------|-----------|
+| Nombre d'étages | {metres['nb_storeys']} | — |
+| Nombre d'espaces (IfcSpace) | {metres['nb_spaces']} | — |
+| Surface brute de plancher (SBP) | {metres['sb_m2']} m² | SIA 416 |
+| Surface utile (SU) | {metres['su_m2']} m² | SIA 416 |
+| **Surface de référence énergétique (SRE)** | **{metres['sre_m2']} m²** | **SIA 380/1** |
+| Volume bâti (V) | {metres['volume_m3']} m³ | SIA 416 |
+| Surface d'enveloppe extérieure | {metres['envelope_m2']} m² | — |
 
-## Détail par étage
+## 2. Détail par étage
 
 {_render_storey_table(metres.get('by_storey', []))}
 
-## Tableau surfaces SIA 416
+## 3. Tableau des surfaces (SIA 416)
 
 {surfaces_md}
 
-## Quantités par CFC (utilisées pour le DPGF)
+## 4. Quantités par CFC / eCCC-Bât (base du DPGF)
 
 {_render_cfc_table(metres.get('by_cfc', {}))}
 
-## Remarques
+## 5. Hypothèses, méthode et réserves
 
-- Les surfaces SU/SRE sont estimées à partir des IfcSpace quand Pset_SpaceCommon le permet.
-  Sinon, approximation : SRE ≈ SB × 0.95, SU ≈ SB × 0.85 (à valider manuellement).
-- Les quantités CFC sont issues du mapping IFC → eCCC-Bât simplifié. À confirmer avec le chiffreur.
-- L'architecte et le chiffreur signataires engagent leur responsabilité sur les métrés officiels.
+- **Surfaces et volumes** établis selon **SIA 416** (SN 504 416) à partir des quantités de la maquette IFC \
+(Qto_SpaceBaseQuantities / Qto_*BaseQuantities). La SBP et le volume sont lus lorsque l'IFC porte les quantités ; \
+sinon une approximation est appliquée et signalée.
+- **Surface de référence énergétique (SRE)** : grandeur du **bilan énergétique, définie par SIA 380/1** \
+(et non par SIA 416). La valeur ci-dessus est une **estimation** issue des surfaces chauffées de la maquette ; \
+elle doit être **confirmée selon les règles de mesure de SIA 380/1** (étages dans l'enveloppe thermique, \
+hauteur libre ≥ 1,0 m, mesures aux dimensions extérieures) avant tout usage réglementaire (CECB, Minergie, OCEN).
+- **Quantités CFC** issues d'un mapping IFC → eCCC-Bât simplifié — à confirmer avec le métreur/chiffreur.
+- Métré établi à partir de la **maquette numérique citée en base** ; sa validité dépend de l'exhaustivité et \
+de l'exactitude de l'IFC. **L'architecte / l'ingénieur signataire engage sa responsabilité** sur les métrés officiels.
 """
 
     pdf_bytes = render_pdf_from_html(
         body_html=markdown_to_html(full_md),
-        title="Métrés automatiques — SIA 416",
+        title="Métrés automatiques — surfaces, volumes & quantités",
+        subtitle="SIA 416 (surfaces/volumes) · SIA 380/1 (SRE) · CFC (DPGF)",
         project_name=params.get("project_name", ""),
         author=params.get("author", ""),
         reference=f"METRES-{datetime.now().strftime('%Y%m%d-%H%M')}",
@@ -376,15 +389,58 @@ def _safe_num(v: Any) -> float:
         return 0.0
 
 
+def _build_base_section(params: dict, project: dict, source_name: str) -> str:
+    """En-tête « Base du projet » : identification, sources, objet, normes.
+
+    Un métré professionnel doit indiquer SUR QUOI il est établi (projet, maquette
+    source) et POURQUOI (objet, méthode, normes) — c'est la « base du projet ».
+    """
+    p = project or {}
+    proj_name = p.get("name") or params.get("project_name") or "[à compléter]"
+    address = p.get("address") or params.get("address") or "[à compléter]"
+    commune = p.get("commune") or ""
+    canton = p.get("canton") or params.get("canton") or ""
+    parcelle = p.get("parcelle") or p.get("parcel") or ""
+    mo = p.get("maitre_ouvrage") or p.get("client") or params.get("maitre_ouvrage") or "[à compléter]"
+    mandataire = params.get("author") or p.get("mandataire") or "[à compléter]"
+    affectation = p.get("affectation") or p.get("zone_affectation") or ""
+
+    lieu = ", ".join([x for x in (address, commune, canton) if x]) or "[à compléter]"
+
+    rows = [
+        ("Projet", proj_name),
+        ("Maître d'ouvrage", mo),
+        ("Localisation", lieu),
+        ("Parcelle", parcelle or "[à compléter]"),
+        ("Affectation", affectation or "[à compléter]"),
+        ("Mandataire / auteur du métré", mandataire),
+        ("Base du métré (source)", f"Maquette numérique IFC — fichier « {source_name} »"),
+        ("Date d'établissement", datetime.now().strftime("%d.%m.%Y")),
+    ]
+    table = "| Élément | Détail |\n|---|---|\n" + "\n".join(f"| {k} | {v} |" for k, v in rows)
+
+    return f"""## Base du projet
+
+{table}
+
+**Objet du métré.** Extraction automatique des **surfaces et volumes** (SIA 416) et des **quantités par CFC / \
+eCCC-Bât** à partir de la maquette numérique du projet, en vue de servir de base au **chiffrage (DPGF)** et aux \
+**études techniques** (dont le pré-dimensionnement énergétique). La **surface de référence énergétique (SRE)** \
+est fournie selon **SIA 380/1** pour le bilan thermique.
+
+**Normes et référentiels.** SIA 416 (SN 504 416) — surfaces et volumes des bâtiments ; SIA 380/1 — surface de \
+référence énergétique (SRE) ; eCCC-Bât / CFC — décomposition par coût pour le DPGF."""
+
+
 def _build_surfaces_table(metres: dict[str, Any]) -> str:
     lines = [
-        "| Code | Grandeur | Unité | Valeur |",
-        "|------|----------|-------|--------|",
-        f"| SB | Surface brute de plancher | m² | {metres['sb_m2']} |",
-        f"| SU | Surface utile (estimée) | m² | {metres['su_m2']} |",
-        f"| SRE | Surface de référence énergétique (≈ 0.95 × SB) | m² | {metres['sre_m2']} |",
-        f"| V | Volume bâti SIA 416 | m³ | {metres['volume_m3']} |",
-        f"| A_env | Surface enveloppe extérieure | m² | {metres['envelope_m2']} |",
+        "| Code | Grandeur | Norme | Unité | Valeur |",
+        "|------|----------|-------|-------|--------|",
+        f"| SBP | Surface brute de plancher | SIA 416 | m² | {metres['sb_m2']} |",
+        f"| SU | Surface utile | SIA 416 | m² | {metres['su_m2']} |",
+        f"| SRE | Surface de référence énergétique | SIA 380/1 | m² | {metres['sre_m2']} |",
+        f"| V | Volume bâti | SIA 416 | m³ | {metres['volume_m3']} |",
+        f"| A_env | Surface d'enveloppe extérieure | — | m² | {metres['envelope_m2']} |",
     ]
     return "\n".join(lines)
 
