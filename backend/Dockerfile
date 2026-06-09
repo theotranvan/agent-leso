@@ -5,7 +5,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Dépendances système : Tesseract (OCR fr+en), WeasyPrint (Pango/Cairo), IfcOpenShell
+# Dépendances système : Tesseract (OCR fr+en), WeasyPrint (Pango/Cairo), IfcOpenShell,
+# LibreDWG (dwg2dxf : conversion DWG → DXF pour le relevé/métrés 2D)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -23,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 \
     libxslt1.1 \
     poppler-utils \
+    libredwg-tools \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
