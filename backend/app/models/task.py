@@ -10,7 +10,7 @@ TaskType = Literal[
     "note_calcul_structure", "verification_eurocode",
     "calcul_thermique_re2020", "calcul_acoustique",
     "dossier_mise_enquete", "reponse_observations_autorite",
-    "metres_automatiques_ifc",
+    "metres_automatiques_ifc", "releve_thermique_2d",
     # Sonnet - standard
     "redaction_cctp", "memoire_technique", "chiffrage_dpgf", "chiffrage_dqe",
     "coordination_inter_lots",

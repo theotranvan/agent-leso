@@ -184,6 +184,7 @@ ROUTING_TABLE: dict[str, str] = {
     # mais taggés pour traçabilité quota
     "simulation_energetique_rapide": MODEL_HAIKU,
     "metres_automatiques_ifc": MODEL_HAIKU,
+    "releve_thermique_2d": MODEL_OPUS,  # lecture vision de plans = qualité max
 
     # Calcul acoustique France : retrograde d'Opus car on exploite un logiciel
     # externe, l'agent ne fait que rédiger la synthèse
