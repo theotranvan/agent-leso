@@ -32,11 +32,22 @@ _ORIENTATIONS = {
 
 # Mots-clés de calques (ArchiCAD/Swiss numérotés ou nommés).
 _LYR_PORTEUR = re.compile(r"porteur|mur|wall|101|102|façade|facade|revêtement|revetement|116", re.I)
+# Surface de façade visible (revêtement / élévation) — calque dédié, plus précis
+# que l'enveloppe des porteurs pour mesurer le gabarit d'une façade.
+_LYR_FACADE_SURF = re.compile(r"116|revêtement|revetement|élévation|elevation", re.I)
 _LYR_TOITURE = re.compile(r"toiture|roof|charpente|111|dach", re.I)
 _LYR_DALLE = re.compile(r"dalle|plancher|radier|slab|floor|109|113", re.I)
 _LYR_ZONE = re.compile(r"zone|611|local|locaux|pièce|piece|raum", re.I)
 _LYR_FENETRE = re.compile(r"fen[êe]tre|window|menuiserie|baie|201|211|fenster", re.I)
-_LYR_SKIP = re.compile(r"cotation|cote|axe|texte|haie|terrain|parcelle|cartouche|logo|mobilier|amén|niveau|601|602|603|501|815|404", re.I)
+# Bruit à exclure : végétation (haies, couronnes, troncs), parcelles, mobilier,
+# aménagements extérieurs, cotation/axes/niveaux, escaliers, garde-corps,
+# bâtiments hors projet / démolis, terrassement, cartouche.
+_LYR_SKIP = re.compile(
+    r"cotation|cote|axe|texte|visualisation|haie|nh_|couronne|tronc|arbre|terrain|"
+    r"parcelle|numero|cartouche|logo|mobilier|agencement|amén|amen|niveau|escalier|"
+    r"garde|démoli|demoli|hors projet|terrassement|601|602|603|501|815|404|402|105|108|003",
+    re.I,
+)
 
 # Locaux NON chauffés (exclus de la SRE).
 _NON_CHAUFFE = re.compile(
@@ -137,10 +148,12 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     # Détermination de l'unité si inconnue : on devine depuis l'étendue.
     xs: list[float] = []
     ys: list[float] = []
+    fxs: list[float] = []   # bornes du revêtement de façade (gabarit précis)
+    fys: list[float] = []
     roof_area = 0.0
     slab_area = 0.0
-    sre = 0.0
-    sre_seen = False
+    sre_labeled: list[float] = []  # surfaces étiquetées « Surface … » (officielles)
+    sre_bare: list[float] = []     # nombres nus « N m² » (fallback)
     window_count = 0
     window_area = 0.0
     notes = []
@@ -161,6 +174,18 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
                 elif dt == "LINE":
                     xs += [e.dxf.start.x, e.dxf.end.x]
                     ys += [e.dxf.start.y, e.dxf.end.y]
+            except Exception:
+                pass
+
+        # Gabarit de façade : bornes du revêtement (calque dédié) via bbox réelle
+        # de chaque entité (couvre arcs/splines, pas seulement les sommets).
+        if _LYR_FACADE_SURF.search(lyr):
+            try:
+                from ezdxf.bbox import extents
+                bb = extents([e])
+                if bb.has_data:
+                    fxs += [bb.extmin.x, bb.extmax.x]
+                    fys += [bb.extmin.y, bb.extmax.y]
             except Exception:
                 pass
 
@@ -194,14 +219,19 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
                 except Exception:
                     pass
 
-        # Zones → SRE : texte de surface sur calque zone
+        # Zones → SRE : texte de surface sur calque zone. On distingue les
+        # surfaces ÉTIQUETÉES par l'architecte (« Surface SBP … 124.0 m² »,
+        # valeur officielle) des nombres nus, et on exclut les locaux non chauffés.
         if dt in ("TEXT", "MTEXT") and _LYR_ZONE.search(lyr):
             t = _mtext_plain(e)
             m = re.search(r"(\d{1,4}[.,]\d{1,2})\s*m[²2]", t)
             if m and not _NON_CHAUFFE.search(t):
                 try:
-                    sre += float(m.group(1).replace(",", "."))
-                    sre_seen = True
+                    val = float(m.group(1).replace(",", "."))
+                    if re.search(r"surface|sre|sbp|\bsu\b", t, re.I):
+                        sre_labeled.append(val)
+                    else:
+                        sre_bare.append(val)
                 except ValueError:
                     pass
 
@@ -226,11 +256,15 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
         "ponts_thermiques": [],
     }
 
-    if plan_type == "facade" and xs:
-        w = (max(xs) - min(xs)) * k
-        h = (max(ys) - min(ys)) * k
+    # Gabarit façade : le revêtement (116) prime sur l'enveloppe des porteurs.
+    gx, gy = (fxs, fys) if fxs else (xs, ys)
+    if plan_type == "facade" and gx:
+        w = (max(gx) - min(gx)) * k
+        h = (max(gy) - min(gy)) * k
         if 1 < w < 200 and 1 < h < 100:
             out["surface_facade_brute_m2"] = round(w * h, 1)
+            if fxs:
+                out["remarques"] += " — gabarit mesuré sur le revêtement de façade"
         if window_area > 0:
             out["surface_fenetres_m2"] = round(window_area, 1)
         elif window_count:
@@ -238,8 +272,12 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     if plan_type == "toiture" and roof_area > 0:
         out["surface_toiture_m2"] = round(roof_area, 1)
     if plan_type in ("etage", "sous_sol"):
-        if sre_seen:
-            out["sre_contribution_m2"] = round(sre, 1)
+        # Valeurs étiquetées par l'architecte si présentes, sinon nombres nus.
+        sre_vals = sre_labeled or sre_bare
+        if sre_vals:
+            out["sre_contribution_m2"] = round(sum(sre_vals), 1)
+            if not sre_labeled:
+                out["remarques"] += " — surfaces non étiquetées, à confirmer"
         if slab_area > 0 and plan_type == "sous_sol":
             out["surface_plancher_ext_terre_m2"] = round(slab_area, 1)
     # Fenêtres détectées sur un plan non-façade : on les remonte aussi si orientées
