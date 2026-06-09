@@ -33,6 +33,8 @@ EXT_TO_TYPE = {
     "jpg": "image",
     "jpeg": "image",
     "tiff": "image",
+    "dxf": "cad",
+    "dwg": "cad",
 }
 
 

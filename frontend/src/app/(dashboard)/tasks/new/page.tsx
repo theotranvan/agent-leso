@@ -98,8 +98,8 @@ const TASK_CATEGORIES: TaskCategory[] = [
     fields: ['project_name', 'canton', 'plan_multi_upload', 'author'],
     help: {
       what: 'Pour les bilans thermiques Lesosai en phase 3.3, sans IFC : LESO lit vos plans 2D (façades, étages, toiture, coupes) et relève les surfaces (SRE, toiture, façades et fenêtres par orientation, planchers, ponts thermiques).',
-      prereq: 'Vos plans en PDF ou images : les 4 façades (avec leur orientation dans le titre), les plans d\'étage, la toiture et les coupes.',
-      tips: 'Chaque valeur est relevée par lecture des cotes et annotations, avec un niveau de confiance. À VÉRIFIER et valider par le thermicien avant saisie Lesosai.',
+      prereq: 'Vos plans : idéalement un export DXF/DWG (1 clic depuis ArchiCAD/AutoCAD), sinon PDF/images. Les 4 façades (orientation dans le titre), les étages, la toiture, les coupes.',
+      tips: 'DXF/DWG = surfaces MESURÉES (fiables). PDF/images = lecture assistée à valider. Le type/Ψ des ponts thermiques reste à confirmer par le thermicien, qui valide l\'ensemble avant Lesosai.',
     },
   },
   {
@@ -993,9 +993,10 @@ function MultiPlanUpload({
 
   return (
     <div className="space-y-3">
-      <Label>Plans (PDF ou images) * — façades, étages, toiture, coupes</Label>
+      <Label>Plans (DXF/DWG, PDF ou images) * — façades, étages, toiture, coupes</Label>
       <p className="text-xs text-muted-foreground -mt-1">
-        Déposez vos planches d'architecte. Pour les façades, gardez le titre d'orientation
+        Idéal : un export <strong>DXF</strong> (ou DWG) — LESO <strong>mesure</strong> la géométrie au lieu d'estimer.
+        À défaut, PDF/images (lecture assistée). Pour les façades, gardez le titre d'orientation
         (« Façade Sud-Ouest »…) : LESO lit l'orientation depuis la planche.
       </p>
 
@@ -1013,8 +1014,8 @@ function MultiPlanUpload({
       )}
 
       <Dropzone
-        accept=".pdf,.png,.jpg,.jpeg"
-        hint="Glissez vos plans (PDF/images, plusieurs fichiers possibles)"
+        accept=".dxf,.dwg,.pdf,.png,.jpg,.jpeg"
+        hint="Glissez vos plans : DXF/DWG (mesuré) ou PDF/images — plusieurs fichiers possibles"
         maxSizeMB={50}
         uploading={uploading}
         onFilesSelected={addFiles}

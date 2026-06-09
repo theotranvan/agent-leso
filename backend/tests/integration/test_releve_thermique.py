@@ -125,3 +125,63 @@ def test_releve_no_documents_raises():
     from app.agent.swiss import releve_thermique_agent as ag
     with pytest.raises(ValueError):
         asyncio.run(ag.execute({"id": "t", "organization_id": "o", "input_params": {}}))
+
+
+# ----------------------------------------------------------------------------
+# Lecture CAO (DXF) — MESURE géométrique (pas de vision)
+# ----------------------------------------------------------------------------
+def _facade_dxf() -> bytes:
+    """DXF façade : murs 20×12 m (mm) + 3 fenêtres (blocs)."""
+    import io
+
+    import ezdxf
+    doc = ezdxf.new()
+    doc.header["$INSUNITS"] = 4  # mm
+    doc.layers.add("101 - Eléments porteurs")
+    doc.layers.add("201 - Fenetres")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (20000, 0), (20000, 12000), (0, 12000)],
+                       close=True, dxfattribs={"layer": "101 - Eléments porteurs"})
+    blk = doc.blocks.new(name="FENETRE")
+    blk.add_lwpolyline([(0, 0), (1500, 0), (1500, 1400), (0, 1400)], close=True)
+    for x in (2000, 6000, 10000):
+        msp.add_blockref("FENETRE", (x, 3000), dxfattribs={"layer": "201 - Fenetres"})
+    s = io.StringIO()
+    doc.write(s)
+    return s.getvalue().encode("utf-8")
+
+
+def test_dxf_takeoff_unit():
+    from app.services.cad.dxf_takeoff import extract_from_dxf
+    r = extract_from_dxf(_facade_dxf(), "227 Façade Sud-Ouest.dxf")
+    assert r["plan_type"] == "facade" and r["orientation"] == "SO"
+    assert r["surface_facade_brute_m2"] == 240.0
+    assert r["surface_fenetres_m2"] == 6.3  # 3 × 1.5×1.4
+    assert r["methode"].startswith("mesure CAO")
+    # pas de numpy qui fuit
+    assert isinstance(r["surface_facade_brute_m2"], float)
+
+
+def test_releve_dxf_measured_not_vision(monkeypatch):
+    """Un DXF est MESURÉ (géométrie), pas lu par vision."""
+    from app.agent.swiss import releve_thermique_agent as ag
+
+    called = {"vision": 0}
+
+    async def _no_vision(*a, **k):
+        called["vision"] += 1
+        return {"text": "{}", "model": "x", "tokens_used": 0, "cost_eur": 0}
+    monkeypatch.setattr(ag, "call_llm", _no_vision, raising=True)
+    monkeypatch.setattr(ag, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
+    monkeypatch.setattr(ag, "get_supabase_admin",
+                        lambda: _SeqAdmin(["227 Façade Sud-Ouest.dxf"]), raising=True)
+
+    result = asyncio.run(ag.execute({
+        "id": "t", "organization_id": "o", "project_id": None,
+        "task_type": "releve_thermique_2d",
+        "input_params": {"project_name": "P", "plan_documents": [{"document_id": "d0"}]},
+    }))
+    t = result["thermal_takeoff"]
+    assert t["facades"]["SO"] == 240.0
+    assert t["fenetres"]["SO"] == 6.3
+    assert called["vision"] == 0  # aucune passe vision sur un DXF

@@ -99,6 +99,28 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         if file_bytes is None:
             per_plan.append({"filename": d.get("filename", "?"), "error": "document introuvable"})
             continue
+
+        # Chemin CAO (DXF/DWG) : on MESURE la géométrie au lieu d'estimer (vision).
+        low = fname.lower()
+        if ftype == "cad" or low.endswith((".dxf", ".dwg")):
+            from app.services.cad.dxf_takeoff import dwg_to_dxf_bytes, extract_from_dxf
+            dxf_bytes = file_bytes if low.endswith(".dxf") else dwg_to_dxf_bytes(file_bytes)
+            extracted = extract_from_dxf(dxf_bytes, fname) if dxf_bytes else None
+            if extracted:
+                extracted["filename"] = fname
+                per_plan.append(extracted)
+            elif low.endswith(".dwg"):
+                per_plan.append({
+                    "filename": fname,
+                    "error": "DWG non converti sur ce serveur — exportez un DXF (1 clic) ou un PDF",
+                })
+            else:
+                per_plan.append({
+                    "filename": fname,
+                    "error": "DXF illisible — réexportez-le proprement (ou fournissez un PDF)",
+                })
+            continue
+
         images = _to_images_b64(file_bytes, ftype)
         if not images:
             per_plan.append({"filename": fname, "error": "rendu image impossible"})
@@ -386,20 +408,21 @@ def _build_report_md(project_name: str, canton: str, t: dict, per_plan: list[dic
     else:
         md += "| _à relever sur coupes_ | |\n"
 
-    md += "\n## 5. Détail par planche (traçabilité)\n\n| Planche | Type | Orient. | Confiance | Remarques |\n|---|---|---|---|---|\n"
+    md += "\n## 5. Détail par planche (traçabilité)\n\n| Planche | Type | Orient. | Méthode | Confiance | Remarques |\n|---|---|---|---|---|---|\n"
     for p in per_plan:
         if p.get("error"):
-            md += f"| {p.get('filename', '?')} | — | — | — | {p['error']} |\n"
+            md += f"| {p.get('filename', '?')} | — | — | — | — | {p['error']} |\n"
         else:
             md += (
                 f"| {p.get('filename', '?')} | {p.get('plan_type', '?')} | "
-                f"{p.get('orientation') or '—'} | {p.get('confiance', '?')} | "
-                f"{(p.get('remarques') or '')[:60]} |\n"
+                f"{p.get('orientation') or '—'} | {p.get('methode', 'lecture vision')} | "
+                f"{p.get('confiance', '?')} | {(p.get('remarques') or '')[:50]} |\n"
             )
 
     md += (
-        "\n> **Méthode :** lecture des cotes, échelles et annotations de surface présentes sur les plans. "
-        "Les valeurs absentes des plans sont laissées « à compléter ». Prochaine étape : reporter ce relevé "
-        "dans Lesosai (ou utiliser la fiche de saisie) et lancer le bilan SIA 380/1."
+        "\n> **Méthode.** Les fichiers **DXF/DWG** sont **mesurés** sur la géométrie vectorielle (valeurs fiables) ; "
+        "les **PDF/images** sont **lus** par IA vision (cotes et annotations, à valider). Les valeurs absentes des "
+        "plans sont laissées « à compléter ». Prochaine étape : reporter dans Lesosai (ou via la fiche de saisie) "
+        "et lancer le bilan SIA 380/1. L'ingénieur thermicien valide et reste responsable."
     )
     return md
