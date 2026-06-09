@@ -47,7 +47,7 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   note_calcul_sia_260_267: 'Note structure SIA 260-267',
   dossier_mise_enquete: 'Dossier mise en enquête',
   reponse_observations_autorite: 'Réponse aux observations',
-  metres_automatiques_ifc: 'Métrés automatiques IFC',
+  metres_automatiques_ifc: 'Métrés automatiques',
   releve_thermique_2d: 'Relevé thermique (plans 2D)',
   controle_reglementaire_geneve: 'Contrôle réglementaire',
   aeai_checklist_generation: 'Checklist AEAI',

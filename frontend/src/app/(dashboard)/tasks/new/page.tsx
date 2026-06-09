@@ -78,15 +78,15 @@ const TASK_CATEGORIES: TaskCategory[] = [
   },
   {
     id: 'metres_automatiques_ifc',
-    title: 'Métrés automatiques IFC',
-    description: 'Extrait SRE, volumes et quantités par CFC depuis un IFC. Produit un DPGF pré-rempli.',
+    title: 'Métrés automatiques',
+    description: 'Surfaces, volumes et quantités par CFC depuis un IFC — ou relevé de surfaces depuis des plans 2D (DXF, DWG, PDF).',
     icon: Ruler, color: 'bg-amber-50 text-amber-700',
     days_saved: '1-2 j économisés',
     fields: ['project_name', 'ifc_upload', 'author'],
     help: {
-      what: 'Lit une maquette IFC et calcule automatiquement surfaces (SRE), volumes, enveloppe et quantités par CFC. Produit aussi un bordereau DPGF pré-rempli.',
-      prereq: 'Un fichier IFC de la maquette architecte (max 50 Mo).',
-      tips: 'Exportez l\'IFC AVEC les quantités : Revit « Export IFC quantities », ArchiCAD « Compute IFC quantities ». Sans cette case, tous les chiffres sortent à zéro.',
+      what: 'Avec un IFC : calcule surfaces (SRE), volumes, enveloppe et quantités par CFC, et produit un DPGF pré-rempli. Avec un plan 2D (DXF/DWG mesuré géométriquement, PDF/image lu par l\'IA) : relève les surfaces (SRE, façades, fenêtres, toiture, planchers) — sans volumes ni quantités CFC.',
+      prereq: 'Un fichier IFC de la maquette, OU un plan 2D : DXF/DWG (export 1 clic depuis ArchiCAD/Revit/AutoCAD) ou PDF (max 50 Mo).',
+      tips: 'Pour des métrés complets (volumes + quantités CFC), fournissez un IFC AVEC les quantités (Revit « Export IFC quantities », ArchiCAD « Compute IFC quantities »). Un DXF/PDF ne donne que les surfaces. Pour relever plusieurs façades/étages d\'un coup, utilisez la tuile « Relevé thermique (plans 2D) ».',
     },
   },
   {
@@ -915,10 +915,10 @@ function AdaptiveFields({
 
       {fields.includes('ifc_upload') && (
         <div>
-          <Label>Fichier IFC *</Label>
+          <Label>Fichier — IFC, DXF, DWG ou PDF *</Label>
           <Dropzone
-            accept=".ifc,.ifczip"
-            hint="Glisse ton IFC (max 50 Mo)"
+            accept=".ifc,.ifczip,.dxf,.dwg,.pdf"
+            hint="IFC = métrés complets · DXF/DWG/PDF = relevé de surfaces (max 50 Mo)"
             maxSizeMB={50}
             uploading={uploading}
             currentFileName={uploadedFileName}
