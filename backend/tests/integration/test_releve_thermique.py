@@ -162,6 +162,45 @@ def test_dxf_takeoff_unit():
     assert isinstance(r["surface_facade_brute_m2"], float)
 
 
+class _CadQuery:
+    """Renvoie un document CAO (DXF) pour le routage métrés."""
+    def __getattr__(self, n):
+        return lambda *a, **k: self
+
+    def execute(self):
+        return _Result({"storage_path": "x.dxf", "filename": "227 Façade Sud-Ouest.dxf",
+                        "file_type": "cad"})
+
+
+class _CadAdmin:
+    def table(self, n):
+        return _CadQuery()
+
+
+def test_metres_non_ifc_delegates_to_takeoff(monkeypatch):
+    """Un DXF sur la tuile « Métrés » → relevé de surfaces (pas de parsing IFC)."""
+    from app.agent.swiss import metres_agent as mg
+    from app.agent.swiss import releve_thermique_agent as ag
+
+    monkeypatch.setattr(mg, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
+    monkeypatch.setattr(mg, "get_supabase_admin", lambda: _CadAdmin(), raising=True)
+    monkeypatch.setattr(ag, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
+    monkeypatch.setattr(ag, "get_supabase_admin", lambda: _CadAdmin(), raising=True)
+
+    async def _no_vision(*a, **k):
+        raise AssertionError("aucune vision sur un DXF")
+    monkeypatch.setattr(ag, "call_llm", _no_vision, raising=True)
+
+    result = asyncio.run(mg.execute({
+        "id": "t-metres", "organization_id": "o", "project_id": None,
+        "task_type": "metres_automatiques_ifc",
+        "input_params": {"project_name": "P", "ifc_document_id": "d0"},
+    }))
+    # On a bien le livrable du relevé thermique (surfaces mesurées), pas un métré IFC.
+    assert "thermal_takeoff" in result
+    assert result["thermal_takeoff"]["facades"]["SO"] == 240.0
+
+
 def test_releve_dxf_measured_not_vision(monkeypatch):
     """Un DXF est MESURÉ (géométrie), pas lu par vision."""
     from app.agent.swiss import releve_thermique_agent as ag

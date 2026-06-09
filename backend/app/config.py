@@ -74,12 +74,21 @@ class Settings(BaseSettings):
     BETA_MODE: bool = False
     BETA_BILLING_CONTACT_EMAIL: str = "contact@digitran.ch"
 
+    # Domaines de prod toujours autorisés, même si ALLOWED_ORIGINS est mal réglé
+    # (filet de sécurité : évite de verrouiller le SaaS sur une coquille de config).
+    # Sûr car l'app s'authentifie par token Bearer, pas par cookie.
+    _ALWAYS_ALLOWED_ORIGINS = ("https://leso.ch", "https://www.leso.ch")
+
     @property
     def cors_origins(self) -> list[str]:
         raw = (self.ALLOWED_ORIGINS or "*").strip()
         if raw == "*":
             return ["*"]
-        return [o.strip() for o in raw.split(",") if o.strip()]
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        for o in self._ALWAYS_ALLOWED_ORIGINS:
+            if o not in origins:
+                origins.append(o)
+        return origins
 
     # Forfaits — vocabulaire unique (solo / bureau / enterprise) partagé par le
     # marketing, Stripe et le quota tokens. Prix HT en CHF (TVA 8.1 % en sus).
@@ -106,7 +115,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 100
     MAX_UPLOAD_SIZE_MB: int = 100
     ALLOWED_EXTENSIONS: set[str] = Field(default_factory=lambda: {
-        "pdf", "docx", "ifc", "bcf", "xlsx", "xls", "png", "jpg", "jpeg", "tiff"
+        "pdf", "docx", "ifc", "bcf", "xlsx", "xls", "png", "jpg", "jpeg", "tiff",
+        "dxf", "dwg",  # plans CAO pour le relevé thermique 2D
     })
 
     # V2 - Suisse

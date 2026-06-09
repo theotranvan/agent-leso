@@ -59,7 +59,7 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     storage = get_storage()
     admin = get_supabase_admin()
 
-    # Récupération de l'IFC
+    # Récupération du fichier source
     ifc_bytes: bytes
     doc_id = params.get("ifc_document_id")
     if doc_id:
@@ -67,9 +67,21 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
             "organization_id", org_id,
         ).maybe_single().execute()
         if not doc.data:
-            raise ValueError("Document IFC introuvable")
-        ifc_bytes = storage.download(doc.data["storage_path"])
+            raise ValueError("Document introuvable")
         source_name = doc.data["filename"]
+        ftype = (doc.data.get("file_type") or "").lower()
+        low = source_name.lower()
+        # Pas de maquette IFC (plan 2D : DXF/DWG mesuré, PDF/image lu par vision) :
+        # on relève les SURFACES via le module dédié plutôt que d'échouer. Le
+        # livrable est alors un relevé de surfaces (sans volumes ni quantités CFC).
+        if ftype not in ("ifc",) and not low.endswith((".ifc", ".ifczip")):
+            from app.agent.swiss import releve_thermique_agent
+            sub_task = {
+                **task,
+                "input_params": {**params, "plan_documents": [{"document_id": doc_id}]},
+            }
+            return await releve_thermique_agent.execute(sub_task)
+        ifc_bytes = storage.download(doc.data["storage_path"])
     else:
         path = params.get("ifc_storage_path")
         if not path:
