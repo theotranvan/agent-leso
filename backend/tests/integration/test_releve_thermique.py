@@ -187,9 +187,10 @@ def test_metres_non_ifc_delegates_to_takeoff(monkeypatch):
     monkeypatch.setattr(ag, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
     monkeypatch.setattr(ag, "get_supabase_admin", lambda: _CadAdmin(), raising=True)
 
-    async def _no_vision(*a, **k):
-        raise AssertionError("aucune vision sur un DXF")
-    monkeypatch.setattr(ag, "call_llm", _no_vision, raising=True)
+    # Vision complémentaire neutralisée (JSON vide) : la géométrie doit suffire.
+    async def _empty_vision(*a, **k):
+        return {"text": "{}", "model": "x", "tokens_used": 0, "cost_eur": 0}
+    monkeypatch.setattr(ag, "call_llm", _empty_vision, raising=True)
 
     result = asyncio.run(mg.execute({
         "id": "t-metres", "organization_id": "o", "project_id": None,
@@ -205,12 +206,11 @@ def test_releve_dxf_measured_not_vision(monkeypatch):
     """Un DXF est MESURÉ (géométrie), pas lu par vision."""
     from app.agent.swiss import releve_thermique_agent as ag
 
-    called = {"vision": 0}
-
-    async def _no_vision(*a, **k):
-        called["vision"] += 1
+    # Hybride : la vision peut être appelée en complément, mais ses estimations
+    # sont neutralisées ici (JSON vide) → les chiffres viennent de la GÉOMÉTRIE.
+    async def _empty_vision(*a, **k):
         return {"text": "{}", "model": "x", "tokens_used": 0, "cost_eur": 0}
-    monkeypatch.setattr(ag, "call_llm", _no_vision, raising=True)
+    monkeypatch.setattr(ag, "call_llm", _empty_vision, raising=True)
     monkeypatch.setattr(ag, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
     monkeypatch.setattr(ag, "get_supabase_admin",
                         lambda: _SeqAdmin(["227 Façade Sud-Ouest.dxf"]), raising=True)
@@ -221,6 +221,5 @@ def test_releve_dxf_measured_not_vision(monkeypatch):
         "input_params": {"project_name": "P", "plan_documents": [{"document_id": "d0"}]},
     }))
     t = result["thermal_takeoff"]
-    assert t["facades"]["SO"] == 240.0
-    assert t["fenetres"]["SO"] == 6.3
-    assert called["vision"] == 0  # aucune passe vision sur un DXF
+    assert t["facades"]["SO"] == 240.0   # gabarit mesuré (géométrie), pas estimé
+    assert t["fenetres"]["SO"] == 6.3    # fenêtres mesurées sur le calque dédié

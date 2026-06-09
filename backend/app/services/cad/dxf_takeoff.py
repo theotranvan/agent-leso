@@ -15,6 +15,7 @@ a la MÊME forme que la lecture vision → il s'agrège dans le même pipeline.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import re
 from io import BytesIO
@@ -35,6 +36,12 @@ _LYR_PORTEUR = re.compile(r"porteur|mur|wall|101|102|façade|facade|revêtement|
 # Surface de façade visible (revêtement / élévation) — calque dédié, plus précis
 # que l'enveloppe des porteurs pour mesurer le gabarit d'une façade.
 _LYR_FACADE_SURF = re.compile(r"116|revêtement|revetement|élévation|elevation", re.I)
+# Calques structurels servant à CADRER le rendu (le bâti, pas le contexte).
+_LYR_FRAME = re.compile(
+    r"101|102|103|104|porteur|mur|wall|116|revêtement|revetement|109|113|dalle|"
+    r"plancher|radier|111|charpente|toiture|roof|611|zone",
+    re.I,
+)
 _LYR_TOITURE = re.compile(r"toiture|roof|charpente|111|dach", re.I)
 _LYR_DALLE = re.compile(r"dalle|plancher|radier|slab|floor|109|113", re.I)
 _LYR_ZONE = re.compile(r"zone|611|local|locaux|pièce|piece|raum", re.I)
@@ -360,3 +367,69 @@ def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
 def _which(name: str) -> str | None:
     import shutil
     return shutil.which(name)
+
+
+def dxf_to_png_b64(dxf_bytes: bytes, max_px: int = 2000) -> str | None:
+    """Rend un DXF en image (JPEG base64) cadrée sur le bâtiment, pour la lecture
+    vision. On exclut le bruit (végétation, parcelles, cotation…) du cadrage afin
+    que la planche soit nette et lisible par l'IA (fenêtres, ligne de terrain,
+    ponts thermiques en coupe — grandeurs non déductibles de la seule géométrie).
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from ezdxf import recover
+        from ezdxf.addons.drawing import Frontend, RenderContext
+        from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+        from ezdxf.bbox import extents
+        from PIL import Image
+    except Exception as exc:  # dépendances de rendu absentes
+        logger.warning("Rendu DXF→image indisponible : %s", exc)
+        return None
+
+    try:
+        doc, _ = recover.read(BytesIO(dxf_bytes))
+        msp = doc.modelspace()
+
+        # On ne dessine QUE le bâti (hors bruit : végétation, parcelles, cotation,
+        # légendes…) et on CADRE sur les calques structurels (murs, façade, dalles,
+        # toiture, zones) pour éviter qu'un repère/élément lointain ne réduise le
+        # bâtiment à un point.
+        drawn = [e for e in msp if not _LYR_SKIP.search(_layer_of(e))]
+        xs: list[float] = []
+        ys: list[float] = []
+        for e in drawn:
+            if not _LYR_FRAME.search(_layer_of(e)):
+                continue
+            try:
+                bb = extents([e])
+                if bb.has_data:
+                    xs += [bb.extmin.x, bb.extmax.x]
+                    ys += [bb.extmin.y, bb.extmax.y]
+            except Exception:
+                pass
+
+        fig = plt.figure(dpi=150)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_axis_off()
+        backend = MatplotlibBackend(ax)
+        Frontend(RenderContext(doc), backend).draw_entities(drawn)
+        backend.finalize()
+        if xs and ys:
+            mx = (max(xs) - min(xs)) * 0.04 + 1
+            my = (max(ys) - min(ys)) * 0.04 + 1
+            ax.set_xlim(min(xs) - mx, max(xs) + mx)
+            ax.set_ylim(min(ys) - my, max(ys) + my)
+        buf = BytesIO()
+        fig.savefig(buf, format="png", facecolor="white", dpi=150)
+        plt.close(fig)
+
+        img = Image.open(BytesIO(buf.getvalue())).convert("RGB")
+        img.thumbnail((max_px, max_px))
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=85)
+        return base64.b64encode(out.getvalue()).decode("ascii")
+    except Exception as exc:
+        logger.warning("Rendu DXF→image échoué : %s", exc)
+        return None
