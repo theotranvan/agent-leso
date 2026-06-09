@@ -221,6 +221,7 @@ Produire un rapport markdown structuré :
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": rapport_pdf,
         "email_filename": rapport_filename,
+        "result_html": body_html,
         "idc_kwh_m2_an": idc_result.idc_normalized_kwh_m2_an,
         "classification": idc_result.classification.status.value,
     }

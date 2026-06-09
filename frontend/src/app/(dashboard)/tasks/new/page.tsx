@@ -90,6 +90,19 @@ const TASK_CATEGORIES: TaskCategory[] = [
     },
   },
   {
+    id: 'releve_thermique_2d',
+    title: 'Relevé thermique (plans 2D)',
+    description: 'Extrait SRE, toiture, façades & fenêtres par orientation, planchers et ponts thermiques depuis des plans PDF — sans maquette 3D.',
+    icon: Flame, color: 'bg-orange-50 text-orange-700',
+    days_saved: 'relevé Lesosai automatisé',
+    fields: ['project_name', 'canton', 'plan_multi_upload', 'author'],
+    help: {
+      what: 'Pour les bilans thermiques Lesosai en phase 3.3, sans IFC : LESO lit vos plans 2D (façades, étages, toiture, coupes) et relève les surfaces (SRE, toiture, façades et fenêtres par orientation, planchers, ponts thermiques).',
+      prereq: 'Vos plans : idéalement un export DXF/DWG (1 clic depuis ArchiCAD/AutoCAD), sinon PDF/images. Les 4 façades (orientation dans le titre), les étages, la toiture, les coupes.',
+      tips: 'DXF/DWG = surfaces MESURÉES (fiables). PDF/images = lecture assistée à valider. Le type/Ψ des ponts thermiques reste à confirmer par le thermicien, qui valide l\'ensemble avant Lesosai.',
+    },
+  },
+  {
     id: 'chiffrage_dpgf',
     title: 'DPGF / Chiffrage',
     description: 'Devis quantitatif structuré par lot à partir du programme',
@@ -319,6 +332,10 @@ function NewTaskInner() {
     if (!selected) return;
     if (selected.id === 'coordination_inter_lots' && (form.ifc_documents || []).length < 2) {
       setError('La coordination nécessite au moins 2 maquettes IFC (une par lot).');
+      return;
+    }
+    if (selected.id === 'releve_thermique_2d' && (form.plan_documents || []).length < 1) {
+      setError('Ajoutez au moins un plan (PDF ou image) à relever.');
       return;
     }
     setSubmitting(true);
@@ -930,7 +947,81 @@ function AdaptiveFields({
           onChange={(items) => setField('ifc_documents', items)}
         />
       )}
+
+      {fields.includes('plan_multi_upload') && (
+        <MultiPlanUpload
+          projectId={projectId}
+          items={form.plan_documents || []}
+          onChange={(items) => setField('plan_documents', items)}
+        />
+      )}
     </>
+  );
+}
+
+type PlanEntry = { document_id: string; filename: string };
+
+function MultiPlanUpload({
+  projectId, items, onChange,
+}: {
+  projectId?: string;
+  items: PlanEntry[];
+  onChange: (items: PlanEntry[]) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const addFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setErr(null);
+    setUploading(true);
+    try {
+      const added: PlanEntry[] = [];
+      for (const f of files) {
+        const r = await api.uploadDocument(f, projectId || undefined);
+        added.push({ document_id: r.id || r.document_id, filename: f.name });
+      }
+      onChange([...items, ...added]);
+    } catch (e: any) {
+      setErr(e?.message || 'Upload échoué');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="space-y-3">
+      <Label>Plans (DXF/DWG, PDF ou images) * — façades, étages, toiture, coupes</Label>
+      <p className="text-xs text-muted-foreground -mt-1">
+        Idéal : un export <strong>DXF</strong> (ou DWG) — LESO <strong>mesure</strong> la géométrie au lieu d'estimer.
+        À défaut, PDF/images (lecture assistée). Pour les façades, gardez le titre d'orientation
+        (« Façade Sud-Ouest »…) : LESO lit l'orientation depuis la planche.
+      </p>
+
+      {items.length > 0 && (
+        <ul className="space-y-1.5">
+          {items.map((it, i) => (
+            <li key={i} className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <span>{it.filename}</span>
+              <button type="button" onClick={() => remove(i)} className="text-xs text-red-600 hover:underline">
+                Retirer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Dropzone
+        accept=".dxf,.dwg,.pdf,.png,.jpg,.jpeg"
+        hint="Glissez vos plans : DXF/DWG (mesuré) ou PDF/images — plusieurs fichiers possibles"
+        maxSizeMB={50}
+        uploading={uploading}
+        onFilesSelected={addFiles}
+      />
+      {err && <p className="text-xs text-red-600">{err}</p>}
+    </div>
   );
 }
 
@@ -1162,6 +1253,9 @@ function buildTaskPayload(
     p.specificities = form.specificities || '';
   } else if (taskType === 'metres_automatiques_ifc') {
     p.ifc_document_id = uploadedDocId;
+  } else if (taskType === 'releve_thermique_2d') {
+    if (form.canton) p.canton = form.canton;
+    p.plan_documents = (form.plan_documents || []).map((d: any) => ({ document_id: d.document_id }));
   } else if (taskType === 'coordination_inter_lots') {
     p.ifc_documents = (form.ifc_documents || []).map((d: any) => ({
       lot: d.lot, document_id: d.document_id,

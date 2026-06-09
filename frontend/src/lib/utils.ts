@@ -48,6 +48,7 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   dossier_mise_enquete: 'Dossier mise en enquête',
   reponse_observations_autorite: 'Réponse aux observations',
   metres_automatiques_ifc: 'Métrés automatiques IFC',
+  releve_thermique_2d: 'Relevé thermique (plans 2D)',
   controle_reglementaire_geneve: 'Contrôle réglementaire',
   aeai_checklist_generation: 'Checklist AEAI',
   aeai_rapport: 'Rapport AEAI',

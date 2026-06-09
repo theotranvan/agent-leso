@@ -377,6 +377,22 @@ Aucun autre texte."""
         "processed": True,
     }).execute()
 
+    # Récap exploitable pour l'export Word (le classeur reste la référence active).
+    recap_md = f"# Récapitulatif DQE — {project_name}\n\n**Total HT estimé :** {total:,.0f} CHF\n"
+    for lot_name, lines in lots_data.items():
+        lot_total = sum((ln.get("quantite") or 0) * (ln.get("prix_unitaire") or 0) for ln in lines)
+        recap_md += f"\n## Lot {lot_name} — {lot_total:,.0f} CHF\n\n"
+        recap_md += "| Article | Désignation | Unité | Qté | PU (CHF) | Total (CHF) |\n"
+        recap_md += "|---|---|---|---|---|---|\n"
+        for ln in lines:
+            q = ln.get("quantite") or 0
+            pu = ln.get("prix_unitaire") or 0
+            recap_md += (
+                f"| {ln.get('article', '')} | {str(ln.get('designation', ''))[:60]} | "
+                f"{ln.get('unite', '')} | {q} | {pu:,.0f} | {q * pu:,.0f} |\n"
+            )
+    recap_md += "\n> Prix indicatifs (base de référence Suisse romande, indice 2025). À valider au marché."
+
     return {
         "result_url": signed_url,
         "preview": f"DQE généré — {len(lots_data)} lots — Total HT : {total:,.0f} CHF",
@@ -385,6 +401,7 @@ Aucun autre texte."""
         "cost_eur": llm_result["cost_eur"],
         "email_bytes": excel_bytes,
         "email_filename": filename,
+        "result_html": markdown_to_html(recap_md),
     }
 
 

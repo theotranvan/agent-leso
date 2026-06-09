@@ -228,9 +228,9 @@ CASES = [
 # données (checklist) et n'ont pas d'artefact fichier.
 _DATA_ONLY = {"aeai_checklist_generation"}
 
-# Livrables sans corps HTML rédigé exportable en Word : la checklist AEAI (données)
-# et le DQE (artefact = classeur Excel multi-lots, pas un document texte).
-_NO_DOCX_HTML = {"aeai_checklist_generation", "chiffrage_dqe"}
+# Seule la checklist AEAI est une donnée pure (pas de document rédigé) ; tous les
+# autres livrables — DQE inclus — exposent un result_html exportable en Word.
+_NO_DOCX_HTML = {"aeai_checklist_generation"}
 
 
 @pytest.mark.parametrize("task_type,module_path,attr,params,llm_text", CASES,
@@ -324,6 +324,20 @@ class _DocAdmin(_FakeAdmin):
         return q
 
 
+
+def _assert_word_ok(result):
+    """Le livrable expose un result_html convertible en Word fidèle, sans CSS."""
+    from app.services.docx_generator import html_to_docx_bytes
+    html = result.get("result_html")
+    assert html, "pas de result_html (export Word tronqué)"
+    b = html_to_docx_bytes(html, title="t")
+    assert b[:2] == b"PK" and len(b) > 2000
+    import io
+
+    import docx
+    txt = "\n".join(p.text for p in docx.Document(io.BytesIO(b)).paragraphs)
+    assert "font-family" not in txt and "{" not in txt, "CSS recopié dans le Word"
+
 def test_metres_pipeline_does_not_crash(monkeypatch):
     from app.agent.swiss import metres_agent
     storage = _IfcStorage(_synthetic_ifc())
@@ -335,6 +349,7 @@ def test_metres_pipeline_does_not_crash(monkeypatch):
     )))
     assert isinstance(result, dict)
     assert result.get("preview")
+    _assert_word_ok(result)
 
 
 def test_coordination_pipeline_does_not_crash(monkeypatch):
@@ -353,6 +368,7 @@ def test_coordination_pipeline_does_not_crash(monkeypatch):
     )))
     assert isinstance(result, dict)
     assert result.get("preview")
+    _assert_word_ok(result)
 
 
 def test_idc_pipeline_does_not_crash(monkeypatch):
@@ -369,3 +385,4 @@ def test_idc_pipeline_does_not_crash(monkeypatch):
     )))
     assert isinstance(result, dict)
     assert result.get("preview")
+    _assert_word_ok(result)

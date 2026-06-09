@@ -177,6 +177,9 @@ async def execute_task(task_id: str) -> dict[str, Any]:
         elif task_type == "metres_automatiques_ifc":
             from app.agent.swiss import metres_agent
             result = await metres_agent.execute(task)
+        elif task_type == "releve_thermique_2d":
+            from app.agent.swiss import releve_thermique_agent
+            result = await releve_thermique_agent.execute(task)
         elif task_type == "rapport_chantier":
             from app.agent.swiss import chantier_agent
             result = await chantier_agent.execute(task)

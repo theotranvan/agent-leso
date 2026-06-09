@@ -30,6 +30,7 @@ _TASK_DOCX_LABELS = {
     "rapport_chantier": "Rapport de chantier",
     "reponse_observations_autorite": "Reponse aux observations",
     "controle_reglementaire_geneve": "Controle reglementaire",
+    "releve_thermique_2d": "Releve thermique (plans 2D)",
 }
 
 

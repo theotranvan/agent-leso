@@ -240,6 +240,7 @@ async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
             "preview": artifacts["notice_md"][:500],
             "email_bytes": artifacts["saf_xlsx"],
             "email_filename": filename,
+            "result_html": markdown_to_html(artifacts["notice_md"]),
         }
 
     if step == "generate_note":
@@ -288,6 +289,7 @@ async def execute(task: "dict[str, Any]") -> "dict[str, Any]":
             "cost_eur": llm.get("cost_eur", 0),
             "email_bytes": pdf_bytes,
             "email_filename": filename,
+            "result_html": markdown_to_html(pipeline["note_md"]),
         }
 
     raise ValueError(f"step inconnu: {step}")
