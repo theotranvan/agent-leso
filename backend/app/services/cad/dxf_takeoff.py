@@ -39,7 +39,12 @@ _LYR_FENETRE = re.compile(r"fen[êe]tre|window|menuiserie|baie|201|211|fenster",
 _LYR_SKIP = re.compile(r"cotation|cote|axe|texte|haie|terrain|parcelle|cartouche|logo|mobilier|amén|niveau|601|602|603|501|815|404", re.I)
 
 # Locaux NON chauffés (exclus de la SRE).
-_NON_CHAUFFE = re.compile(r"garage|cave|abri|parking|technique|local technique|buanderie|réduit|reduit|cage|circulation ext|balcon|terrasse|loggia|gaine", re.I)
+_NON_CHAUFFE = re.compile(
+    r"garage|cave|abri|parking|technique|local technique|buanderie|réduit|reduit|cage|"
+    r"circulation ext|balcon|terrasse|loggia|gaine|couvert|voiture|vélo|velo|carport|"
+    r"pergola|jardin|pluie|combl|non chauff",
+    re.I,
+)
 
 
 def detect_plan_type(filename: str) -> tuple[str, str | None]:
@@ -249,28 +254,69 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     return out
 
 
-def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
-    """Convertit un DWG en DXF si un binaire dwg2dxf est disponible (config env)."""
+# Versions DXF essayées par dwg2dxf. La sérialisation DXF de LibreDWG est
+# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre,
+# donc on convertit dans plusieurs versions et on retient celle qui se parse avec
+# le plus d'entités. None = version native du DWG.
+_DWG_VERSIONS: tuple[str | None, ...] = (None, "r2000", "r2013")
+
+
+def _dxf_entity_count(dxf_bytes: bytes) -> int:
+    """Nombre d'entités modelspace si ezdxf parse le DXF, sinon -1 (illisible)."""
+    try:
+        from ezdxf import recover
+        doc, _ = recover.read(BytesIO(dxf_bytes))
+        return sum(1 for _ in doc.modelspace())
+    except Exception:
+        return -1
+
+
+def _run_dwg2dxf(conv: str, dwg_bytes: bytes, version: str | None) -> bytes | None:
+    """Une conversion dwg2dxf en mode minimal (saute la section TABLES, souvent
+    mal sérialisée par LibreDWG ; les calques restent lisibles sur les entités)."""
     import os
     import subprocess
     import tempfile
-    conv = os.environ.get("LIBREDWG_DWG2DXF") or _which("dwg2dxf")
-    if not conv:
-        return None
     try:
         with tempfile.TemporaryDirectory() as d:
             src = os.path.join(d, "in.dwg")
             dst = os.path.join(d, "out.dxf")
             with open(src, "wb") as f:
                 f.write(dwg_bytes)
-            subprocess.run([conv, "-y", "-o", dst, src], check=True,
-                           capture_output=True, timeout=120)
+            cmd = [conv, "-m", "-y"]
+            if version:
+                cmd += ["--as", version]
+            cmd += ["-o", dst, src]
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
             if os.path.exists(dst):
                 with open(dst, "rb") as f:
                     return f.read()
     except Exception as exc:
-        logger.warning("Conversion DWG→DXF échouée : %s", exc)
+        # Échec attendu pour certaines versions cibles (toutes ne savent pas
+        # sérialiser un DWG donné) ; dwg_to_dxf_bytes essaie les autres.
+        logger.debug("Conversion DWG→DXF (%s) échouée : %s", version or "native", exc)
     return None
+
+
+def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
+    """Convertit un DWG en DXF si le binaire dwg2dxf (LibreDWG) est disponible.
+
+    On essaie plusieurs versions cibles et on retient le DXF qui se parse avec le
+    plus d'entités (la qualité de sortie de LibreDWG dépend de la version)."""
+    import os
+    conv = os.environ.get("LIBREDWG_DWG2DXF") or _which("dwg2dxf")
+    if not conv:
+        return None
+    best: bytes | None = None
+    best_score = 0  # il faut au moins 1 entité lisible
+    for ver in _DWG_VERSIONS:
+        data = _run_dwg2dxf(conv, dwg_bytes, ver)
+        if not data:
+            continue
+        score = _dxf_entity_count(data)
+        if score > best_score:
+            best_score, best = score, data
+    return best
 
 
 def _which(name: str) -> str | None:
