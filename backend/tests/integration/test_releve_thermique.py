@@ -202,6 +202,32 @@ def test_metres_non_ifc_delegates_to_takeoff(monkeypatch):
     assert result["thermal_takeoff"]["facades"]["SO"] == 240.0
 
 
+def test_metres_multi_plans_delegates_to_takeoff(monkeypatch):
+    """Plusieurs plans (plan_documents) sur la tuile Métrés → relevé agrégé."""
+    from app.agent.swiss import metres_agent as mg
+    from app.agent.swiss import releve_thermique_agent as ag
+
+    monkeypatch.setattr(mg, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
+    monkeypatch.setattr(mg, "get_supabase_admin", lambda: _CadAdmin(), raising=True)
+    monkeypatch.setattr(ag, "get_storage", lambda: _Storage(_facade_dxf()), raising=True)
+    monkeypatch.setattr(ag, "get_supabase_admin", lambda: _CadAdmin(), raising=True)
+
+    async def _empty_vision(*a, **k):
+        return {"text": "{}", "model": "x", "tokens_used": 0, "cost_eur": 0}
+    monkeypatch.setattr(ag, "call_llm", _empty_vision, raising=True)
+
+    result = asyncio.run(mg.execute({
+        "id": "t-metres-multi", "organization_id": "o", "project_id": None,
+        "task_type": "metres_automatiques_ifc",
+        "input_params": {"project_name": "P", "plan_documents": [
+            {"document_id": "d0"}, {"document_id": "d1"},
+        ]},
+    }))
+    assert "thermal_takeoff" in result
+    # Les 2 plans (même façade de test) sont AGRÉGÉS → 2 × 240 = 480 m².
+    assert result["thermal_takeoff"]["facades"]["SO"] == 480.0
+
+
 def test_releve_dxf_measured_not_vision(monkeypatch):
     """Un DXF est MESURÉ (géométrie), pas lu par vision."""
     from app.agent.swiss import releve_thermique_agent as ag

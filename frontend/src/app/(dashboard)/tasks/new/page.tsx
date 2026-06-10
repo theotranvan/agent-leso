@@ -338,6 +338,10 @@ function NewTaskInner() {
       setError('Ajoutez au moins un plan (PDF ou image) à relever.');
       return;
     }
+    if (selected.id === 'metres_automatiques_ifc' && (form.plan_documents || []).length < 1) {
+      setError('Ajoutez au moins un fichier (IFC, ou un/plusieurs plans DXF/DWG/PDF).');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -914,17 +918,14 @@ function AdaptiveFields({
       )}
 
       {fields.includes('ifc_upload') && (
-        <div>
-          <Label>Fichier — IFC, DXF, DWG ou PDF *</Label>
-          <Dropzone
-            accept=".ifc,.ifczip,.dxf,.dwg,.pdf"
-            hint="IFC = métrés complets · DXF/DWG/PDF = relevé de surfaces (max 50 Mo)"
-            maxSizeMB={50}
-            uploading={uploading}
-            currentFileName={uploadedFileName}
-            onFilesSelected={onFileUpload}
-          />
-        </div>
+        <MultiPlanUpload
+          projectId={projectId}
+          items={form.plan_documents || []}
+          onChange={(items) => setField('plan_documents', items)}
+          accept=".ifc,.ifczip,.dxf,.dwg,.pdf"
+          label="Fichiers — IFC, DXF, DWG ou PDF *"
+          hint="1 IFC = métrés complets (volumes + quantités CFC). Plusieurs DXF/DWG/PDF — ou un dossier entier — = relevé de surfaces agrégé (façades, étages, toiture, coupes)."
+        />
       )}
 
       {fields.includes('autorite_pdf_upload') && (
@@ -963,29 +964,48 @@ type PlanEntry = { document_id: string; filename: string };
 
 function MultiPlanUpload({
   projectId, items, onChange,
+  accept = '.dxf,.dwg,.pdf,.png,.jpg,.jpeg',
+  label = 'Plans (DXF/DWG, PDF ou images) * — façades, étages, toiture, coupes',
+  hint = 'Idéal : un export DXF (ou DWG) — LESO mesure la géométrie au lieu d\'estimer. À défaut, PDF/images (lecture assistée). Pour les façades, gardez le titre d\'orientation (« Façade Sud-Ouest »…).',
 }: {
   projectId?: string;
   items: PlanEntry[];
   onChange: (items: PlanEntry[]) => void;
+  accept?: string;
+  label?: string;
+  hint?: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const allowedExts = accept.split(',').map((s) => s.trim().replace(/^\./, '').toLowerCase());
+  const extOf = (name: string) => (name.includes('.') ? name.split('.').pop()!.toLowerCase() : '');
 
   const addFiles = async (files: File[]) => {
-    if (!files.length) return;
     setErr(null);
+    // Filtre les fichiers retenus (utile quand on dépose un DOSSIER : on ignore
+    // .DS_Store, miniatures, et tout ce qui n'est pas un plan accepté).
+    const kept = files.filter((f) => allowedExts.includes(extOf(f.name)));
+    if (!kept.length) {
+      setErr(`Aucun fichier accepté (${accept}) dans la sélection.`);
+      return;
+    }
     setUploading(true);
+    setProgress({ done: 0, total: kept.length });
     try {
       const added: PlanEntry[] = [];
-      for (const f of files) {
+      for (const f of kept) {
         const r = await api.uploadDocument(f, projectId || undefined);
         added.push({ document_id: r.id || r.document_id, filename: f.name });
+        setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
       }
       onChange([...items, ...added]);
     } catch (e: any) {
       setErr(e?.message || 'Upload échoué');
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   };
 
@@ -993,12 +1013,8 @@ function MultiPlanUpload({
 
   return (
     <div className="space-y-3">
-      <Label>Plans (DXF/DWG, PDF ou images) * — façades, étages, toiture, coupes</Label>
-      <p className="text-xs text-muted-foreground -mt-1">
-        Idéal : un export <strong>DXF</strong> (ou DWG) — LESO <strong>mesure</strong> la géométrie au lieu d'estimer.
-        À défaut, PDF/images (lecture assistée). Pour les façades, gardez le titre d'orientation
-        (« Façade Sud-Ouest »…) : LESO lit l'orientation depuis la planche.
-      </p>
+      <Label>{label}</Label>
+      <p className="text-xs text-muted-foreground -mt-1">{hint}</p>
 
       {items.length > 0 && (
         <ul className="space-y-1.5">
@@ -1014,12 +1030,20 @@ function MultiPlanUpload({
       )}
 
       <Dropzone
-        accept=".dxf,.dwg,.pdf,.png,.jpg,.jpeg"
-        hint="Glissez vos plans : DXF/DWG (mesuré) ou PDF/images — plusieurs fichiers possibles"
+        accept={accept}
+        multiple
+        directory
+        hint="Glissez plusieurs fichiers — ou un dossier entier (façades, étages, toiture, coupes)"
         maxSizeMB={50}
         uploading={uploading}
         onFilesSelected={addFiles}
       />
+      {progress && (
+        <p className="text-xs text-muted-foreground">Téléversement {progress.done}/{progress.total}…</p>
+      )}
+      {items.length > 0 && (
+        <p className="text-xs text-muted-foreground">{items.length} plan(s) ajouté(s).</p>
+      )}
       {err && <p className="text-xs text-red-600">{err}</p>}
     </div>
   );
@@ -1252,7 +1276,16 @@ function buildTaskPayload(
     };
     p.specificities = form.specificities || '';
   } else if (taskType === 'metres_automatiques_ifc') {
-    p.ifc_document_id = uploadedDocId;
+    const docs = (form.plan_documents || []) as any[];
+    const single = docs.length === 1 ? docs[0] : null;
+    const isIfc = !!single && /\.(ifc|ifczip)$/i.test(single.filename || '');
+    if (isIfc) {
+      // Un seul IFC → métrés complets (volumes + quantités CFC).
+      p.ifc_document_id = single.document_id;
+    } else {
+      // Plusieurs plans (ou un seul DXF/DWG/PDF) → relevé de surfaces agrégé.
+      p.plan_documents = docs.map((d: any) => ({ document_id: d.document_id }));
+    }
   } else if (taskType === 'releve_thermique_2d') {
     if (form.canton) p.canton = form.canton;
     p.plan_documents = (form.plan_documents || []).map((d: any) => ({ document_id: d.document_id }));

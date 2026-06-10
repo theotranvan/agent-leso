@@ -59,6 +59,17 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
     storage = get_storage()
     admin = get_supabase_admin()
 
+    # Plusieurs plans 2D (DXF/DWG/PDF) fournis → relevé de surfaces AGRÉGÉ : on
+    # délègue l'ensemble au module relevé thermique (qui agrège façades par
+    # orientation, SRE par niveau, toiture, fenêtres, ponts thermiques…).
+    plan_docs = params.get("plan_documents")
+    if plan_docs:
+        from app.agent.swiss import releve_thermique_agent
+        return await releve_thermique_agent.execute({
+            **task,
+            "input_params": {**params, "plan_documents": plan_docs},
+        })
+
     # Récupération du fichier source
     ifc_bytes: bytes
     doc_id = params.get("ifc_document_id")
