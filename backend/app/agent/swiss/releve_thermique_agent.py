@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -108,10 +109,16 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         low = fname.lower()
         if ftype == "cad" or low.endswith((".dxf", ".dwg")):
             from app.services.cad.dxf_takeoff import (
-                dwg_to_dxf_bytes, dxf_to_png_b64, extract_from_dxf,
+                dwg_to_dxf_bytes, dxf_to_png_b64, extract_from_dwg, extract_from_dxf,
             )
-            dxf_bytes = file_bytes if low.endswith(".dxf") else dwg_to_dxf_bytes(file_bytes)
-            geo = extract_from_dxf(dxf_bytes, fname) if dxf_bytes else None
+            if low.endswith(".dwg"):
+                # DWG : extraction double (conversion minimale + complète réparée :
+                # tampons de zone, empreinte des murs → périmètres).
+                geo = extract_from_dwg(file_bytes, fname)
+                dxf_bytes = dwg_to_dxf_bytes(file_bytes)
+            else:
+                dxf_bytes = file_bytes
+                geo = extract_from_dxf(dxf_bytes, fname) if dxf_bytes else None
             vis: dict[str, Any] | None = None
             if dxf_bytes:
                 img_b64 = dxf_to_png_b64(dxf_bytes)
@@ -264,11 +271,26 @@ def _to_images_b64(file_bytes: bytes, file_type: str) -> list[str]:
         return []
 
 
+_TYPE_HUMAIN = {
+    "facade": "une FAÇADE (élévation)", "toiture": "un plan de TOITURE",
+    "coupe": "une COUPE", "sous_sol": "un plan de SOUS-SOL",
+    "etage": "un plan d'ÉTAGE", "autre": "indéterminé",
+}
+
+
 async def _read_plan(img_b64: str, filename: str, task: dict) -> tuple[dict, dict]:
     """Appelle l'IA vision sur une planche et renvoie (données, usage)."""
+    # Indice de type depuis le nom de fichier : évite les contresens (un plan
+    # d'étage au rendu épuré pris pour une toiture, etc.).
+    from app.services.cad.dxf_takeoff import detect_plan_type
+    ptype, _ = detect_plan_type(filename)
+    hint = _TYPE_HUMAIN.get(ptype, "indéterminé")
     content = [
         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": img_b64}},
-        {"type": "text", "text": f"Planche : « {filename} ». Fais le relevé thermique de CETTE planche selon le format JSON imposé."},
+        {"type": "text", "text": (
+            f"Planche : « {filename} ». D'après son NOM, cette planche est {hint} — "
+            "fais-en le relevé thermique selon le format JSON imposé en respectant ce type."
+        )},
     ]
     try:
         res = await call_llm(
@@ -314,11 +336,17 @@ def _merge_geo_vision(geo: dict | None, vis: dict | None) -> dict | None:
     for kk in _NUM_KEYS:
         if geo.get(kk) is not None:           # une mesure géométrique > estimation vision
             out[kk] = geo[kk]
+    for kk in ("perimetre_m", "profondeur_enterree_m"):   # mesures auxiliaires
+        if geo.get(kk) is not None:
+            out[kk] = geo[kk]
     if geo.get("orientation"):                # orientation depuis le nom de fichier
         out["orientation"] = geo["orientation"]
     out["plan_type"] = geo.get("plan_type") or out.get("plan_type")
-    if geo.get("ponts_thermiques"):
-        out["ponts_thermiques"] = geo["ponts_thermiques"]
+    # Ponts thermiques : on CUMULE géométrie (longueurs mesurées) et vision
+    # (types repérés) ; la consolidation canonique a lieu à l'agrégation.
+    ponts = list(geo.get("ponts_thermiques") or []) + list(vis.get("ponts_thermiques") or [])
+    if ponts:
+        out["ponts_thermiques"] = ponts
     out["methode"] = "mesure CAO + lecture vision"
     rem = [r for r in (geo.get("remarques"), vis.get("remarques")) if r]
     if rem:
@@ -353,17 +381,66 @@ def _num(v) -> float | None:
         return None
 
 
+# Consolidation canonique des ponts thermiques : les mêmes jonctions sont
+# repérées sur plusieurs planches (2 coupes + façades) sous des libellés
+# variés ; on regroupe par famille et on retient les longueurs MESURÉES.
+_PONT_CANON: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"acrot|rive|toiture", re.I), "Acrotère / rive de toiture"),
+    (re.compile(r"balcon|porte.?à.?faux|coursive|auvent|casquette", re.I),
+     "Dalle de balcon / porte-à-faux"),
+    (re.compile(r"radier|enterr|sous.?sol|pied de bâtiment|pied de batiment|sur terrain", re.I),
+     "Jonction radier / mur enterré"),
+    (re.compile(r"dalle|plancher|étage|etage|niveau", re.I),
+     "Jonction dalle intermédiaire / façade"),
+    (re.compile(r"fen|linteau|tableau|embrasure|baie", re.I),
+     "Contour de baies (linteaux / tableaux)"),
+]
+
+
+def _consolidate_ponts(ponts: list[dict]) -> list[dict]:
+    groups: dict[str, dict] = {}
+    autres: list[dict] = []
+    for pt in ponts:
+        typ = str(pt.get("type") or "")
+        ln = _num(pt.get("longueur_m"))
+        measured = "mesur" in typ.lower()
+        for pat, canon in _PONT_CANON:
+            if pat.search(typ):
+                g = groups.setdefault(canon, {"type": canon, "longueur_m": None,
+                                              "mentions": 0, "mesure": False})
+                g["mentions"] += 1
+                if ln is not None and (measured or not g["mesure"]):
+                    if measured and not g["mesure"]:
+                        g["longueur_m"] = ln          # 1re longueur mesurée : on repart d'elle
+                        g["mesure"] = True
+                    elif measured:
+                        g["longueur_m"] = round((g["longueur_m"] or 0) + ln, 1)  # Σ niveaux mesurés
+                    elif g["longueur_m"] is None:
+                        g["longueur_m"] = ln
+                break
+        else:
+            autres.append({"type": typ or "à préciser", "longueur_m": ln,
+                           "mentions": 1, "mesure": False})
+    ordered = [groups[c] for _, c in _PONT_CANON if c in groups]
+    return ordered + autres
+
+
 def _aggregate(per_plan: list[dict]) -> dict[str, Any]:
     sre = 0.0
     sre_seen = False
+    sre_detail: list[str] = []
     toiture = None
-    contre_terre = 0.0
+    ct_elev = 0.0
     ct_seen = False
     planchers = 0.0
     pl_seen = False
+    pl_detail: list[str] = []
     facades: dict[str, float | None] = {o: None for o in ORIENTATIONS}
     fenetres: dict[str, float | None] = {o: None for o in ORIENTATIONS}
+    facades_ct: dict[str, float | None] = {o: None for o in ORIENTATIONS}
     ponts: list[dict] = []
+    ss_perim: float | None = None      # périmètre sous-sol (mur enterré)
+    profondeur: float | None = None    # profondeur enterrée (coupes)
 
     for p in per_plan:
         if p.get("error"):
@@ -372,17 +449,25 @@ def _aggregate(per_plan: list[dict]) -> dict[str, Any]:
         if c is not None:
             sre += c
             sre_seen = True
+            niveau = p.get("plan_type", "?")
+            net = "nettes" in (p.get("remarques") or "")
+            sre_detail.append(f"{niveau} {c:g} m²" + (" (net)" if net else ""))
         t = _num(p.get("surface_toiture_m2"))
         if t is not None:
             toiture = (toiture or 0) + t
         ct = _num(p.get("surface_facade_contre_terre_m2"))
         if ct is not None:
-            contre_terre += ct
+            ct_elev += ct
             ct_seen = True
         pl = _num(p.get("surface_plancher_ext_terre_m2"))
         if pl is not None:
             planchers += pl
             pl_seen = True
+            pl_detail.append(f"{p.get('plan_type', '?')} {pl:g} m²")
+        if p.get("plan_type") == "sous_sol" and _num(p.get("perimetre_m")):
+            ss_perim = _num(p.get("perimetre_m"))
+        if _num(p.get("profondeur_enterree_m")):
+            profondeur = max(profondeur or 0, _num(p.get("profondeur_enterree_m")))
         ori = (p.get("orientation") or "").upper().replace("-", "")
         if ori in facades:
             fb = _num(p.get("surface_facade_brute_m2"))
@@ -391,18 +476,38 @@ def _aggregate(per_plan: list[dict]) -> dict[str, Any]:
             fw = _num(p.get("surface_fenetres_m2"))
             if fw is not None:
                 fenetres[ori] = (fenetres[ori] or 0) + fw
+            if ct is not None:
+                facades_ct[ori] = (facades_ct[ori] or 0) + ct
         for pt in (p.get("ponts_thermiques") or []):
             if isinstance(pt, dict) and (pt.get("type") or pt.get("longueur_m")):
-                ponts.append({"type": pt.get("type") or "à préciser", "longueur_m": _num(pt.get("longueur_m"))})
+                ponts.append({"type": pt.get("type") or "à préciser",
+                              "longueur_m": _num(pt.get("longueur_m"))})
+
+    # Façades contre terre : si périmètre sous-sol ET profondeur (coupes) sont
+    # mesurés, l'enveloppe enterrée = périmètre × profondeur (plus complet que
+    # les seules parties visibles en élévation, souvent non dessinées).
+    contre_terre: float | None = None
+    ct_note = ""
+    if ss_perim and profondeur:
+        contre_terre = round(ss_perim * profondeur, 1)
+        ct_note = (f"périmètre sous-sol mesuré {ss_perim:g} m × profondeur enterrée "
+                   f"mesurée {profondeur:g} m (coupes) — à affiner selon le profil du terrain")
+    elif ct_seen:
+        contre_terre = round(ct_elev, 1)
+        ct_note = "parties enterrées visibles sur les élévations (ligne de terrain)"
 
     return {
         "sre_m2": round(sre, 1) if sre_seen else None,
+        "sre_detail": sre_detail,
         "surface_toiture_m2": round(toiture, 1) if toiture is not None else None,
-        "surface_facade_contre_terre_m2": round(contre_terre, 1) if ct_seen else None,
+        "surface_facade_contre_terre_m2": contre_terre,
+        "contre_terre_note": ct_note,
         "surface_plancher_ext_terre_m2": round(planchers, 1) if pl_seen else None,
+        "planchers_detail": pl_detail,
         "facades": facades,
         "fenetres": fenetres,
-        "ponts_thermiques": ponts,
+        "facades_ct": facades_ct,
+        "ponts_thermiques": _consolidate_ponts(ponts),
     }
 
 
@@ -410,7 +515,7 @@ def _aggregate(per_plan: list[dict]) -> dict[str, Any]:
 # Rapport markdown
 # ---------------------------------------------------------------------------
 def _fmt(v, unit="m²"):
-    return f"{v:,.1f} {unit}".replace(",", "'") if isinstance(v, (int, float)) else "_à compléter_"
+    return f"{v:,.1f} {unit}".replace(",", "'") if isinstance(v, (int, float)) else "à compléter"
 
 
 def _cell(v) -> str:
@@ -418,6 +523,23 @@ def _cell(v) -> str:
     ligne (sinon le texte vision casse l'alignement du tableau dans le PDF)."""
     s = "" if v is None else str(v)
     return s.replace("|", "/").replace("\n", " ").replace("\r", " ").strip()
+
+
+def _short(v, n: int = 120) -> str:
+    """Tronque proprement (à la frontière de mot, avec ellipse)."""
+    s = _cell(v)
+    if len(s) <= n:
+        return s
+    cut = s[:n].rsplit(" ", 1)[0]
+    return cut + "…"
+
+
+_PREFIX_TRANSFERT = re.compile(r"^(swisstransfer|wetransfer)[_-][0-9a-f-]+[_-]", re.I)
+
+
+def _clean_name(filename: str) -> str:
+    """Nom de planche lisible : retire les préfixes d'outils de transfert."""
+    return _PREFIX_TRANSFERT.sub("", filename or "")
 
 
 def _sum_orient(d: dict) -> float | None:
@@ -438,19 +560,19 @@ def _build_report_md(project_name: str, canton: str, t: dict, per_plan: list[dic
 
 | # | Donnée demandée | Valeur relevée | Détail |
 |---|---|---|---|
-| 1 | Surface de référence énergétique (SRE) | {_fmt(t['sre_m2'])} | locaux chauffés |
-| 2 | Surface de toiture | {_fmt(t['surface_toiture_m2'])} | — |
+| 1 | Surface de référence énergétique (SRE) | {_fmt(t['sre_m2'])} | {_cell(' + '.join(t.get('sre_detail') or []) or 'locaux chauffés')} |
+| 2 | Surface de toiture | {_fmt(t['surface_toiture_m2'])} | mesurée (plan de toiture) |
 | 3 | Surfaces de façades ext. **par orientation** | {_fmt(_sum_orient(t['facades']))} (total) | **voir § 2** |
-| 4 | Surfaces de façades **contre terre** | {_fmt(t['surface_facade_contre_terre_m2'])} | sous-sol / coupes |
+| 4 | Surfaces de façades **contre terre** | {_fmt(t['surface_facade_contre_terre_m2'])} | {_short(t.get('contre_terre_note') or 'sous-sol / coupes', 70)} |
 | 5 | Surfaces des fenêtres **par orientation** | {_fmt(_sum_orient(t['fenetres']))} (total) | **voir § 3** |
-| 6 | Surfaces de planchers (ext./terre/local non chauffé) | {_fmt(t['surface_plancher_ext_terre_m2'])} | dalles |
-| 7 | Ponts thermiques (longueur + type) | {len(t['ponts_thermiques'])} repéré(s) | **voir § 4** |
+| 6 | Surfaces de planchers (ext./terre/local non chauffé) | {_fmt(t['surface_plancher_ext_terre_m2'])} | {_cell(' + '.join(t.get('planchers_detail') or []) or 'dalles')} |
+| 7 | Ponts thermiques (longueur + type) | {len(t['ponts_thermiques'])} famille(s) | **voir § 4** |
 
-_« à compléter » = donnée non lisible sur les planches fournies (à relever sur un plan/coupe complémentaire ou à confirmer par le thermicien)._
+« à compléter » = donnée non lisible sur les planches fournies (à relever sur un plan/coupe complémentaire ou à confirmer par le thermicien).
 
 ## 2. Façades par orientation
 
-| Orientation | Surface façade brute | dont fenêtres | Façade opaque (estimée) |
+| Orientation | Surface façade brute | dont baies (fenêtres/portes-fenêtres) | Façade opaque (estimée) |
 |---|---|---|---|
 """
     for o in ORIENTATIONS:
@@ -463,32 +585,36 @@ _« à compléter » = donnée non lisible sur les planches fournies (à relever
             opaque = fac - (fen or 0)
         md += f"| {o} | {_fmt(fac)} | {_fmt(fen)} | {_fmt(opaque)} |\n"
     if not any(t["facades"].values()):
-        md += "| — | _aucune façade lue_ | | |\n"
+        md += "| — | aucune façade lue | | |\n"
 
-    md += "\n## 3. Fenêtres par orientation\n\n| Orientation | Surface vitrée |\n|---|---|\n"
+    md += "\n## 3. Fenêtres par orientation\n\nBaies (fenêtres + portes-fenêtres) mesurées sur les élévations — vitrage net à préciser selon les cadres.\n\n| Orientation | Surface des baies |\n|---|---|\n"
     for o in ORIENTATIONS:
         fen = t["fenetres"].get(o)
         if fen is not None:
             md += f"| {o} | {_fmt(fen)} |\n"
     if not any(v is not None for v in t["fenetres"].values()):
-        md += "| — | _à compléter_ |\n"
+        md += "| — | à compléter |\n"
 
-    md += "\n## 4. Ponts thermiques\n\n| Type | Longueur |\n|---|---|\n"
+    md += "\n## 4. Ponts thermiques\n\n| Type (famille) | Longueur | Repérages |\n|---|---|---|\n"
     if t["ponts_thermiques"]:
         for pt in t["ponts_thermiques"]:
-            md += f"| {_cell(pt['type'])} | {_fmt(pt['longueur_m'], 'm')} |\n"
+            longueur = _fmt(pt.get("longueur_m"), "m")
+            if pt.get("mesure"):
+                longueur += " (mesurée)"
+            mentions = pt.get("mentions", 1)
+            md += f"| {_cell(pt['type'])} | {longueur} | {mentions} planche(s) |\n"
     else:
-        md += "| _à relever sur coupes_ | |\n"
+        md += "| à relever sur coupes | | |\n"
 
     md += "\n## 5. Détail par planche (traçabilité)\n\n| Planche | Type | Orient. | Méthode | Confiance | Remarques |\n|---|---|---|---|---|---|\n"
     for p in per_plan:
         if p.get("error"):
-            md += f"| {_cell(p.get('filename', '?'))} | — | — | — | — | {_cell(p['error'])} |\n"
+            md += f"| {_cell(_clean_name(p.get('filename', '?')))} | — | — | — | — | {_short(p['error'])} |\n"
         else:
             md += (
-                f"| {_cell(p.get('filename', '?'))} | {_cell(p.get('plan_type', '?'))} | "
+                f"| {_cell(_clean_name(p.get('filename', '?')))} | {_cell(p.get('plan_type', '?'))} | "
                 f"{_cell(p.get('orientation') or '—')} | {_cell(p.get('methode', 'lecture vision'))} | "
-                f"{_cell(p.get('confiance', '?'))} | {_cell((p.get('remarques') or '')[:80])} |\n"
+                f"{_cell(p.get('confiance', '?'))} | {_short(p.get('remarques'))} |\n"
             )
 
     md += (

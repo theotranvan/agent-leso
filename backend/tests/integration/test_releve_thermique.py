@@ -113,7 +113,7 @@ def test_releve_thermique_pipeline(monkeypatch):
     assert t["surface_toiture_m2"] == 238
     assert t["facades"]["SO"] == 250 and t["facades"]["NE"] == 208
     assert t["fenetres"]["SO"] == 45 and t["fenetres"]["NE"] == 30
-    assert any(p["type"] == "balcon" for p in t["ponts_thermiques"])
+    assert any("balcon" in p["type"].lower() for p in t["ponts_thermiques"])  # consolidé en famille canonique
     assert result.get("result_html") and result.get("preview")
 
     from app.services.docx_generator import html_to_docx_bytes
