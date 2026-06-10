@@ -100,15 +100,30 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
             per_plan.append({"filename": d.get("filename", "?"), "error": "document introuvable"})
             continue
 
-        # Chemin CAO (DXF/DWG) : on MESURE la géométrie au lieu d'estimer (vision).
+        # Chemin CAO (DXF/DWG) : HYBRIDE. On MESURE la géométrie (SRE étiquetée,
+        # gabarit de façade, toiture — précis et vérifiables) ET on LIT le rendu
+        # avec l'IA vision pour les grandeurs non déductibles de la seule
+        # géométrie (fenêtres par orientation, façades contre terre, planchers
+        # par type de contact, ponts thermiques en coupe). On fusionne ensuite.
         low = fname.lower()
         if ftype == "cad" or low.endswith((".dxf", ".dwg")):
-            from app.services.cad.dxf_takeoff import dwg_to_dxf_bytes, extract_from_dxf
+            from app.services.cad.dxf_takeoff import (
+                dwg_to_dxf_bytes, dxf_to_png_b64, extract_from_dxf,
+            )
             dxf_bytes = file_bytes if low.endswith(".dxf") else dwg_to_dxf_bytes(file_bytes)
-            extracted = extract_from_dxf(dxf_bytes, fname) if dxf_bytes else None
-            if extracted:
-                extracted["filename"] = fname
-                per_plan.append(extracted)
+            geo = extract_from_dxf(dxf_bytes, fname) if dxf_bytes else None
+            vis: dict[str, Any] | None = None
+            if dxf_bytes:
+                img_b64 = dxf_to_png_b64(dxf_bytes)
+                if img_b64:
+                    vis, usage = await _read_plan(img_b64, fname, task)
+                    total_cost += usage.get("cost_eur", 0) or 0
+                    total_tokens += usage.get("tokens_used", 0) or 0
+
+            merged = _merge_geo_vision(geo, vis)
+            if merged:
+                merged["filename"] = fname
+                per_plan.append(merged)
             elif low.endswith(".dwg"):
                 per_plan.append({
                     "filename": fname,
@@ -270,6 +285,45 @@ async def _read_plan(img_b64: str, filename: str, task: dict) -> tuple[dict, dic
     except Exception as exc:
         logger.warning("Lecture vision échouée (%s) : %s", filename, exc)
         return {"error": f"lecture échouée: {exc}"}, {}
+
+
+_NUM_KEYS = (
+    "sre_contribution_m2", "surface_toiture_m2", "surface_facade_brute_m2",
+    "surface_fenetres_m2", "surface_facade_contre_terre_m2",
+    "surface_plancher_ext_terre_m2",
+)
+
+
+def _merge_geo_vision(geo: dict | None, vis: dict | None) -> dict | None:
+    """Fusionne mesure géométrique (CAO) et lecture vision d'une même planche.
+
+    La géométrie prime pour ce qu'elle mesure de façon fiable (SRE étiquetée,
+    gabarit de façade, toiture) ; la vision comble le reste (fenêtres, façades
+    contre terre, planchers par contact, ponts thermiques en coupe).
+    """
+    geo = None if (not geo or geo.get("error")) else geo
+    vis = None if (not vis or vis.get("error")) else vis
+    if not geo and not vis:
+        return None
+    if not vis:
+        return dict(geo)
+    if not geo:
+        return dict(vis)
+
+    out = dict(vis)
+    for kk in _NUM_KEYS:
+        if geo.get(kk) is not None:           # une mesure géométrique > estimation vision
+            out[kk] = geo[kk]
+    if geo.get("orientation"):                # orientation depuis le nom de fichier
+        out["orientation"] = geo["orientation"]
+    out["plan_type"] = geo.get("plan_type") or out.get("plan_type")
+    if geo.get("ponts_thermiques"):
+        out["ponts_thermiques"] = geo["ponts_thermiques"]
+    out["methode"] = "mesure CAO + lecture vision"
+    rem = [r for r in (geo.get("remarques"), vis.get("remarques")) if r]
+    if rem:
+        out["remarques"] = " | ".join(rem)
+    return out
 
 
 def _parse_json(text: str) -> dict:

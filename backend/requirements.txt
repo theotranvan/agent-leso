@@ -52,3 +52,4 @@ python-dotenv==1.0.1
 tenacity==9.0.0
 pytz==2024.2
 ezdxf==1.4.4
+matplotlib==3.10.9  # backend de rendu DXF→image (ezdxf.addons.drawing) pour la lecture vision des plans CAO

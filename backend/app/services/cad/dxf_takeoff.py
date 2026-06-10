@@ -15,6 +15,7 @@ a la MÊME forme que la lecture vision → il s'agrège dans le même pipeline.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import re
 from io import BytesIO
@@ -32,14 +33,36 @@ _ORIENTATIONS = {
 
 # Mots-clés de calques (ArchiCAD/Swiss numérotés ou nommés).
 _LYR_PORTEUR = re.compile(r"porteur|mur|wall|101|102|façade|facade|revêtement|revetement|116", re.I)
+# Surface de façade visible (revêtement / élévation) — calque dédié, plus précis
+# que l'enveloppe des porteurs pour mesurer le gabarit d'une façade.
+_LYR_FACADE_SURF = re.compile(r"116|revêtement|revetement|élévation|elevation", re.I)
+# Calques structurels servant à CADRER le rendu (le bâti, pas le contexte).
+_LYR_FRAME = re.compile(
+    r"101|102|103|104|porteur|mur|wall|116|revêtement|revetement|109|113|dalle|"
+    r"plancher|radier|111|charpente|toiture|roof|611|zone",
+    re.I,
+)
 _LYR_TOITURE = re.compile(r"toiture|roof|charpente|111|dach", re.I)
 _LYR_DALLE = re.compile(r"dalle|plancher|radier|slab|floor|109|113", re.I)
 _LYR_ZONE = re.compile(r"zone|611|local|locaux|pièce|piece|raum", re.I)
 _LYR_FENETRE = re.compile(r"fen[êe]tre|window|menuiserie|baie|201|211|fenster", re.I)
-_LYR_SKIP = re.compile(r"cotation|cote|axe|texte|haie|terrain|parcelle|cartouche|logo|mobilier|amén|niveau|601|602|603|501|815|404", re.I)
+# Bruit à exclure : végétation (haies, couronnes, troncs), parcelles, mobilier,
+# aménagements extérieurs, cotation/axes/niveaux, escaliers, garde-corps,
+# bâtiments hors projet / démolis, terrassement, cartouche.
+_LYR_SKIP = re.compile(
+    r"cotation|cote|axe|texte|visualisation|haie|nh_|couronne|tronc|arbre|terrain|"
+    r"parcelle|numero|cartouche|logo|mobilier|agencement|amén|amen|niveau|escalier|"
+    r"garde|démoli|demoli|hors projet|terrassement|601|602|603|501|815|404|402|105|108|003",
+    re.I,
+)
 
 # Locaux NON chauffés (exclus de la SRE).
-_NON_CHAUFFE = re.compile(r"garage|cave|abri|parking|technique|local technique|buanderie|réduit|reduit|cage|circulation ext|balcon|terrasse|loggia|gaine", re.I)
+_NON_CHAUFFE = re.compile(
+    r"garage|cave|abri|parking|technique|local technique|buanderie|réduit|reduit|cage|"
+    r"circulation ext|balcon|terrasse|loggia|gaine|couvert|voiture|vélo|velo|carport|"
+    r"pergola|jardin|pluie|combl|non chauff",
+    re.I,
+)
 
 
 def detect_plan_type(filename: str) -> tuple[str, str | None]:
@@ -132,10 +155,12 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     # Détermination de l'unité si inconnue : on devine depuis l'étendue.
     xs: list[float] = []
     ys: list[float] = []
+    fxs: list[float] = []   # bornes du revêtement de façade (gabarit précis)
+    fys: list[float] = []
     roof_area = 0.0
     slab_area = 0.0
-    sre = 0.0
-    sre_seen = False
+    sre_labeled: list[float] = []  # surfaces étiquetées « Surface … » (officielles)
+    sre_bare: list[float] = []     # nombres nus « N m² » (fallback)
     window_count = 0
     window_area = 0.0
     notes = []
@@ -156,6 +181,18 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
                 elif dt == "LINE":
                     xs += [e.dxf.start.x, e.dxf.end.x]
                     ys += [e.dxf.start.y, e.dxf.end.y]
+            except Exception:
+                pass
+
+        # Gabarit de façade : bornes du revêtement (calque dédié) via bbox réelle
+        # de chaque entité (couvre arcs/splines, pas seulement les sommets).
+        if _LYR_FACADE_SURF.search(lyr):
+            try:
+                from ezdxf.bbox import extents
+                bb = extents([e])
+                if bb.has_data:
+                    fxs += [bb.extmin.x, bb.extmax.x]
+                    fys += [bb.extmin.y, bb.extmax.y]
             except Exception:
                 pass
 
@@ -189,14 +226,19 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
                 except Exception:
                     pass
 
-        # Zones → SRE : texte de surface sur calque zone
+        # Zones → SRE : texte de surface sur calque zone. On distingue les
+        # surfaces ÉTIQUETÉES par l'architecte (« Surface SBP … 124.0 m² »,
+        # valeur officielle) des nombres nus, et on exclut les locaux non chauffés.
         if dt in ("TEXT", "MTEXT") and _LYR_ZONE.search(lyr):
             t = _mtext_plain(e)
             m = re.search(r"(\d{1,4}[.,]\d{1,2})\s*m[²2]", t)
             if m and not _NON_CHAUFFE.search(t):
                 try:
-                    sre += float(m.group(1).replace(",", "."))
-                    sre_seen = True
+                    val = float(m.group(1).replace(",", "."))
+                    if re.search(r"surface|sre|sbp|\bsu\b", t, re.I):
+                        sre_labeled.append(val)
+                    else:
+                        sre_bare.append(val)
                 except ValueError:
                     pass
 
@@ -221,11 +263,15 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
         "ponts_thermiques": [],
     }
 
-    if plan_type == "facade" and xs:
-        w = (max(xs) - min(xs)) * k
-        h = (max(ys) - min(ys)) * k
+    # Gabarit façade : le revêtement (116) prime sur l'enveloppe des porteurs.
+    gx, gy = (fxs, fys) if fxs else (xs, ys)
+    if plan_type == "facade" and gx:
+        w = (max(gx) - min(gx)) * k
+        h = (max(gy) - min(gy)) * k
         if 1 < w < 200 and 1 < h < 100:
             out["surface_facade_brute_m2"] = round(w * h, 1)
+            if fxs:
+                out["remarques"] += " — gabarit mesuré sur le revêtement de façade"
         if window_area > 0:
             out["surface_fenetres_m2"] = round(window_area, 1)
         elif window_count:
@@ -233,8 +279,12 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     if plan_type == "toiture" and roof_area > 0:
         out["surface_toiture_m2"] = round(roof_area, 1)
     if plan_type in ("etage", "sous_sol"):
-        if sre_seen:
-            out["sre_contribution_m2"] = round(sre, 1)
+        # Valeurs étiquetées par l'architecte si présentes, sinon nombres nus.
+        sre_vals = sre_labeled or sre_bare
+        if sre_vals:
+            out["sre_contribution_m2"] = round(sum(sre_vals), 1)
+            if not sre_labeled:
+                out["remarques"] += " — surfaces non étiquetées, à confirmer"
         if slab_area > 0 and plan_type == "sous_sol":
             out["surface_plancher_ext_terre_m2"] = round(slab_area, 1)
     # Fenêtres détectées sur un plan non-façade : on les remonte aussi si orientées
@@ -249,30 +299,137 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
     return out
 
 
-def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
-    """Convertit un DWG en DXF si un binaire dwg2dxf est disponible (config env)."""
+# Versions DXF essayées par dwg2dxf. La sérialisation DXF de LibreDWG est
+# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre,
+# donc on convertit dans plusieurs versions et on retient celle qui se parse avec
+# le plus d'entités. None = version native du DWG.
+_DWG_VERSIONS: tuple[str | None, ...] = (None, "r2000", "r2013")
+
+
+def _dxf_entity_count(dxf_bytes: bytes) -> int:
+    """Nombre d'entités modelspace si ezdxf parse le DXF, sinon -1 (illisible)."""
+    try:
+        from ezdxf import recover
+        doc, _ = recover.read(BytesIO(dxf_bytes))
+        return sum(1 for _ in doc.modelspace())
+    except Exception:
+        return -1
+
+
+def _run_dwg2dxf(conv: str, dwg_bytes: bytes, version: str | None) -> bytes | None:
+    """Une conversion dwg2dxf en mode minimal (saute la section TABLES, souvent
+    mal sérialisée par LibreDWG ; les calques restent lisibles sur les entités)."""
     import os
     import subprocess
     import tempfile
-    conv = os.environ.get("LIBREDWG_DWG2DXF") or _which("dwg2dxf")
-    if not conv:
-        return None
     try:
         with tempfile.TemporaryDirectory() as d:
             src = os.path.join(d, "in.dwg")
             dst = os.path.join(d, "out.dxf")
             with open(src, "wb") as f:
                 f.write(dwg_bytes)
-            subprocess.run([conv, "-y", "-o", dst, src], check=True,
-                           capture_output=True, timeout=120)
+            cmd = [conv, "-m", "-y"]
+            if version:
+                cmd += ["--as", version]
+            cmd += ["-o", dst, src]
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
             if os.path.exists(dst):
                 with open(dst, "rb") as f:
                     return f.read()
     except Exception as exc:
-        logger.warning("Conversion DWG→DXF échouée : %s", exc)
+        # Échec attendu pour certaines versions cibles (toutes ne savent pas
+        # sérialiser un DWG donné) ; dwg_to_dxf_bytes essaie les autres.
+        logger.debug("Conversion DWG→DXF (%s) échouée : %s", version or "native", exc)
     return None
+
+
+def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
+    """Convertit un DWG en DXF si le binaire dwg2dxf (LibreDWG) est disponible.
+
+    On essaie plusieurs versions cibles et on retient le DXF qui se parse avec le
+    plus d'entités (la qualité de sortie de LibreDWG dépend de la version)."""
+    import os
+    conv = os.environ.get("LIBREDWG_DWG2DXF") or _which("dwg2dxf")
+    if not conv:
+        return None
+    best: bytes | None = None
+    best_score = 0  # il faut au moins 1 entité lisible
+    for ver in _DWG_VERSIONS:
+        data = _run_dwg2dxf(conv, dwg_bytes, ver)
+        if not data:
+            continue
+        score = _dxf_entity_count(data)
+        if score > best_score:
+            best_score, best = score, data
+    return best
 
 
 def _which(name: str) -> str | None:
     import shutil
     return shutil.which(name)
+
+
+def dxf_to_png_b64(dxf_bytes: bytes, max_px: int = 2000) -> str | None:
+    """Rend un DXF en image (JPEG base64) cadrée sur le bâtiment, pour la lecture
+    vision. On exclut le bruit (végétation, parcelles, cotation…) du cadrage afin
+    que la planche soit nette et lisible par l'IA (fenêtres, ligne de terrain,
+    ponts thermiques en coupe — grandeurs non déductibles de la seule géométrie).
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from ezdxf import recover
+        from ezdxf.addons.drawing import Frontend, RenderContext
+        from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+        from ezdxf.bbox import extents
+        from PIL import Image
+    except Exception as exc:  # dépendances de rendu absentes
+        logger.warning("Rendu DXF→image indisponible : %s", exc)
+        return None
+
+    try:
+        doc, _ = recover.read(BytesIO(dxf_bytes))
+        msp = doc.modelspace()
+
+        # On ne dessine QUE le bâti (hors bruit : végétation, parcelles, cotation,
+        # légendes…) et on CADRE sur les calques structurels (murs, façade, dalles,
+        # toiture, zones) pour éviter qu'un repère/élément lointain ne réduise le
+        # bâtiment à un point.
+        drawn = [e for e in msp if not _LYR_SKIP.search(_layer_of(e))]
+        xs: list[float] = []
+        ys: list[float] = []
+        for e in drawn:
+            if not _LYR_FRAME.search(_layer_of(e)):
+                continue
+            try:
+                bb = extents([e])
+                if bb.has_data:
+                    xs += [bb.extmin.x, bb.extmax.x]
+                    ys += [bb.extmin.y, bb.extmax.y]
+            except Exception:
+                pass
+
+        fig = plt.figure(dpi=150)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_axis_off()
+        backend = MatplotlibBackend(ax)
+        Frontend(RenderContext(doc), backend).draw_entities(drawn)
+        backend.finalize()
+        if xs and ys:
+            mx = (max(xs) - min(xs)) * 0.04 + 1
+            my = (max(ys) - min(ys)) * 0.04 + 1
+            ax.set_xlim(min(xs) - mx, max(xs) + mx)
+            ax.set_ylim(min(ys) - my, max(ys) + my)
+        buf = BytesIO()
+        fig.savefig(buf, format="png", facecolor="white", dpi=150)
+        plt.close(fig)
+
+        img = Image.open(BytesIO(buf.getvalue())).convert("RGB")
+        img.thumbnail((max_px, max_px))
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=85)
+        return base64.b64encode(out.getvalue()).decode("ascii")
+    except Exception as exc:
+        logger.warning("Rendu DXF→image échoué : %s", exc)
+        return None
