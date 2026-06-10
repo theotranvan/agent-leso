@@ -2,18 +2,26 @@
 # LibreDWG n'est pas packagé dans les dépôts Debian de l'image slim ; on compile
 # l'outil dwg2dxf (statique) depuis la release officielle. Il convertit les plans
 # DWG → DXF pour le relevé thermique / métrés 2D (mesure géométrique).
+#
+# La source est VENDORÉE dans le repo (backend/vendor/) : le builder Render
+# n'accède pas toujours aux assets GitHub (redirigés vers une CDN) → on évite
+# tout téléchargement réseau au build (cause d'échec déterministe). La
+# compilation est volontairement limitée à -j2 : les gros fichiers générés
+# (dynapi.c…) compilés en parallèle massif font sauter la mémoire du builder
+# (OOM → exit 2). pcre2/perl ne sont PAS requis (vérifié : build OK sans eux).
 FROM python:3.12-slim AS dwgbuild
 ARG LIBREDWG_VERSION=0.13.3
+ARG LIBREDWG_SHA256=83f1f6e78a744777a481ff4520e4cef3f8ac4b2c1c25671077ca12fe81e8816e
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl xz-utils ca-certificates \
+    build-essential xz-utils \
     && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL -o /tmp/libredwg.tar.xz \
-      "https://github.com/LibreDWG/libredwg/releases/download/${LIBREDWG_VERSION}/libredwg-${LIBREDWG_VERSION}.tar.xz" \
+COPY vendor/libredwg-${LIBREDWG_VERSION}.tar.xz /tmp/libredwg.tar.xz
+RUN echo "${LIBREDWG_SHA256}  /tmp/libredwg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ld && tar xf /tmp/libredwg.tar.xz -C /tmp/ld --strip-components=1 \
     && cd /tmp/ld \
     && ./configure --disable-bindings --disable-shared --enable-static --disable-dependency-tracking \
-    && make -C src -j"$(nproc)" \
-    && make -C programs dwg2dxf -j"$(nproc)" \
+    && make -C src -j2 \
+    && make -C programs dwg2dxf -j2 \
     && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
     && /usr/local/bin/dwg2dxf --version
 
