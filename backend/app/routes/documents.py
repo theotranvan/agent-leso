@@ -64,34 +64,45 @@ async def upload_document(
     if size_mb > settings.MAX_UPLOAD_SIZE_MB:
         raise HTTPException(status_code=413, detail=f"Fichier trop volumineux ({size_mb:.1f} MB > {settings.MAX_UPLOAD_SIZE_MB} MB)")
 
-    # Upload storage
+    # Upload storage — erreur explicite (sinon 500 opaque côté client)
     storage = get_storage()
     doc_id = str(uuid.uuid4())
     safe_filename = filename.replace("/", "_").replace("\\", "_")
     storage_path = f"{user.organization_id}/uploads/{doc_id}/{safe_filename}"
-    storage.upload(storage_path, file_bytes, content_type=file.content_type or "application/octet-stream")
+    try:
+        storage.upload(storage_path, file_bytes, content_type=file.content_type or "application/octet-stream")
+    except Exception as e:
+        logger.exception(f"Échec stockage du fichier {safe_filename}: {e}")
+        raise HTTPException(status_code=502, detail="Échec de l'enregistrement du fichier (stockage indisponible).") from e
 
     # Insert DB
     admin = get_supabase_admin()
-    doc = admin.table("documents").insert({
-        "id": doc_id,
-        "organization_id": user.organization_id,
-        "project_id": project_id,
-        "filename": safe_filename,
-        "file_type": file_type,
-        "storage_path": storage_path,
-        "processed": False,
-    }).execute()
+    try:
+        doc = admin.table("documents").insert({
+            "id": doc_id,
+            "organization_id": user.organization_id,
+            "project_id": project_id,
+            "filename": safe_filename,
+            "file_type": file_type,
+            "storage_path": storage_path,
+            "processed": False,
+        }).execute()
+    except Exception as e:
+        logger.exception(f"Échec enregistrement DB du document {doc_id}: {e}")
+        raise HTTPException(status_code=502, detail="Échec de l'enregistrement du document (base de données).") from e
 
-    await audit_log(
-        action="document_uploaded",
-        organization_id=user.organization_id,
-        user_id=user.id,
-        resource_type="document",
-        resource_id=doc_id,
-        metadata={"filename": safe_filename, "size_mb": round(size_mb, 2)},
-        ip_address=request.client.host if request.client else None,
-    )
+    try:
+        await audit_log(
+            action="document_uploaded",
+            organization_id=user.organization_id,
+            user_id=user.id,
+            resource_type="document",
+            resource_id=doc_id,
+            metadata={"filename": safe_filename, "size_mb": round(size_mb, 2)},
+            ip_address=request.client.host if request.client else None,
+        )
+    except Exception as e:  # journalisation non bloquante : le fichier est déjà enregistré
+        logger.warning(f"audit_log upload échoué (non bloquant): {e}")
 
     # Pipeline en background (extraction + embeddings)
     background_tasks.add_task(_process_document_pipeline, doc_id, user.organization_id, project_id)

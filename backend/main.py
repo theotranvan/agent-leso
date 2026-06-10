@@ -104,6 +104,27 @@ app.add_middleware(
 # Sécurité
 app.add_middleware(SecurityHeadersMiddleware)
 
+
+def _cors_headers(request: Request) -> dict[str, str]:
+    """En-têtes CORS pour une réponse d'erreur (gérée hors du CORSMiddleware).
+
+    Reflète l'origine de la requête si elle est autorisée, pour que les réponses
+    d'erreur (500) ne soient pas bloquées/masquées par le navigateur comme des
+    « CORS error »."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    allowed = _cors_origins
+    if allowed == ["*"]:
+        return {"Access-Control-Allow-Origin": "*"}
+    if origin in allowed:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -122,11 +143,20 @@ async def health():
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Fallback global - log + réponse générique (pas de détail interne en prod)."""
+    """Fallback global - log + réponse générique (pas de détail interne en prod).
+
+    IMPORTANT : on appose ici les en-têtes CORS. Cette réponse est renvoyée par
+    le ServerErrorMiddleware de Starlette, qui est EN DEHORS du CORSMiddleware ;
+    sans ces en-têtes, une erreur serveur (500) arrive au navigateur sans
+    Access-Control-Allow-Origin et apparaît comme une « CORS error » trompeuse
+    (ex. à l'upload), masquant le vrai 500. On les remet pour que l'erreur réelle
+    soit visible côté client.
+    """
     logger.exception(f"Erreur non gérée: {exc}")
+    headers = _cors_headers(request)
     if settings.is_production:
-        return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"}, headers=headers)
+    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=headers)
 
 
 # Routes versionnées /api/*
