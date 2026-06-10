@@ -3,9 +3,34 @@ import { useCallback, useState } from 'react';
 import { Upload, FileIcon, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Parcourt récursivement une entrée du DataTransfer (fichier ou dossier déposé)
+// et renvoie tous les fichiers contenus.
+async function readEntryFiles(entry: any): Promise<File[]> {
+  if (!entry) return [];
+  if (entry.isFile) {
+    return new Promise<File[]>((resolve) => entry.file((f: File) => resolve([f]), () => resolve([])));
+  }
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    const all: any[] = [];
+    await new Promise<void>((resolve) => {
+      const readBatch = () => reader.readEntries((batch: any[]) => {
+        if (!batch.length) { resolve(); return; }
+        all.push(...batch);
+        readBatch();
+      }, () => resolve());
+      readBatch();
+    });
+    const nested = await Promise.all(all.map(readEntryFiles));
+    return nested.flat();
+  }
+  return [];
+}
+
 interface DropzoneProps {
   accept?: string;
   multiple?: boolean;
+  directory?: boolean;
   maxSizeMB?: number;
   label?: string;
   hint?: string;
@@ -19,6 +44,7 @@ interface DropzoneProps {
 export function Dropzone({
   accept,
   multiple = false,
+  directory = false,
   maxSizeMB = 25,
   label,
   hint,
@@ -59,6 +85,19 @@ export function Dropzone({
     e.stopPropagation();
     setDragActive(false);
     if (disabled || uploading) return;
+
+    // Dépôt d'un DOSSIER (ou de plusieurs fichiers) : on parcourt récursivement
+    // les entrées pour récupérer tous les fichiers (le swisstransfer en un glisser).
+    if (multiple && e.dataTransfer.items && e.dataTransfer.items.length) {
+      const entries = Array.from(e.dataTransfer.items)
+        .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
+        .filter(Boolean) as any[];
+      if (entries.some((en) => en && en.isDirectory)) {
+        const collected = (await Promise.all(entries.map(readEntryFiles))).flat();
+        if (collected.length) { await validateAndSubmit(collected); return; }
+      }
+    }
+
     const files = Array.from(e.dataTransfer.files);
     if (!files.length) return;
     await validateAndSubmit(multiple ? files : [files[0]]);
@@ -116,6 +155,21 @@ export function Dropzone({
           </>
         )}
       </label>
+      {directory && multiple && !uploading && (
+        <label className="mt-2 inline-flex text-xs font-medium text-primary underline cursor-pointer">
+          📁 ou choisir un dossier entier
+          <input
+            type="file"
+            // @ts-expect-error — attributs non standard (sélection de dossier)
+            webkitdirectory=""
+            directory=""
+            multiple
+            disabled={disabled || uploading}
+            onChange={handleInput}
+            className="sr-only"
+          />
+        </label>
+      )}
       {localError && (
         <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
           <X className="h-3 w-3" /> {localError}

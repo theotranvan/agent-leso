@@ -322,7 +322,7 @@ def _merge_geo_vision(geo: dict | None, vis: dict | None) -> dict | None:
     out["methode"] = "mesure CAO + lecture vision"
     rem = [r for r in (geo.get("remarques"), vis.get("remarques")) if r]
     if rem:
-        out["remarques"] = " | ".join(rem)
+        out["remarques"] = " ; ".join(rem)
     return out
 
 
@@ -413,6 +413,13 @@ def _fmt(v, unit="m²"):
     return f"{v:,.1f} {unit}".replace(",", "'") if isinstance(v, (int, float)) else "_à compléter_"
 
 
+def _cell(v) -> str:
+    """Texte sûr pour une cellule Markdown : neutralise les « | » et retours
+    ligne (sinon le texte vision casse l'alignement du tableau dans le PDF)."""
+    s = "" if v is None else str(v)
+    return s.replace("|", "/").replace("\n", " ").replace("\r", " ").strip()
+
+
 def _sum_orient(d: dict) -> float | None:
     """Somme des valeurs non nulles d'un dict par orientation (None si tout vide)."""
     vals = [v for v in (d or {}).values() if isinstance(v, (int, float))]
@@ -469,19 +476,19 @@ _« à compléter » = donnée non lisible sur les planches fournies (à relever
     md += "\n## 4. Ponts thermiques\n\n| Type | Longueur |\n|---|---|\n"
     if t["ponts_thermiques"]:
         for pt in t["ponts_thermiques"]:
-            md += f"| {pt['type']} | {_fmt(pt['longueur_m'], 'm')} |\n"
+            md += f"| {_cell(pt['type'])} | {_fmt(pt['longueur_m'], 'm')} |\n"
     else:
         md += "| _à relever sur coupes_ | |\n"
 
     md += "\n## 5. Détail par planche (traçabilité)\n\n| Planche | Type | Orient. | Méthode | Confiance | Remarques |\n|---|---|---|---|---|---|\n"
     for p in per_plan:
         if p.get("error"):
-            md += f"| {p.get('filename', '?')} | — | — | — | — | {p['error']} |\n"
+            md += f"| {_cell(p.get('filename', '?'))} | — | — | — | — | {_cell(p['error'])} |\n"
         else:
             md += (
-                f"| {p.get('filename', '?')} | {p.get('plan_type', '?')} | "
-                f"{p.get('orientation') or '—'} | {p.get('methode', 'lecture vision')} | "
-                f"{p.get('confiance', '?')} | {(p.get('remarques') or '')[:50]} |\n"
+                f"| {_cell(p.get('filename', '?'))} | {_cell(p.get('plan_type', '?'))} | "
+                f"{_cell(p.get('orientation') or '—')} | {_cell(p.get('methode', 'lecture vision'))} | "
+                f"{_cell(p.get('confiance', '?'))} | {_cell((p.get('remarques') or '')[:80])} |\n"
             )
 
     md += (
