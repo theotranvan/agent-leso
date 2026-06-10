@@ -71,7 +71,12 @@ p { margin: 0.3cm 0; text-align: justify; }
 ul, ol { margin: 0.3cm 0; padding-left: 1cm; }
 li { margin: 0.1cm 0; }
 
-table { width: 100%; border-collapse: collapse; margin: 0.5cm 0; font-size: 9pt; page-break-inside: avoid; }
+/* Les tableaux peuvent se couper entre les pages (un tableau insécable plus
+   haut qu'une page provoquait une page blanche + débordement) ; les LIGNES
+   restent insécables et l'en-tête se répète sur chaque page. */
+table { width: 100%; border-collapse: collapse; margin: 0.5cm 0; font-size: 9pt; page-break-inside: auto; }
+tr { page-break-inside: avoid; }
+thead { display: table-header-group; }
 th { background: #f5f5f5; border: 1px solid #d4d4d4; padding: 6px 8px; text-align: left; font-weight: 600; }
 td { border: 1px solid #e5e5e5; padding: 6px 8px; vertical-align: top; }
 tr:nth-child(even) td { background: #fafafa; }
