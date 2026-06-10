@@ -20,6 +20,7 @@ RUN echo "${LIBREDWG_SHA256}  /tmp/libredwg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ld && tar xf /tmp/libredwg.tar.xz -C /tmp/ld --strip-components=1 \
     && cd /tmp/ld \
     && ./configure --disable-bindings --disable-shared --enable-static --disable-dependency-tracking \
+                   --disable-Werror --enable-compile-warnings=no CFLAGS="-O2 -w" \
     && make -C src -j2 \
     && make -C programs dwg2dxf -j2 \
     && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
