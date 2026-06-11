@@ -181,11 +181,14 @@ Conserve toutes les valeurs techniques et normes fournies."""
     base_model = get_model_for_task("redaction_cctp")
     model_override = get_model_override_for_regeneration(regen_context, base_model)
 
+    # 16 000 tokens : un CCTP multi-lots (électricité, second œuvre…) avec
+    # articles sur mesure dépasse largement 8 000 → la sortie était tronquée
+    # en plein milieu d'une section. Sonnet 4.6 gère cette taille sans peine.
     llm_result = await call_llm(
         task_type="redaction_cctp",
         system_prompt=SYSTEM_PROMPT_CCTP,
         user_content=user_content,
-        max_tokens=8000,
+        max_tokens=16000,
         temperature=0.2,
         model_override=model_override,
         organization_id=org_id,
@@ -195,6 +198,43 @@ Conserve toutes les valeurs techniques et normes fournies."""
     body_html = llm_result["text"]
     # Nettoyage si le LLM a wrappé dans des balises markdown de code
     body_html = body_html.replace("```html", "").replace("```", "").strip()
+
+    # Continuation si la limite est malgré tout atteinte (lot très volumineux) :
+    # on reprend là où le modèle s'est arrêté plutôt que de laisser une section
+    # fantôme. On borne à 2 reprises pour éviter toute boucle.
+    cont = 0
+    while llm_result.get("stop_reason") == "max_tokens" and cont < 2:
+        cont += 1
+        logger.warning("CCTP tronqué (lot=%s) — reprise %d", lot_label, cont)
+        llm_result = await call_llm(
+            task_type="redaction_cctp",
+            system_prompt=SYSTEM_PROMPT_CCTP,
+            user_content=(
+                "Tu as commencé à rédiger ce CCTP mais ta réponse a été coupée. "
+                "Voici EXACTEMENT ce que tu as déjà produit :\n\n"
+                f"{body_html[-6000:]}\n\n"
+                "Reprends et termine le document en produisant UNIQUEMENT la SUITE "
+                "(HTML sémantique), sans rien répéter, réintroduire ni reformuler ce "
+                "qui précède. Commence directement par la suite logique."
+            ),
+            max_tokens=16000,
+            temperature=0.2,
+            model_override=model_override,
+            organization_id=org_id,
+            task_id=task.get("id"),
+        )
+        suite = llm_result["text"].replace("```html", "").replace("```", "").strip()
+        body_html = body_html.rstrip() + "\n" + suite
+
+    if llm_result.get("stop_reason") == "max_tokens":
+        # Garde-fou honnête : on ne laisse jamais une section coupée passer pour
+        # complète. (En pratique inatteignable avec 16k tokens × 3 passes.)
+        body_html += (
+            "<blockquote><strong>⚠ Document volumineux — fin tronquée.</strong> "
+            "Certaines sections en fin de lot n'ont pas pu être générées en une fois. "
+            "Relancez la tâche ou scindez le lot ; les prescriptions manquantes sont "
+            "disponibles dans la bibliothèque LESO.</blockquote>"
+        )
 
     import re as _re
     lot_slug = _re.sub(r"[^a-z0-9]+", "_", lot_label.lower()).strip("_") or "lot"

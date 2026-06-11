@@ -275,6 +275,9 @@ async def _call_anthropic(
     usage = {
         "input_tokens": response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,
+        # "max_tokens" = sortie coupée par la limite (document incomplet) ;
+        # remonté pour que les agents longs (CCTP…) puissent réagir.
+        "stop_reason": getattr(response, "stop_reason", None),
     }
     return text, usage
 
@@ -390,4 +393,5 @@ async def call_llm(
         "cost_eur": cost_eur,
         "cost_chf": cost_chf,
         "fallback_used": fallback_used,
+        "stop_reason": usage.get("stop_reason"),
     }
