@@ -238,6 +238,14 @@ async def execute_task(task_id: str) -> dict[str, Any]:
                     result_html.encode("utf-8"),
                     content_type="text/html",
                 )
+                # Persistance DB (filet fiable, transactionnel) — dégrade
+                # proprement si la colonne result_html (migration 011) est absente.
+                try:
+                    admin.table("tasks").update(
+                        {"result_html": result_html}
+                    ).eq("id", task_id).execute()
+                except Exception as exc2:
+                    logger.debug("Colonne result_html absente (migration 011 ?) : %s", exc2)
         except Exception as exc:
             logger.warning("Stockage source DOCX échec (non-bloquant) task=%s : %s", task_id, exc)
 

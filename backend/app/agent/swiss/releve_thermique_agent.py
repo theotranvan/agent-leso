@@ -342,6 +342,19 @@ def _merge_geo_vision(geo: dict | None, vis: dict | None) -> dict | None:
     if geo.get("orientation"):                # orientation depuis le nom de fichier
         out["orientation"] = geo["orientation"]
     out["plan_type"] = geo.get("plan_type") or out.get("plan_type")
+    # Confiance : quand la GÉOMÉTRIE a fourni des mesures, sa confiance prime
+    # (mesure vectorielle cohérente) sur l'estimation vision, souvent pessimiste
+    # sur un rendu épuré. On retient la meilleure des deux.
+    _rank = {"faible": 0, "moyenne": 1, "haute": 2}
+    geo_has_measure = (
+        any(geo.get(kk) is not None for kk in _NUM_KEYS)
+        or geo.get("perimetre_m") is not None
+        or geo.get("profondeur_enterree_m") is not None
+        or bool(geo.get("ponts_thermiques"))
+    )
+    if geo_has_measure:
+        gc, vc = geo.get("confiance", "moyenne"), vis.get("confiance", "faible")
+        out["confiance"] = gc if _rank.get(gc, 1) >= _rank.get(vc, 0) else vc
     # Ponts thermiques : on CUMULE géométrie (longueurs mesurées) et vision
     # (types repérés) ; la consolidation canonique a lieu à l'agrégation.
     ponts = list(geo.get("ponts_thermiques") or []) + list(vis.get("ponts_thermiques") or [])

@@ -145,13 +145,15 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
     footer = ("Document généré par LESO — à vérifier et valider par l'ingénieur "
               "responsable avant diffusion.")
 
-    # HTML source (sidecar) si disponible, sinon repli sur l'aperçu texte
-    body_html = None
-    try:
-        raw = get_storage().download(f"{user.organization_id}/_docx_src/{task_id}.html")
-        body_html = raw.decode("utf-8")
-    except Exception:
-        body_html = None
+    # HTML source du livrable : 1) colonne DB result_html (fiable, migration 011) ;
+    # 2) sidecar storage ; 3) repli sur l'aperçu texte.
+    body_html = t.get("result_html") or None
+    if not body_html:
+        try:
+            raw = get_storage().download(f"{user.organization_id}/_docx_src/{task_id}.html")
+            body_html = raw.decode("utf-8")
+        except Exception:
+            body_html = None
 
     docx_bytes = None
     if body_html:
