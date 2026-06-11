@@ -396,19 +396,26 @@ def _extract_doc(doc, msp, filename: str) -> dict:
                     sre_bare.append(val)
 
     # Si unité inconnue, devine (mm si étendue énorme)
+    unit_guessed = False
     if not k and (xs or fxs):
         allx = xs + fxs
         ally = ys + fys
         span = max(max(allx) - min(allx), max(ally) - min(ally))
         k = 0.001 if span > 2000 else 1.0
+        unit_guessed = True
         notes.append("unité non déclarée — supposée " + ("mm" if k == 0.001 else "m"))
     k = k or 0.001
+
+    # Confiance : « haute » si l'unité du dessin est déclarée et les mesures
+    # géométriques cohérentes ; « moyenne » si l'unité a dû être déduite (cas
+    # fréquent des exports DWG) — les mesures restent cohérentes entre elles.
+    confiance = "moyenne" if unit_guessed else "haute"
 
     out: dict = {
         "plan_type": plan_type,
         "orientation": orientation,
         "methode": "mesure CAO (DXF)",
-        "confiance": "haute",
+        "confiance": confiance,
         "remarques": "; ".join(notes) or "géométrie vectorielle mesurée",
         "sre_contribution_m2": None,
         "surface_toiture_m2": None,
