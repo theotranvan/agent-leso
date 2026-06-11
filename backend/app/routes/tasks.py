@@ -13,6 +13,30 @@ from app.models.task import TaskCreate, TaskStatusResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
+
+def _html_to_plaintext(html: str) -> str:
+    """Extrait le texte lisible d'un HTML (repli quand la conversion DOCX échoue).
+
+    Sans dépendance externe : on retire les blocs non visibles (style/script/head),
+    on transforme les fins de bloc en sauts de ligne, puis on déshabille les balises
+    et on décode les entités. But : sortir le CONTENU COMPLET du livrable plutôt
+    que la seule ligne d'aperçu.
+    """
+    import html as _html
+    import re
+
+    if not html:
+        return ""
+    txt = re.sub(r"(?is)<(script|style|head)\b.*?</\1>", " ", html)
+    txt = re.sub(r"(?i)<br\s*/?>", "\n", txt)
+    txt = re.sub(r"(?i)</(p|div|tr|li|h[1-6]|table|thead|tbody)>", "\n", txt)
+    txt = re.sub(r"(?i)</td>|</th>", "\t", txt)
+    txt = re.sub(r"(?s)<[^>]+>", "", txt)
+    txt = _html.unescape(txt)
+    # Compacte les lignes vides multiples laissées par le strip.
+    lines = [ln.strip() for ln in txt.splitlines()]
+    return "\n".join(ln for ln in lines if ln)
+
 # Libellés lisibles pour les exports Word
 _TASK_DOCX_LABELS = {
     "redaction_cctp": "CCTP",
@@ -148,10 +172,29 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
     # HTML source du livrable : 1) colonne DB result_html (fiable, migration 011) ;
     # 2) sidecar storage ; 3) repli sur l'aperçu texte.
     body_html = t.get("result_html") or None
+    html_source = "db" if body_html else None
+
+    # Filet anti-cache : si `select("*")` n'a pas renvoyé result_html (cache de
+    # schéma PostgREST encore tiède juste après la migration 011), on retente une
+    # lecture CIBLÉE de la colonne par son nom — ce qui force PostgREST à la voir.
+    if not body_html:
+        try:
+            targeted = (
+                admin.table("tasks").select("result_html")
+                .eq("id", task_id).eq("organization_id", user.organization_id)
+                .maybe_single().execute()
+            )
+            if targeted.data and targeted.data.get("result_html"):
+                body_html = targeted.data["result_html"]
+                html_source = "db-targeted"
+        except Exception as exc:
+            logger.info("Lecture ciblée result_html indisponible task=%s : %s", task_id, exc)
+
     if not body_html:
         try:
             raw = get_storage().download(f"{user.organization_id}/_docx_src/{task_id}.html")
             body_html = raw.decode("utf-8")
+            html_source = "sidecar"
         except Exception:
             body_html = None
 
@@ -165,22 +208,36 @@ async def export_task_docx(task_id: str, user: Annotated[AuthUser, Depends(get_c
             branding = None
         project_info = {k: v for k, v in {"Projet": project_name, "Type de document": label}.items() if v}
         # La conversion HTML→DOCX ne doit JAMAIS faire échouer le bouton : si le
-        # HTML de l'agent contient une structure imprévue, on retombe sur l'aperçu
-        # texte plutôt que de renvoyer une 500.
+        # HTML de l'agent contient une structure imprévue, on retombe d'abord sur
+        # le TEXTE COMPLET du livrable (jamais sur la seule ligne d'aperçu).
         try:
             docx_bytes = html_to_docx_bytes(
                 body_html, title=title, project_info=project_info,
                 branding=branding, footer_note=footer,
             )
         except Exception as exc:
-            logger.warning("Export DOCX depuis HTML échoué (repli texte) task=%s : %s", task_id, exc)
-            docx_bytes = None
+            logger.warning("Export DOCX depuis HTML échoué (repli texte complet) task=%s : %s", task_id, exc)
+            docx_bytes = text_to_docx_bytes(
+                _html_to_plaintext(body_html) or t.get("result_preview") or "Aucun contenu disponible.",
+                title=title, footer_note=footer,
+            )
+            html_source = (html_source or "db") + "+texte"
 
     if not docx_bytes:
+        # Aucune source riche : on n'a que l'aperçu d'une ligne. On le signale dans
+        # les logs pour diagnostiquer (DB vide ? sidecar manquant ? cache PostgREST ?).
+        logger.warning(
+            "Export DOCX appauvri (aucune source HTML) task=%s type=%s : "
+            "result_html présent dans la tâche=%s — repli sur l'aperçu.",
+            task_id, t.get("task_type"), bool(t.get("result_html")),
+        )
         docx_bytes = text_to_docx_bytes(
             t.get("result_preview") or "Aucun contenu disponible.",
             title=title, footer_note=footer,
         )
+        html_source = "preview"
+
+    logger.info("Export DOCX task=%s source=%s taille=%d", task_id, html_source, len(docx_bytes))
 
     safe = "".join(c if c.isalnum() else "_" for c in label)[:40]
     filename = f"{safe}_{task_id[:8]}.docx"
