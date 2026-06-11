@@ -2,7 +2,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, Download, Zap, RefreshCw, Loader2, AlertCircle, Sparkles, History, FileText,
+  ArrowLeft, Download, Zap, RefreshCw, Loader2, AlertCircle, Sparkles, History, Lock,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -18,18 +18,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState<string | null>(null);
   const [showRegenDialog, setShowRegenDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [docxLoading, setDocxLoading] = useState(false);
-
-  const handleDocx = async () => {
-    setDocxLoading(true);
-    try {
-      await api.exportTaskDocx(id);
-    } catch (e: any) {
-      setError(e?.userMessage || e?.message || 'Export Word échoué');
-    } finally {
-      setDocxLoading(false);
-    }
-  };
 
   const fetchTask = async () => {
     try {
@@ -117,9 +105,15 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </a>
             )}
             {isDone && (
-              <Button variant="outline" onClick={handleDocx} disabled={docxLoading} className="gap-2">
-                {docxLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                Word
+              // Export Word temporairement verrouillé (stabilisation en cours).
+              <Button
+                variant="outline"
+                disabled
+                title="Export Word en cours de finalisation — bientôt disponible"
+                className="gap-2 cursor-not-allowed"
+              >
+                <Lock className="h-4 w-4" />
+                Word <span className="text-xs text-muted-foreground">(en cours)</span>
               </Button>
             )}
             {canRegenerate && (
