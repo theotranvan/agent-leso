@@ -26,6 +26,39 @@ def _reopen(data: bytes) -> Document:
     return Document(BytesIO(data))
 
 
+def _all_text(doc: Document) -> str:
+    return "\n".join(p.text for p in doc.paragraphs)
+
+
+class TestNoCssLeak:
+    """Le CSS ne doit JAMAIS apparaître comme texte dans le Word (bug prod)."""
+
+    def test_raw_css_block_is_stripped(self):
+        html = (
+            "<h1>CCTP — Lot 240</h1>\n"
+            "body { font-family: Arial; max-width: 900px; margin: 0 auto; }\n"
+            "h1 { border-bottom: 3px solid #1a3a5c; }\n"
+            "<h2>Section</h2><p>Contenu réel.</p>"
+        )
+        txt = _all_text(_reopen(html_to_docx_bytes(html, title="T")))
+        assert "font-family" not in txt and "max-width" not in txt
+        assert "Contenu réel." in txt
+
+    def test_full_html_doc_keeps_only_body(self):
+        html = (
+            "<!DOCTYPE html><html><head><style>p{color:red;} h1{margin:0;}</style>"
+            "</head><body><h2>Titre</h2><p>Le vrai texte.</p></body></html>"
+        )
+        txt = _all_text(_reopen(html_to_docx_bytes(html, title="T")))
+        assert "color:red" not in txt and "margin:0" not in txt
+        assert "Le vrai texte." in txt
+
+    def test_legit_single_brace_is_kept(self):
+        html = "<p>Le débit { Q } vaut 12 m³/h selon SIA 384.</p>"
+        txt = _all_text(_reopen(html_to_docx_bytes(html, title="T")))
+        assert "12 m³/h" in txt
+
+
 class TestValidDocx:
     def test_returns_valid_ooxml_bytes(self):
         data = html_to_docx_bytes("<p>Bonjour</p>", title="Test")

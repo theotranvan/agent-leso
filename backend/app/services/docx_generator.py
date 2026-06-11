@@ -18,6 +18,7 @@ au même design, éditable par l'ingénieur. Aucune dépendance externe en plus.
 from __future__ import annotations
 
 import logging
+import re
 from html.parser import HTMLParser
 from io import BytesIO
 
@@ -29,6 +30,38 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 logger = logging.getLogger(__name__)
+
+# Bloc CSS « sélecteur { … } » répété ≥2× : neutralise une feuille de style qui
+# aurait fui hors d'une balise <style> (LLM ayant produit un document complet,
+# CSS échappé, etc.) — ces blocs ne doivent jamais apparaître comme du texte.
+_CSS_LEAK_RE = re.compile(
+    r"(?:@?[#.\w][\w \t.,:#>()\[\]\"'%+/*-]*\{[^{}]*\}\s*){2,}",
+)
+_STYLE_RE = re.compile(r"<style[^>]*>.*?</style>", re.I | re.S)
+_SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.I | re.S)
+_HEAD_RE = re.compile(r"<head[^>]*>.*?</head>", re.I | re.S)
+_BODY_RE = re.compile(r"<body[^>]*>(.*)</body>", re.I | re.S)
+
+
+def _sanitize_html(html: str) -> str:
+    """Robustifie le HTML avant conversion Word :
+
+    - si c'est un document complet, on ne garde que le contenu de <body> ;
+    - on retire style/script/head (même malformés ou avec attributs) ;
+    - on neutralise toute feuille de style restée en texte brut (cas vu en prod :
+      le CSS de charte s'affichait littéralement dans le .docx).
+    """
+    if not html:
+        return ""
+    m = _BODY_RE.search(html)
+    if m:
+        html = m.group(1)
+    html = _STYLE_RE.sub(" ", html)
+    html = _SCRIPT_RE.sub(" ", html)
+    html = _HEAD_RE.sub(" ", html)
+    html = re.sub(r"<!DOCTYPE[^>]*>", " ", html, flags=re.I)
+    html = _CSS_LEAK_RE.sub(" ", html)
+    return html
 
 # h1 18pt · h2 13pt · h3 11pt · h4+ 10.5pt (mêmes tailles que le CSS du PDF).
 _HEADING_PT = {"h1": 16, "h2": 13, "h3": 11, "h4": 10.5, "h5": 10, "h6": 10}
@@ -452,7 +485,7 @@ def html_to_docx_bytes(
 
     parser = _HtmlToDocx(doc, primary, accent)
     try:
-        parser.feed(body_html or "")
+        parser.feed(_sanitize_html(body_html or ""))
         parser.close()
     except Exception as exc:  # pragma: no cover - robustesse
         logger.warning("Conversion HTML→DOCX partielle : %s", exc)
