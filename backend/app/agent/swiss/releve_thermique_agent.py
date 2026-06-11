@@ -109,7 +109,10 @@ async def execute(task: dict[str, Any]) -> dict[str, Any]:
         low = fname.lower()
         if ftype == "cad" or low.endswith((".dxf", ".dwg")):
             from app.services.cad.dxf_takeoff import (
-                dwg_to_dxf_bytes, dxf_to_png_b64, extract_from_dwg, extract_from_dxf,
+                dwg_to_dxf_bytes,
+                dxf_to_png_b64,
+                extract_from_dwg,
+                extract_from_dxf,
             )
             if low.endswith(".dwg"):
                 # DWG : extraction double (conversion minimale + complète réparée :
