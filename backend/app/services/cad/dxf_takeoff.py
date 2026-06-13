@@ -721,10 +721,20 @@ def extract_from_dwg(dwg_bytes: bytes, filename: str) -> dict | None:
 # Conversion DWG → DXF (LibreDWG)
 # ---------------------------------------------------------------------------
 # Versions DXF essayées par dwg2dxf. La sérialisation DXF de LibreDWG est
-# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre,
-# donc on convertit dans plusieurs versions et on retient celle qui se parse avec
-# le plus d'entités. None = version native du DWG.
-_DWG_VERSIONS: tuple[str | None, ...] = (None, "r2000", "r2013")
+# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre
+# (constaté : un DWG 2018 donne 0 entité en r2000 mais 6 en natif/r2013), donc on
+# convertit dans plusieurs versions et on retient celle qui se parse avec le plus
+# d'entités. None = version native du DWG. L'ordre place les cibles les plus
+# robustes en tête pour permettre une sortie anticipée (cf. dwg_to_dxf_bytes).
+_DWG_VERSIONS: tuple[str | None, ...] = (
+    None, "r2013", "r2018", "r2010", "r2007", "r2004", "r2000",
+)
+
+# Au-delà de ce nombre d'entités lisibles, on considère la conversion « franchement
+# bonne » et on arrête d'essayer d'autres versions (un vrai plan d'archi en compte
+# des centaines). En dessous, on explore toutes les cibles : c'est exactement le
+# cas des fichiers récalcitrants qu'on cherche à rattraper.
+_DWG_GOOD_ENOUGH = 50
 
 
 def _dxf_entity_count(dxf_bytes: bytes) -> int:
@@ -786,6 +796,11 @@ def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
         score = _dxf_entity_count(data)
         if score > best_score:
             best_score, best = score, data
+        # Sortie anticipée : dès qu'une version donne une géométrie franchement
+        # exploitable, inutile de convertir dans toutes les autres (rapide sur les
+        # plans normaux ; on n'épuise l'éventail que pour les fichiers difficiles).
+        if best_score >= _DWG_GOOD_ENOUGH:
+            break
     return best
 
 
