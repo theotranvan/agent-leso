@@ -162,6 +162,31 @@ def test_dxf_takeoff_unit():
     assert isinstance(r["surface_facade_brute_m2"], float)
 
 
+def test_detect_plan_type_accents_nfd():
+    """Noms de fichiers macOS (NFD, accents décomposés) — bug prod « Choulex ».
+
+    « Façade »/« étage » y sont stockés avec un caractère combinant séparé : sans
+    normalisation, le plan retombe en « autre » → façade non mesurée, étage exclu
+    de la SRE. On vérifie la classification sur les formes décomposées exactes.
+    """
+    import unicodedata
+
+    from app.services.cad.dxf_takeoff import detect_plan_type
+
+    def nfd(s: str) -> str:
+        return unicodedata.normalize("NFD", s)
+
+    assert detect_plan_type(nfd("Sud-ouest Façade.dwg")) == ("facade", "SO")
+    assert detect_plan_type(nfd("Nord-est Façade.dwg")) == ("facade", "NE")
+    assert detect_plan_type(nfd("1. 1er étage.dwg")) == ("etage", None)
+    assert detect_plan_type(nfd("2. Attique.dwg")) == ("etage", None)
+    assert detect_plan_type(nfd("0. Rez-de-chaussée.dwg")) == ("etage", None)
+    assert detect_plan_type(nfd("-1. Sous-sol.dwg")) == ("sous_sol", None)
+    assert detect_plan_type(nfd("3. Toiture.dwg")) == ("toiture", None)
+    # Forme composée (NFC) : doit toujours marcher aussi.
+    assert detect_plan_type("Sud-est Façade.dwg") == ("facade", "SE")
+
+
 class _CadQuery:
     """Renvoie un document CAO (DXF) pour le routage métrés."""
     def __getattr__(self, n):

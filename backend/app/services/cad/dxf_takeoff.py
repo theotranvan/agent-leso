@@ -30,6 +30,7 @@ import base64
 import logging
 import math
 import re
+import unicodedata
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
@@ -88,15 +89,26 @@ _PIECE_CHAUFFEE = re.compile(
 )
 
 
+def _strip_accents(s: str) -> str:
+    """Minuscule SANS diacritiques. Indispensable : les noms de fichiers issus de
+    macOS sont en forme décomposée (NFD) — « Façade » y est stocké « Fac◌̧ade »,
+    « étage » → « e◌́tage ». Un simple `"façade" in nom` échoue alors silencieusement
+    et le plan retombe en « autre » (façade non mesurée, étage exclu de la SRE).
+    On décompose puis on retire les marques combinantes pour comparer en ASCII.
+    """
+    nfkd = unicodedata.normalize("NFKD", (s or "").lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
 def detect_plan_type(filename: str) -> tuple[str, str | None]:
-    """(plan_type, orientation) déduits du nom de fichier."""
-    f = (filename or "").lower()
+    """(plan_type, orientation) déduits du nom de fichier (insensible aux accents)."""
+    f = _strip_accents(filename)
     orient = None
     for k, v in _ORIENTATIONS.items():
-        if k in f:
+        if _strip_accents(k) in f:
             orient = v
             break
-    if "façade" in f or "facade" in f or "elevation" in f or "élévation" in f:
+    if "facade" in f or "elevation" in f:
         return "facade", orient
     if "toiture" in f or "toit" in f or "roof" in f or "dach" in f:
         return "toiture", None
@@ -104,7 +116,7 @@ def detect_plan_type(filename: str) -> tuple[str, str | None]:
         return "coupe", None
     if "sous-sol" in f or "sous sol" in f or "ssol" in f or "cave" in f or "untergeschoss" in f:
         return "sous_sol", None
-    if "rez" in f or "étage" in f or "etage" in f or "attique" in f or "plan" in f or "niveau" in f or "geschoss" in f:
+    if "rez" in f or "etage" in f or "attique" in f or "plan" in f or "niveau" in f or "geschoss" in f:
         return "etage", None
     return "autre", orient
 
