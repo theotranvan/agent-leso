@@ -306,10 +306,30 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
         msp = doc.modelspace()
     except Exception:
         return None
-    return _extract_doc(doc, msp, filename)
+    return _extract_doc(doc, _geometry_entities(doc, msp), filename)
 
 
-def _extract_doc(doc, msp, filename: str) -> dict:
+def _geometry_entities(doc, msp) -> list:
+    """Entités porteuses de géométrie. Modelspace en priorité ; s'il est vide,
+    on bascule sur les présentations papier (layouts). Certains exports DWG/DXF
+    placent toute la géométrie en espace papier — sans ce repli, la planche
+    rendait « 0 entité » et était abandonnée (« DWG non converti »)."""
+    ents = list(msp)
+    if ents:
+        return ents
+    paper: list = []
+    try:
+        for name in doc.layout_names():
+            lay = doc.layout(name)
+            if lay is msp:
+                continue
+            paper.extend(lay)
+    except Exception:
+        pass
+    return paper or ents
+
+
+def _extract_doc(doc, entities, filename: str) -> dict:
     plan_type, orientation = detect_plan_type(filename)
     k = _unit_to_m(doc)
 
@@ -328,7 +348,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
     window_area = 0.0
     notes = []
 
-    for e in msp:
+    for e in entities:
         lyr = _layer_of(e)
         dt = e.dxftype()
 
@@ -450,7 +470,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
             if fxs:
                 out["remarques"] += " — gabarit mesuré sur le revêtement de façade"
             # Baies mesurées sur l'élévation (polylignes de menuiseries)
-            baies, nb = _baies_elevation(msp, k, (x0, y0, x1, y1))
+            baies, nb = _baies_elevation(entities, k, (x0, y0, x1, y1))
             if baies > 0:
                 out["surface_fenetres_m2"] = baies
                 out["remarques"] += f" — {nb} baie(s) mesurée(s) sur l'élévation"
@@ -459,7 +479,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
             elif window_count:
                 out["remarques"] += f" — {window_count} fenêtre(s) détectée(s), surface à confirmer"
             # Partie contre terre visible (ligne de terrain de l'élévation)
-            ct = _contre_terre_elevation(msp, k, (x0, y0, x1, y1))
+            ct = _contre_terre_elevation(entities, k, (x0, y0, x1, y1))
             if ct >= 0.5:
                 out["surface_facade_contre_terre_m2"] = ct
                 out["remarques"] += " — partie enterrée mesurée sous la ligne de terrain"
@@ -738,11 +758,21 @@ _DWG_GOOD_ENOUGH = 50
 
 
 def _dxf_entity_count(dxf_bytes: bytes) -> int:
-    """Nombre d'entités modelspace si ezdxf parse le DXF, sinon -1 (illisible)."""
+    """Nombre d'entités lisibles si ezdxf parse le DXF, sinon -1 (illisible).
+
+    On compte le modelspace ET les présentations papier : certains exports
+    placent la géométrie en espace papier, et la compter évite de rejeter une
+    conversion pourtant exploitable (cf. _geometry_entities)."""
     try:
         from ezdxf import recover
         doc, _ = recover.read(BytesIO(dxf_bytes))
-        return sum(1 for _ in doc.modelspace())
+        n = sum(1 for _ in doc.modelspace())
+        try:
+            for name in doc.layout_names():
+                n += sum(1 for _ in doc.layout(name))
+        except Exception:
+            pass
+        return n
     except Exception:
         return -1
 

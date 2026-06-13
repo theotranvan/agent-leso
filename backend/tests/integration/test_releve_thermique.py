@@ -187,6 +187,32 @@ def test_detect_plan_type_accents_nfd():
     assert detect_plan_type("Sud-est Façade.dwg") == ("facade", "SE")
 
 
+def test_geometry_in_paperspace_is_measured():
+    """Géométrie placée en ESPACE PAPIER (modelspace vide) — classe de panne
+    « 0 entité → DWG non converti ». Le repli sur les présentations doit
+    rattraper la planche au lieu de l'abandonner.
+    """
+    import io
+
+    import ezdxf
+
+    from app.services.cad.dxf_takeoff import extract_from_dxf
+
+    doc = ezdxf.new()
+    doc.header["$INSUNITS"] = 6  # m
+    doc.layers.add("111 - Toiture")
+    psp = doc.layout("Layout1")
+    psp.add_lwpolyline([(0, 0), (8, 0), (8, 5), (0, 5)], close=True,
+                       dxfattribs={"layer": "111 - Toiture"})
+    s = io.StringIO()
+    doc.write(s)
+
+    assert sum(1 for _ in doc.modelspace()) == 0  # rien en modelspace
+    r = extract_from_dxf(s.getvalue().encode("utf-8"), "3. Toiture.dwg")
+    assert r["plan_type"] == "toiture"
+    assert r["surface_toiture_m2"] == 40.0  # 8 × 5, lu en espace papier
+
+
 class _CadQuery:
     """Renvoie un document CAO (DXF) pour le routage métrés."""
     def __getattr__(self, n):
