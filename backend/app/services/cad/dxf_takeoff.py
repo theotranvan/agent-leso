@@ -30,6 +30,7 @@ import base64
 import logging
 import math
 import re
+import unicodedata
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
@@ -88,15 +89,26 @@ _PIECE_CHAUFFEE = re.compile(
 )
 
 
+def _strip_accents(s: str) -> str:
+    """Minuscule SANS diacritiques. Indispensable : les noms de fichiers issus de
+    macOS sont en forme décomposée (NFD) — « Façade » y est stocké « Fac◌̧ade »,
+    « étage » → « e◌́tage ». Un simple `"façade" in nom` échoue alors silencieusement
+    et le plan retombe en « autre » (façade non mesurée, étage exclu de la SRE).
+    On décompose puis on retire les marques combinantes pour comparer en ASCII.
+    """
+    nfkd = unicodedata.normalize("NFKD", (s or "").lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
 def detect_plan_type(filename: str) -> tuple[str, str | None]:
-    """(plan_type, orientation) déduits du nom de fichier."""
-    f = (filename or "").lower()
+    """(plan_type, orientation) déduits du nom de fichier (insensible aux accents)."""
+    f = _strip_accents(filename)
     orient = None
     for k, v in _ORIENTATIONS.items():
-        if k in f:
+        if _strip_accents(k) in f:
             orient = v
             break
-    if "façade" in f or "facade" in f or "elevation" in f or "élévation" in f:
+    if "facade" in f or "elevation" in f:
         return "facade", orient
     if "toiture" in f or "toit" in f or "roof" in f or "dach" in f:
         return "toiture", None
@@ -104,7 +116,7 @@ def detect_plan_type(filename: str) -> tuple[str, str | None]:
         return "coupe", None
     if "sous-sol" in f or "sous sol" in f or "ssol" in f or "cave" in f or "untergeschoss" in f:
         return "sous_sol", None
-    if "rez" in f or "étage" in f or "etage" in f or "attique" in f or "plan" in f or "niveau" in f or "geschoss" in f:
+    if "rez" in f or "etage" in f or "attique" in f or "plan" in f or "niveau" in f or "geschoss" in f:
         return "etage", None
     return "autre", orient
 
@@ -294,10 +306,30 @@ def extract_from_dxf(dxf_bytes: bytes, filename: str) -> dict | None:
         msp = doc.modelspace()
     except Exception:
         return None
-    return _extract_doc(doc, msp, filename)
+    return _extract_doc(doc, _geometry_entities(doc, msp), filename)
 
 
-def _extract_doc(doc, msp, filename: str) -> dict:
+def _geometry_entities(doc, msp) -> list:
+    """Entités porteuses de géométrie. Modelspace en priorité ; s'il est vide,
+    on bascule sur les présentations papier (layouts). Certains exports DWG/DXF
+    placent toute la géométrie en espace papier — sans ce repli, la planche
+    rendait « 0 entité » et était abandonnée (« DWG non converti »)."""
+    ents = list(msp)
+    if ents:
+        return ents
+    paper: list = []
+    try:
+        for name in doc.layout_names():
+            lay = doc.layout(name)
+            if lay is msp:
+                continue
+            paper.extend(lay)
+    except Exception:
+        pass
+    return paper or ents
+
+
+def _extract_doc(doc, entities, filename: str) -> dict:
     plan_type, orientation = detect_plan_type(filename)
     k = _unit_to_m(doc)
 
@@ -316,7 +348,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
     window_area = 0.0
     notes = []
 
-    for e in msp:
+    for e in entities:
         lyr = _layer_of(e)
         dt = e.dxftype()
 
@@ -438,7 +470,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
             if fxs:
                 out["remarques"] += " — gabarit mesuré sur le revêtement de façade"
             # Baies mesurées sur l'élévation (polylignes de menuiseries)
-            baies, nb = _baies_elevation(msp, k, (x0, y0, x1, y1))
+            baies, nb = _baies_elevation(entities, k, (x0, y0, x1, y1))
             if baies > 0:
                 out["surface_fenetres_m2"] = baies
                 out["remarques"] += f" — {nb} baie(s) mesurée(s) sur l'élévation"
@@ -447,7 +479,7 @@ def _extract_doc(doc, msp, filename: str) -> dict:
             elif window_count:
                 out["remarques"] += f" — {window_count} fenêtre(s) détectée(s), surface à confirmer"
             # Partie contre terre visible (ligne de terrain de l'élévation)
-            ct = _contre_terre_elevation(msp, k, (x0, y0, x1, y1))
+            ct = _contre_terre_elevation(entities, k, (x0, y0, x1, y1))
             if ct >= 0.5:
                 out["surface_facade_contre_terre_m2"] = ct
                 out["remarques"] += " — partie enterrée mesurée sous la ligne de terrain"
@@ -709,18 +741,38 @@ def extract_from_dwg(dwg_bytes: bytes, filename: str) -> dict | None:
 # Conversion DWG → DXF (LibreDWG)
 # ---------------------------------------------------------------------------
 # Versions DXF essayées par dwg2dxf. La sérialisation DXF de LibreDWG est
-# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre,
-# donc on convertit dans plusieurs versions et on retient celle qui se parse avec
-# le plus d'entités. None = version native du DWG.
-_DWG_VERSIONS: tuple[str | None, ...] = (None, "r2000", "r2013")
+# inégale selon la version cible ; la « meilleure » varie d'un fichier à l'autre
+# (constaté : un DWG 2018 donne 0 entité en r2000 mais 6 en natif/r2013), donc on
+# convertit dans plusieurs versions et on retient celle qui se parse avec le plus
+# d'entités. None = version native du DWG. L'ordre place les cibles les plus
+# robustes en tête pour permettre une sortie anticipée (cf. dwg_to_dxf_bytes).
+_DWG_VERSIONS: tuple[str | None, ...] = (
+    None, "r2013", "r2018", "r2010", "r2007", "r2004", "r2000",
+)
+
+# Au-delà de ce nombre d'entités lisibles, on considère la conversion « franchement
+# bonne » et on arrête d'essayer d'autres versions (un vrai plan d'archi en compte
+# des centaines). En dessous, on explore toutes les cibles : c'est exactement le
+# cas des fichiers récalcitrants qu'on cherche à rattraper.
+_DWG_GOOD_ENOUGH = 50
 
 
 def _dxf_entity_count(dxf_bytes: bytes) -> int:
-    """Nombre d'entités modelspace si ezdxf parse le DXF, sinon -1 (illisible)."""
+    """Nombre d'entités lisibles si ezdxf parse le DXF, sinon -1 (illisible).
+
+    On compte le modelspace ET les présentations papier : certains exports
+    placent la géométrie en espace papier, et la compter évite de rejeter une
+    conversion pourtant exploitable (cf. _geometry_entities)."""
     try:
         from ezdxf import recover
         doc, _ = recover.read(BytesIO(dxf_bytes))
-        return sum(1 for _ in doc.modelspace())
+        n = sum(1 for _ in doc.modelspace())
+        try:
+            for name in doc.layout_names():
+                n += sum(1 for _ in doc.layout(name))
+        except Exception:
+            pass
+        return n
     except Exception:
         return -1
 
@@ -774,6 +826,11 @@ def dwg_to_dxf_bytes(dwg_bytes: bytes) -> bytes | None:
         score = _dxf_entity_count(data)
         if score > best_score:
             best_score, best = score, data
+        # Sortie anticipée : dès qu'une version donne une géométrie franchement
+        # exploitable, inutile de convertir dans toutes les autres (rapide sur les
+        # plans normaux ; on n'épuise l'éventail que pour les fichiers difficiles).
+        if best_score >= _DWG_GOOD_ENOUGH:
+            break
     return best
 
 
